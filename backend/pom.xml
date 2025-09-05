@@ -6,12 +6,25 @@
   <groupId>com.aerolineas</groupId>
   <artifactId>aerolineas-backend</artifactId>
   <version>1.0.0</version>
+  <name>Aerolineas Backend</name>
+  <description>API backend con Javalin y Oracle</description>
   <packaging>jar</packaging>
 
   <properties>
     <java.version>17</java.version>
-    <maven.compiler.release>${java.version}</maven.compiler.release>
+    <maven.compiler.release>${java.version}</maven.compiler.release>  
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <javalin.version>6.2.0</javalin.version>
+    <hikari.version>5.1.0</hikari.version>
+    <ojdbc.version>23.4.0.24.05</ojdbc.version>
+    <dotenv.version>3.0.0</dotenv.version>
+    <slf4j.version>2.0.13</slf4j.version>
+    <jackson.version>2.17.1</jackson.version>
+
+    <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
+    <exec-maven-plugin.version>3.2.0</exec-maven-plugin.version>
+    <maven-shade-plugin.version>3.5.0</maven-shade-plugin.version>
   </properties>
 
   <dependencies>
@@ -19,35 +32,47 @@
     <dependency>
       <groupId>io.javalin</groupId>
       <artifactId>javalin</artifactId>
-      <version>6.2.0</version>
+      <version>${javalin.version}</version>
     </dependency>
 
-    <!-- HikariCP (pool) -->
+    <!-- Pool de conexiones -->
     <dependency>
       <groupId>com.zaxxer</groupId>
       <artifactId>HikariCP</artifactId>
-      <version>5.1.0</version>
+      <version>${hikari.version}</version>
     </dependency>
 
-    <!-- Oracle JDBC driver -->
+    <!-- Oracle JDBC (para Java 11+) -->
     <dependency>
       <groupId>com.oracle.database.jdbc</groupId>
-      <artifactId>ojdbc8</artifactId>
-      <version>23.4.0.24.05</version>
+      <artifactId>ojdbc11</artifactId>
+      <version>${ojdbc.version}</version>
     </dependency>
 
-    <!-- Dotenv (variables .env) -->
+    <!-- Variables de entorno (.env) -->
     <dependency>
       <groupId>io.github.cdimascio</groupId>
       <artifactId>dotenv-java</artifactId>
-      <version>3.0.0</version>
+      <version>${dotenv.version}</version>
     </dependency>
 
-    <!-- Logs simples -->
+    <!-- Logging simple -->
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-simple</artifactId>
-      <version>2.0.13</version>
+      <version>${slf4j.version}</version>
+    </dependency>
+
+    <!-- JSON (Jackson) -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.datatype</groupId>
+      <artifactId>jackson-datatype-jsr310</artifactId>
+      <version>${jackson.version}</version>
     </dependency>
   </dependencies>
 
@@ -57,27 +82,27 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.11.0</version>
+        <version>${maven-compiler-plugin.version}</version>
         <configuration>
           <release>${java.version}</release>
         </configuration>
       </plugin>
 
-      <!-- Ejecutar en dev: mvn exec:java -Dexec.mainClass=com.aerolineas.App -->
+      <!-- Ejecutar en desarrollo: mvn exec:java -Dexec.mainClass=com.aerolineas.App -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
-        <version>3.2.0</version>
+        <version>${exec-maven-plugin.version}</version>
         <configuration>
           <mainClass>com.aerolineas.App</mainClass>
         </configuration>
       </plugin>
 
-      <!-- Empacar uber-jar con dependencias -->
+      <!-- Empaquetar un uber-jar con dependencias -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>3.5.0</version>
+        <version>${maven-shade-plugin.version}</version>
         <executions>
           <execution>
             <phase>package</phase>

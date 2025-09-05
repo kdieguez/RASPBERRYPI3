@@ -1,0 +1,91 @@
+package com.aerolineas.dao;
+
+import com.aerolineas.config.DB;
+import com.aerolineas.dto.CiudadDTOs;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class CiudadDAO {
+
+    public long create(CiudadDTOs.Create dto) throws Exception {
+        if (dto == null || dto.nombre() == null || dto.nombre().isBlank())
+            throw new IllegalArgumentException("El nombre de la ciudad es requerido.");
+
+        try (Connection cn = DB.getConnection()) {
+            if (!existePais(cn, dto.idPais()))
+                throw new IllegalArgumentException("El país indicado no existe.");
+
+            if (existeCiudadEnPais(cn, dto.idPais(), dto.nombre()))
+                throw new IllegalArgumentException("Ya existe una ciudad con ese nombre en el país.");
+
+            String sql = "INSERT INTO CIUDAD (ID_PAIS, NOMBRE, ACTIVO) VALUES (?,?,1)";
+            try (PreparedStatement ps = cn.prepareStatement(sql, new String[]{"ID_CIUDAD"})) {
+                ps.setLong(1, dto.idPais());
+                ps.setString(2, dto.nombre().trim());
+                ps.executeUpdate();
+
+                try (ResultSet rs = ps.getGeneratedKeys()) {
+                    if (rs.next()) return rs.getLong(1);
+                    throw new SQLException("No se generó ID_CIUDAD");
+                }
+            }
+        }
+    }
+
+    public List<CiudadDTOs.View> listAll(Long idPais) throws Exception {
+        String base = """
+            SELECT c.ID_CIUDAD, c.ID_PAIS, p.NOMBRE AS PAIS, c.NOMBRE, NVL(c.ACTIVO,1) AS ACTIVO
+            FROM CIUDAD c JOIN PAIS p ON p.ID_PAIS = c.ID_PAIS
+            """;
+        String order = " ORDER BY p.NOMBRE, c.NOMBRE";
+
+        try (Connection cn = DB.getConnection();
+             PreparedStatement ps = (idPais == null)
+                     ? cn.prepareStatement(base + order)
+                     : cn.prepareStatement(base + " WHERE c.ID_PAIS=? " + order)) {
+            if (idPais != null) ps.setLong(1, idPais);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<CiudadDTOs.View> out = new ArrayList<>();
+                while (rs.next()) {
+                    out.add(new CiudadDTOs.View(
+                            rs.getLong("ID_CIUDAD"),
+                            rs.getLong("ID_PAIS"),
+                            rs.getString("PAIS"),
+                            rs.getString("NOMBRE"),
+                            rs.getInt("ACTIVO") == 1
+                    ));
+                }
+                return out;
+            }
+        }
+    }
+
+    public void toggleActiva(long idCiudad) throws Exception {
+        String sql = "UPDATE CIUDAD SET ACTIVO = CASE WHEN NVL(ACTIVO,1)=1 THEN 0 ELSE 1 END WHERE ID_CIUDAD=?";
+        try (Connection cn = DB.getConnection(); PreparedStatement ps = cn.prepareStatement(sql)) {
+            ps.setLong(1, idCiudad);
+            int n = ps.executeUpdate();
+            if (n == 0) throw new IllegalArgumentException("Ciudad no encontrada.");
+        }
+    }
+
+    // ===== Helpers =====
+    private boolean existePais(Connection cn, long idPais) throws Exception {
+        String sql = "SELECT 1 FROM PAIS WHERE ID_PAIS=?";
+        try (PreparedStatement ps = cn.prepareStatement(sql)) {
+            ps.setLong(1, idPais);
+            try (ResultSet rs = ps.executeQuery()) { return rs.next(); }
+        }
+    }
+
+    private boolean existeCiudadEnPais(Connection cn, long idPais, String nombre) throws Exception {
+        String sql = "SELECT 1 FROM CIUDAD WHERE ID_PAIS=? AND UPPER(NOMBRE)=UPPER(?)";
+        try (PreparedStatement ps = cn.prepareStatement(sql)) {
+            ps.setLong(1, idPais);
+            ps.setString(2, nombre.trim());
+            try (ResultSet rs = ps.executeQuery()) { return rs.next(); }
+        }
+    }
+}
