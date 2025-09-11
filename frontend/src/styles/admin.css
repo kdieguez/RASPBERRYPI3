@@ -1,0 +1,13 @@
+/* src/admin/admin.css */
+.admin-shell { min-height: 100vh; display: grid; grid-template-rows: 56px 1fr; }
+.admin-topbar { display:flex; align-items:center; gap:12px; padding:0 16px; border-bottom:1px solid #e5e7eb; background:#fff; }
+.admin-topbar .brand { font-weight:800; color:#0f172a; text-decoration:none; }
+.admin-topbar .spacer { flex:1; }
+.admin-topbar .btn { border:0; background:#e11d48; color:#fff; border-radius:10px; padding:8px 12px; font-weight:700; cursor:pointer; }
+
+.admin-body { display:grid; grid-template-columns: 220px 1fr; min-height: 0; }
+.admin-aside { border-right:1px solid #e5e7eb; padding:16px; background:#fafafa; }
+.admin-aside .item { display:block; padding:10px 12px; border-radius:10px; color:#0f172a; text-decoration:none; font-weight:600; }
+.admin-aside .item:hover { background:#eef2ff; }
+
+.admin-content { padding:20px; }

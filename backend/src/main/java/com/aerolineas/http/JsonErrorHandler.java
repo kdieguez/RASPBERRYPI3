@@ -1,6 +1,5 @@
 package com.aerolineas.http;
 
-import io.javalin.http.Context;
 import io.javalin.http.ExceptionHandler;
 
 public class JsonErrorHandler {

@@ -24,7 +24,6 @@ public final class Auth {
     };
   }
 
-  /** Helper para leer claims donde los necesites */
   @SuppressWarnings("unchecked")
   public static Map<String,Object> claims(Context ctx) {
     Object raw = ctx.attribute("claims");
@@ -32,7 +31,6 @@ public final class Auth {
     return null;
   }
 
-  // ----------------- privados -----------------
   private static Map<String,Object> parseAndAttach(Context ctx) {
     String auth = ctx.header("Authorization");
     if (auth == null || !auth.startsWith("Bearer ")) {

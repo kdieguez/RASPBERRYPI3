@@ -6,16 +6,20 @@ import com.aerolineas.dto.AuthDTOs.LoginResponse;
 import com.aerolineas.dto.AuthDTOs.RegisterRequest;
 import com.aerolineas.dto.AuthDTOs.UserView;
 import com.aerolineas.model.Usuario;
+import com.aerolineas.util.CaptchaUtil;
 import com.aerolineas.util.JwtUtil;
 import com.aerolineas.util.PasswordUtil;
 import io.javalin.http.Context;
-import com.aerolineas.util.CaptchaUtil;
 
 import java.util.Map;
 
 public class AuthController {
 
   private final UsuarioDAO usuarios = new UsuarioDAO();
+
+  private static String normEmail(String e) {
+    return e == null ? null : e.trim().toLowerCase();
+  }
 
   private long expSeconds() {
     return Long.parseLong(System.getenv().getOrDefault("JWT_EXP_MIN", "120")) * 60L;
@@ -39,13 +43,15 @@ public class AuthController {
         .check(b -> CaptchaUtil.verify(b.captchaToken()), "captcha inválido")
         .get();
 
-    if (usuarios.findByEmail(body.email()) != null) {
+    final String email = normEmail(body.email());
+
+    if (usuarios.findByEmail(email) != null) {
       ctx.status(409).json(Map.of("error", "email ya registrado"));
       return;
     }
 
     String hash = PasswordUtil.hash(body.password());
-    Usuario u = usuarios.create(body.email(), hash, body.nombres(), body.apellidos());
+    Usuario u = usuarios.create(email, hash, body.nombres().trim(), body.apellidos().trim());
 
     UserView view = new UserView(
         u.getIdUsuario(), u.getEmail(), u.getNombres(), u.getApellidos(), u.getIdRol()
@@ -61,7 +67,9 @@ public class AuthController {
         .check(b -> b.password() != null && !b.password().isBlank(), "password requerido")
         .get();
 
-    Usuario u = usuarios.findByEmail(body.email());
+    final String email = normEmail(body.email());
+    Usuario u = usuarios.findByEmail(email);
+
     if (u == null || !u.isHabilitado() || !PasswordUtil.verify(body.password(), u.getContrasenaHash())) {
       ctx.status(401).json(Map.of("error", "credenciales no válidas"));
       return;
@@ -76,8 +84,7 @@ public class AuthController {
   }
 
   public void me(Context ctx) {
-    @SuppressWarnings("unchecked")
-    Map<String, Object> claims = ctx.attribute("claims");
+    Map<String, Object> claims = ctx.<Map<String, Object>>attribute("claims");
     if (claims == null) {
       ctx.status(401).json(Map.of("error", "no autenticado"));
       return;

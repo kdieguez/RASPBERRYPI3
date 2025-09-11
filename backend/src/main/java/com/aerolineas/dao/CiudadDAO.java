@@ -71,7 +71,6 @@ public class CiudadDAO {
         }
     }
 
-    // ===== Helpers =====
     private boolean existePais(Connection cn, long idPais) throws Exception {
         String sql = "SELECT 1 FROM PAIS WHERE ID_PAIS=?";
         try (PreparedStatement ps = cn.prepareStatement(sql)) {

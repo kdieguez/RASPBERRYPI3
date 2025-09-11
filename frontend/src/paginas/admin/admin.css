@@ -1,0 +1,30 @@
+.admin .admin__header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 24px 0 12px;
+}
+.admin .admin__search{ 
+  display:flex; 
+  gap:8px; 
+}
+
+.admin .btn{ 
+  padding:10px 14px; 
+  border-radius:10px; 
+  border:1px solid #e5e7eb; 
+  background:#fff; 
+  cursor:pointer; }
+
+  .admin .table-wrap{ 
+  overflow:auto; 
+}
+
+.admin .table{ 
+  width:100%; 
+  border-collapse: collapse; 
+}
+
+.admin .table th, .admin .table td{ 
+  border-bottom:1px solid #e5e7eb; 
+  padding:10px 8px; 
+  text-align:left; 
+}

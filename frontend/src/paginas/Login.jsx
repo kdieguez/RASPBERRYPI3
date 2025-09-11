@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import axios from "../lib/axios";             
 import "../styles/login.css";
-
-const API = import.meta.env.VITE_API_URL || "http://localhost:8080";
+import { saveAuth } from "../lib/auth";
 
 export default function Login() {
   const nav = useNavigate();
@@ -17,14 +16,11 @@ export default function Login() {
 
   const submit = async (e) => {
     e.preventDefault();
-    setErr(""); setLoading(true);
+    setErr("");
+    setLoading(true);
     try {
-      const { data } = await axios.post(`${API}/api/auth/login`, form);
-
-      localStorage.setItem("auth.token", data.token);
-      localStorage.setItem("auth.user", JSON.stringify(data.user));
-      localStorage.setItem("auth.expiresAt", String(Date.now() + data.expires_in * 1000));
-
+      const { data } = await axios.post("/api/auth/login", form);
+      saveAuth({ token: data.token, user: data.user, expiresInSec: data.expires_in });
       nav("/");
     } catch (e2) {
       const msg = e2?.response?.status === 401
@@ -63,11 +59,7 @@ export default function Login() {
               value={form.password}
               onChange={(e)=>onChange("password", e.target.value)}
             />
-            <button
-              type="button"
-              className="toggle"
-              onClick={()=>setShowPass(s=>!s)}
-            >
+            <button type="button" className="toggle" onClick={()=>setShowPass(s=>!s)}>
               {showPass ? "Ocultar" : "Mostrar"}
             </button>
           </div>
@@ -80,7 +72,7 @@ export default function Login() {
         </form>
 
         <p className="muted">
-          ¿No tienes cuenta? <Link to="/register">Crear cuenta</Link>
+          ¿No tienes cuenta? <Link to="/registro">Crear cuenta</Link>
         </p>
       </div>
     </div>

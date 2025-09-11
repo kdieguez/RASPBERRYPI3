@@ -18,7 +18,6 @@ public class CiudadController {
             ctx.json(dao.listAll(idPais));
         });
 
-        // Admin: crear ciudad y toggle activo
         app.before("/api/v1/ciudades", Auth.adminOrEmpleado());
         app.before("/api/v1/ciudades/*", Auth.adminOrEmpleado());
 
