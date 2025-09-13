@@ -9,6 +9,12 @@ import UsuariosList from "./paginas/admin/UsuariosList";
 import UsuarioEdit from "./paginas/admin/UsuarioEdit";
 import "./styles/home.css";
 import VueloNuevo from "./paginas/admin/VueloNuevo";
+import AdminPaises from "./paginas/admin/Paises";
+import AdminCiudades from "./paginas/admin/Ciudades";
+import AdminRutas from "./paginas/admin/Rutas";
+import VuelosCatalogo from "./paginas/VuelosCatalogo";
+import VueloEdit from "./paginas/admin/VueloEdit";
+import AdminVuelosList from "./paginas/admin/AdminVuelosList";
 
 function Home() {
   return (
@@ -29,12 +35,18 @@ export default function App() {
           <Route path="/registro" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/perfil" element={<Perfil />} />
+          <Route path="/vuelos" element={<VuelosCatalogo/>} />
 
           {/* Rutas admin */}
           <Route element={<ProtectedRoute allowRoles={[1]} />}>
             <Route path="/admin/vuelos/nuevo" element={<VueloNuevo />} />
             <Route path="/admin/usuarios" element={<UsuariosList />} />
             <Route path="/admin/usuarios/:id" element={<UsuarioEdit />} />
+            <Route path="/admin/paises" element={<AdminPaises />} />
+            <Route path="/admin/ciudades" element={<AdminCiudades />} />
+            <Route path="/admin/rutas" element={<AdminRutas />} />
+            <Route path="/admin/vuelos" element={<AdminVuelosList />} />
+            <Route path="/admin/vuelos/:id" element={<VueloEdit />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

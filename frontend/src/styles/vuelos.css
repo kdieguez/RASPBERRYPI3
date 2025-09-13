@@ -1,0 +1,15 @@
+.pag-vuelo{ padding:28px 0 40px; }
+.block-title{ margin:6px 0 8px; color:#0f172a; }
+.check{ display:inline-flex; gap:8px; align-items:center; font-weight:600; color:#334155; }
+.clase{ border:1px solid #e5e7eb; border-radius:12px; padding:12px; }
+.clase.off{ opacity:.65; }
+
+.grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.grid-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+@media (max-width:760px){ .grid-2,.grid-3{ grid-template-columns:1fr; } }
+
+.input-readonly[readonly]{
+  background:#f8fafc;
+  color:#0f172a;
+  cursor:not-allowed;
+}

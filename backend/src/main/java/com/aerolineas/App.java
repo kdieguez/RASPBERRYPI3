@@ -35,6 +35,12 @@ public class App {
 
   public static void main(String[] args) {
     var app = Javalin.create(cfg -> cfg.http.defaultContentType = "application/json").start(8080);
+    app.exception(IllegalArgumentException.class, (e, ctx) -> {
+      ctx.status(400).json(Map.of("error", e.getMessage()));
+    });
+    app.exception(Exception.class, (e, ctx) -> {
+      ctx.status(500).json(Map.of("error", e.getMessage() == null ? "Error interno" : e.getMessage()));
+    });
 
     DB.init();
 
@@ -66,5 +72,6 @@ public class App {
     new CiudadController().routes(app);
     new RutaController().routes(app);
     new VueloController().routes(app);
+    new ClaseController().routes(app);
   }
 }

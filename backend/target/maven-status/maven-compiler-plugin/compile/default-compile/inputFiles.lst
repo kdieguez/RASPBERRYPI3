@@ -1,6 +1,7 @@
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\AuthController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\model\Usuario.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\PasajeroDAO.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\ClaseController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\UsuarioDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\util\JwtUtil.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\AdminUsuarioController.java
@@ -22,8 +23,10 @@ C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\CiudadController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\config\DB.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\util\EstadosVuelo.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\ClaseDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\PaisDTOs.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\CiudadDTOs.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\ClaseDTOs.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\App.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\PaisDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\UsuarioAdminDTOs.java

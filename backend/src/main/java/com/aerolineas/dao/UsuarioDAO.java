@@ -3,6 +3,7 @@ package com.aerolineas.dao;
 import com.aerolineas.config.DB;
 import com.aerolineas.model.Usuario;
 import com.aerolineas.dto.UsuarioAdminDTOs;
+import com.aerolineas.dto.VueloDTO;
 import com.aerolineas.util.PasswordUtil;
 
 import java.sql.*;
@@ -283,6 +284,138 @@ public class UsuarioDAO {
             ps.setString(3, dto.pasaporte());
             ps.setLong(4, id);
             ps.executeUpdate();
+          }
+        }
+
+        cn.commit();
+      } catch (Exception e) {
+        cn.rollback();
+        throw e;
+      } finally {
+        cn.setAutoCommit(true);
+      }
+    }
+  }
+
+  public VueloDTO.View obtenerVuelo(long id) throws Exception {
+    String sql = """
+        SELECT v.ID_VUELO, v.CODIGO, v.ID_RUTA, v.FECHA_SALIDA, v.FECHA_LLEGADA, v.ACTIVO,
+               sc.ID_CLASE, sc.CUPO_TOTAL, sc.PRECIO
+        FROM VUELO v
+        LEFT JOIN SALIDA_CLASE sc ON v.ID_VUELO = sc.ID_VUELO
+        WHERE v.ID_VUELO = ?
+        """;
+
+    VueloDTO.View view = null;
+    List<VueloDTO.ClaseConfig> clases = new ArrayList<>();
+    List<VueloDTO.EscalaView> escalas = new ArrayList<>();
+
+    try (Connection cn = DB.getConnection();
+         PreparedStatement ps = cn.prepareStatement(sql)) {
+      ps.setLong(1, id);
+      try (ResultSet rs = ps.executeQuery()) {
+        while (rs.next()) {
+          if (view == null) {
+            view = new VueloDTO.View(
+                rs.getLong("ID_VUELO"),
+                rs.getString("CODIGO"),
+                rs.getLong("ID_RUTA"),
+                rs.getTimestamp("FECHA_SALIDA").toLocalDateTime(),
+                rs.getTimestamp("FECHA_LLEGADA").toLocalDateTime(),
+                rs.getInt("ACTIVO") == 1,
+                clases,
+                escalas
+            );
+          }
+          int idClase = rs.getInt("ID_CLASE");
+          if (!rs.wasNull()) {
+            clases.add(new VueloDTO.ClaseConfig(
+                idClase,
+                rs.getInt("CUPO_TOTAL"),
+                rs.getDouble("PRECIO")));
+          }
+        }
+      }
+    }
+    if (view == null) return null;
+
+    String sqlEsc = """
+        SELECT ve.ID_CIUDAD, c.NOMBRE AS CIUDAD, p.NOMBRE AS PAIS,
+               ve.LLEGADA, ve.SALIDA
+        FROM VUELO_ESCALA ve
+        JOIN CIUDAD c ON c.ID_CIUDAD = ve.ID_CIUDAD
+        JOIN PAIS p ON p.ID_PAIS = c.ID_PAIS
+        WHERE ve.ID_VUELO = ?
+        """;
+    try (Connection cn = DB.getConnection();
+         PreparedStatement ps = cn.prepareStatement(sqlEsc)) {
+      ps.setLong(1, id);
+      try (ResultSet rs = ps.executeQuery()) {
+        while (rs.next()) {
+          escalas.add(new VueloDTO.EscalaView(
+              rs.getLong("ID_CIUDAD"),
+              rs.getString("CIUDAD"),
+              rs.getString("PAIS"),
+              rs.getTimestamp("LLEGADA").toLocalDateTime(),
+              rs.getTimestamp("SALIDA").toLocalDateTime()
+          ));
+        }
+      }
+    }
+    return view;
+  }
+
+  public void actualizarVueloAdmin(long idVuelo, VueloDTO.UpdateAdmin dto) throws Exception {
+    try (Connection cn = DB.getConnection()) {
+      cn.setAutoCommit(false);
+      try {
+        String up = "UPDATE VUELO SET CODIGO=?, ID_RUTA=?, FECHA_SALIDA=?, FECHA_LLEGADA=?, ACTIVO=? WHERE ID_VUELO=?";
+        try (PreparedStatement ps = cn.prepareStatement(up)) {
+          ps.setString(1, dto.codigo().trim());
+          ps.setLong(2, dto.idRuta());
+          ps.setTimestamp(3, Timestamp.valueOf(dto.fechaSalida()));
+          ps.setTimestamp(4, Timestamp.valueOf(dto.fechaLlegada()));
+          ps.setInt(5, (dto.activo()!=null && dto.activo()) ? 1 : 0);
+          ps.setLong(6, idVuelo);
+          int n = ps.executeUpdate();
+          if (n == 0) throw new SQLException("Vuelo no existe: " + idVuelo);
+        }
+
+        // Reemplazar clases
+        try (PreparedStatement del = cn.prepareStatement("DELETE FROM SALIDA_CLASE WHERE ID_VUELO=?")) {
+          del.setLong(1, idVuelo);
+          del.executeUpdate();
+        }
+        if (dto.clases() != null) {
+          for (VueloDTO.ClaseConfig c : dto.clases()) {
+            try (PreparedStatement ins = cn.prepareStatement(
+                "INSERT INTO SALIDA_CLASE (ID_VUELO, ID_CLASE, CUPO_TOTAL, PRECIO) VALUES (?,?,?,?)")) {
+              ins.setLong(1, idVuelo);
+              ins.setInt(2, c.idClase());
+              ins.setInt(3, c.cupoTotal());
+              ins.setDouble(4, c.precio());
+              ins.executeUpdate();
+            }
+          }
+        }
+
+        // Reemplazar escala (0..1)
+        try (PreparedStatement delE = cn.prepareStatement("DELETE FROM VUELO_ESCALA WHERE ID_VUELO=?")) {
+          delE.setLong(1, idVuelo);
+          delE.executeUpdate();
+        }
+        if (dto.escalas()!=null && !dto.escalas().isEmpty()) {
+          if (dto.escalas().size() > 1) throw new SQLException("Solo se permite 1 escala por vuelo");
+          var e = dto.escalas().get(0);
+          if (e.llegada().isAfter(e.salida()))
+            throw new SQLException("La hora de SALIDA de la escala debe ser >= LLEGADA");
+          try (PreparedStatement insE = cn.prepareStatement(
+              "INSERT INTO VUELO_ESCALA (ID_VUELO, ID_CIUDAD, LLEGADA, SALIDA) VALUES (?,?,?,?)")) {
+            insE.setLong(1, idVuelo);
+            insE.setLong(2, e.idCiudad());
+            insE.setTimestamp(3, Timestamp.valueOf(e.llegada()));
+            insE.setTimestamp(4, Timestamp.valueOf(e.salida()));
+            insE.executeUpdate();
           }
         }
 

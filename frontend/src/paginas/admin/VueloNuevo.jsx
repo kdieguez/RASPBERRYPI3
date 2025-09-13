@@ -1,73 +1,73 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import axios from "../../lib/axios";
-import "../../styles/adminVuelos.css";
+import { rutasApi, paisesApi, ciudadesApi, clasesApi, vuelosApi } from "../../api/adminCatalogos";
+import AdminNav from "./AdminNav";
+import "../../styles/vuelos.css";
 
-const CLASES = [
-  { idClase: 1, nombre: "Económica" },
-  { idClase: 2, nombre: "Ejecutiva" },
-  { idClase: 3, nombre: "Primera"  },
-];
+const ensureSeconds = (s) => (!s ? null : (s.length === 16 ? `${s}:00` : s));
 
-const toIso = (v) => {
-  if (!v) return null;
-  return v.length === 16 ? `${v}:00` : v; 
+const genFlightCode = () => {
+  const L = "ABCDEFGHJKMNPQRSTUVWXYZ"; 
+  const D = "0123456789";
+  const pick = (str) => str[Math.floor(Math.random() * str.length)];
+  return `AR${pick(L)}${pick(D)}${pick(L)}${pick(D)}`;
 };
 
-export default function VueloNuevo(){
-  const nav = useNavigate();
-
-  const [loading, setLoading] = useState(true);
-  const [saving,  setSaving] = useState(false);
-  const [err, setErr] = useState("");
-  const [ok, setOk] = useState(false);
-
-  const [rutas, setRutas] = useState([]);
-  const [ciudades,setCiudades]= useState([]);
-
+export default function VueloNuevo() {
   const [codigo, setCodigo] = useState("");
   const [idRuta, setIdRuta] = useState("");
-  const [salida, setSalida] = useState("");   
-  const [llegada,setLlegada]= useState("");   
+  const [salida, setSalida] = useState("");
+  const [llegada, setLlegada] = useState("");
 
-  const [clases, setClases] = useState(
-    CLASES.map(c => ({ ...c, enabled: true, cupoTotal: "", precio: "" }))
-  );
+  const [isRoundTrip, setIsRoundTrip] = useState(false);
+  const [codigoR, setCodigoR] = useState("");
+  const [idRutaR, setIdRutaR] = useState("");
+  const [salidaR, setSalidaR] = useState("");
+  const [llegadaR, setLlegadaR] = useState("");
 
-  const [usarEscala, setUsarEscala] = useState(false);
-  const [escCiudad,  setEscCiudad]  = useState("");
-  const [escLlegada, setEscLlegada] = useState("");
-  const [escSalida,  setEscSalida]  = useState("");
+  const [rutas, setRutas] = useState([]);
+  const [paises, setPaises] = useState([]);
+  const [clases, setClases] = useState([]);     
+  const [clasesR, setClasesR] = useState([]);  
+  const [sameClasses, setSameClasses] = useState(true);
 
-  const canSubmit = useMemo(() => {
-    if (!codigo.trim() || !idRuta || !salida || !llegada) return false;
-    const s = new Date(salida); const l = new Date(llegada);
-    if (!(s < l)) return false;
+  const [usaEscala, setUsaEscala] = useState(false);
+  const [paisEsc, setPaisEsc] = useState("");
+  const [ciudadesEsc, setCiudadesEsc] = useState([]);
+  const [idCiudadEsc, setIdCiudadEsc] = useState("");
+  const [llegadaEsc, setLlegadaEsc] = useState("");
+  const [salidaEsc, setSalidaEsc] = useState("");
 
-    const clasesValidas = clases
-      .filter(c => c.enabled)
-      .filter(c => Number(c.cupoTotal) > 0 && Number(c.precio) > 0);
-    if (clasesValidas.length === 0) return false;
-
-    if (usarEscala) {
-      if (!escCiudad || !escLlegada || !escSalida) return false;
-      const el = new Date(escLlegada);
-      const es = new Date(escSalida);
-      if (!(el <= es)) return false; 
-    }
-    return true;
-  }, [codigo, idRuta, salida, llegada, clases, usarEscala, escCiudad, escLlegada, escSalida]);
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
-        const [rutasRes, ciuRes] = await Promise.all([
-          axios.get("/api/v1/rutas"),         
-          axios.get("/api/public/ciudades"),    
+        setErr("");
+        const [rutasRes, paisesRes, clasesRes] = await Promise.all([
+          rutasApi.list(),
+          paisesApi.list(),
+          clasesApi.list(),
         ]);
         setRutas(rutasRes.data || []);
-        setCiudades(ciuRes.data || []);
+        setPaises(paisesRes.data || []);
+
+        const base = (clasesRes.data || []).map((c, idx) => ({
+          idClase: c.idClase,
+          nombre: c.nombre,
+          enabled: idx === 0,
+          cupo: "",
+          precio: "",
+        }));
+        setClases(base);
+        setClasesR(base.map(x => ({ ...x })));
+
+        setCodigo(genFlightCode());
+        setCodigoR(genFlightCode());
       } catch (e) {
         setErr(e?.response?.data?.error || "No se pudieron cargar catálogos");
       } finally {
@@ -76,45 +76,120 @@ export default function VueloNuevo(){
     })();
   }, []);
 
-  const toggleClase = (id) => {
-    setClases(list => list.map(c => c.idClase === id ? { ...c, enabled: !c.enabled } : c));
+  useEffect(() => {
+    if (!paisEsc) { setCiudadesEsc([]); setIdCiudadEsc(""); return; }
+    (async () => {
+      try {
+        const { data } = await ciudadesApi.list(paisEsc);
+        setCiudadesEsc(data || []);
+      } catch {
+        setErr("No se pudieron cargar ciudades de la escala");
+      }
+    })();
+  }, [paisEsc]);
+
+  useEffect(() => {
+    if (!isRoundTrip || !idRuta) return;
+    const r = rutas.find(x => String(x.idRuta) === String(idRuta));
+    if (!r) return;
+    const inv = rutas.find(x =>
+      String(x.idCiudadOrigen) === String(r.idCiudadDestino) &&
+      String(x.idCiudadDestino) === String(r.idCiudadOrigen)
+    );
+    if (inv) setIdRutaR(String(inv.idRuta));
+  }, [isRoundTrip, idRuta, rutas]);
+
+  const toggleClase = (listSetter) => (idClase) =>
+    listSetter(list => list.map(c => c.idClase === idClase ? { ...c, enabled: !c.enabled } : c));
+  const onClase = (listSetter) => (idClase, k, v) =>
+    listSetter(list => list.map(c => c.idClase === idClase ? { ...c, [k]: v.replace(/[^0-9.]/g, "") } : c));
+
+  const clasesPayload = (list) => {
+    const on = list.filter(c => c.enabled);
+    if (on.length === 0) return null;
+    const out = [];
+    for (const c of on) {
+      const cupo = Number(c.cupo);
+      const precio = Number(c.precio);
+      if (!Number.isFinite(cupo) || cupo <= 0) return null;
+      if (!Number.isFinite(precio) || precio <= 0) return null;
+      out.push({ idClase: c.idClase, cupoTotal: cupo, precio });
+    }
+    return out;
   };
 
-  const setClaseField = (id, field, value) => {
-    setClases(list => list.map(c => c.idClase === id ? { ...c, [field]: value } : c));
-  };
+  const escalaPayloadIda = useMemo(() => {
+    if (!usaEscala) return [];
+    if (!idCiudadEsc || !llegadaEsc || !salidaEsc) return null;
+    if (new Date(llegadaEsc) > new Date(salidaEsc)) return null;
+    return [{
+      idCiudad: Number(idCiudadEsc),
+      llegada: ensureSeconds(llegadaEsc),
+      salida:  ensureSeconds(salidaEsc),
+    }];
+  }, [usaEscala, idCiudadEsc, llegadaEsc, salidaEsc]);
+
+  const idaOk =
+    codigo.trim() && idRuta && salida && llegada &&
+    clasesPayload(clases) && escalaPayloadIda !== null &&
+    new Date(salida) < new Date(llegada);
+
+  const regresoOk = !isRoundTrip || (
+    codigoR.trim() && idRutaR && salidaR && llegadaR &&
+    (sameClasses ? true : !!clasesPayload(clasesR)) &&
+    new Date(salidaR) < new Date(llegadaR)
+  );
+
+  const canSave = idaOk && regresoOk;
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!canSubmit) return;
-
-    setErr(""); setOk(false); setSaving(true);
+    setErr(""); setOk(false);
+    if (!canSave) { setErr("Revisa los campos obligatorios."); return; }
 
     try {
-      const payload = {
-        codigo: codigo.trim(),
-        idRuta: Number(idRuta),
-        fechaSalida: toIso(salida),
-        fechaLlegada: toIso(llegada),
-        clases: clases
-          .filter(c => c.enabled && Number(c.cupoTotal) > 0 && Number(c.precio) > 0)
-          .map(c => ({
-            idClase: c.idClase,
-            cupoTotal: Number(c.cupoTotal),
-            precio: Number(c.precio),
-          })),
-        escalas: (!usarEscala || !escCiudad || !escLlegada || !escSalida)
-          ? []
-          : [{
-              idCiudad: Number(escCiudad),
-              llegada:  toIso(escLlegada),
-              salida:   toIso(escSalida),
-            }],
-      };
+      setSaving(true);
 
-      await axios.post("/api/v1/vuelos", payload);
+      if (!isRoundTrip) {
+        const payload = {
+          codigo: codigo.trim().toUpperCase(),
+          idRuta: Number(idRuta),
+          fechaSalida: ensureSeconds(salida),
+          fechaLlegada: ensureSeconds(llegada),
+          clases: clasesPayload(clases),
+          escalas: escalaPayloadIda || [],
+        };
+        await vuelosApi.create(payload);
+      } else {
+        const ida = {
+          codigo: codigo.trim().toUpperCase(),
+          idRuta: Number(idRuta),
+          fechaSalida: ensureSeconds(salida),
+          fechaLlegada: ensureSeconds(llegada),
+          clases: clasesPayload(clases),
+          escalas: escalaPayloadIda || [],
+        };
+        const regreso = {
+          codigo: codigoR.trim().toUpperCase(),
+          idRuta: Number(idRutaR),
+          fechaSalida: ensureSeconds(salidaR),
+          fechaLlegada: ensureSeconds(llegadaR),
+          clases: sameClasses ? clasesPayload(clases) : clasesPayload(clasesR),
+          escalas: [],
+        };
+        await vuelosApi.createRoundTrip({ ida, regreso });
+      }
+
       setOk(true);
-      setTimeout(() => nav("/admin", { replace: true }), 900);
+
+      setCodigo(genFlightCode());
+      setCodigoR(genFlightCode());
+      setIdRuta(""); setSalida(""); setLlegada("");
+      setIsRoundTrip(false);
+      setIdRutaR(""); setSalidaR(""); setLlegadaR("");
+      setClases(clases.map((c, i) => ({ ...c, enabled: i === 0, cupo: "", precio: "" })));
+      setClasesR(clasesR.map((c, i) => ({ ...c, enabled: i === 0, cupo: "", precio: "" })));
+      setUsaEscala(false); setPaisEsc(""); setIdCiudadEsc(""); setLlegadaEsc(""); setSalidaEsc("");
     } catch (e2) {
       setErr(e2?.response?.data?.error || "No se pudo crear el vuelo");
     } finally {
@@ -122,143 +197,203 @@ export default function VueloNuevo(){
     }
   };
 
-  if (loading) {
-    return (
-      <div className="container pag-admin">
-        <div className="card">
-          <div className="skl title" />
-          <div className="skl row" />
-          <div className="skl row" />
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="container pag-admin">
-      <div className="card">
-        <div className="perfil__head">
-          <div>
-            <h2>Crear vuelo</h2>
-            <p className="subtitle">
-              Configura un nuevo vuelo. <Link to="/admin">Volver al panel</Link>
-            </p>
-          </div>
-        </div>
-
-        <form onSubmit={submit} className="form">
-          <div className="grid-3">
-            <div>
-              <label className="label">Código</label>
-              <input className="input" value={codigo} onChange={(e)=>setCodigo(e.target.value)} placeholder="ej: AR1234" />
+    <>
+      <AdminNav/>
+      <div className="container pag-vuelo">
+        <div className="card">
+          <div className="perfil__head">
+            <div className="avatar">
+              <svg width="36" height="36" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M2 13c7-1 10-4 12-9l2 1-2 6 7 1 1 2-7 1 2 6-2 1c-2-5-5-8-12-9v-1Z"/>
+              </svg>
             </div>
-
             <div>
-              <label className="label">Ruta</label>
-              <select className="input" value={idRuta} onChange={(e)=>setIdRuta(e.target.value)}>
-                <option value="">-- Selecciona una ruta --</option>
-                {rutas.map(r => (
-                  <option key={r.idRuta} value={r.idRuta}>
-                    {r.ciudadOrigen} → {r.ciudadDestino} {r.activa ? "" : "(inactiva)"}
-                  </option>
-                ))}
-              </select>
+              <h2>Crear vuelo</h2>
+              <p className="subtitle">Configura un nuevo vuelo. Volver al panel</p>
             </div>
-
-            <div />
           </div>
 
-          <div className="grid-3">
-            <div>
-              <label className="label">Salida</label>
-              <input className="input" type="datetime-local" value={salida} onChange={(e)=>setSalida(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Llegada</label>
-              <input className="input" type="datetime-local" value={llegada} onChange={(e)=>setLlegada(e.target.value)} />
-            </div>
-            <div />
-          </div>
-
-          <hr className="sep" />
-
-          <h3 className="h3">Clases</h3>
-          <div className="grid-3">
-            {clases.map(c => (
-              <div key={c.idClase} className={`clase ${!c.enabled ? "is-off" : ""}`}>
-                <label className="label">
-                  <input type="checkbox" checked={c.enabled} onChange={()=>toggleClase(c.idClase)} />
-                  <span style={{marginLeft:8}}>{c.nombre}</span>
-                </label>
-                <div className="grid-2" style={{marginTop:6}}>
-                  <input
-                    className="input"
-                    type="number"
-                    min="0"
-                    placeholder="Cupo total"
-                    value={c.cupoTotal}
-                    onChange={(e)=>setClaseField(c.idClase, "cupoTotal", e.target.value)}
-                    disabled={!c.enabled}
-                  />
-                  <input
-                    className="input"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Precio"
-                    value={c.precio}
-                    onChange={(e)=>setClaseField(c.idClase, "precio", e.target.value)}
-                    disabled={!c.enabled}
-                  />
+          {loading ? (
+            <>
+              <div className="skl title" />
+              <div className="skl row" /><div className="skl row" />
+            </>
+          ) : (
+            <form className="form" onSubmit={submit}>
+              <h3 className="block-title">Ida</h3>
+              <div className="grid-2">
+                <div>
+                  <label className="label">Código</label>
+                  <input className="input" value={codigo} readOnly />
+                  <div className="hint">Se genera automáticamente</div>
+                </div>
+                <div>
+                  <label className="label">Ruta</label>
+                  <select className="input" value={idRuta} onChange={e=>setIdRuta(e.target.value)}>
+                    <option value="">-- Selecciona una ruta --</option>
+                    {rutas.map(r => (
+                      <option key={r.idRuta} value={r.idRuta}>
+                        {r.ciudadOrigen} → {r.ciudadDestino}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-            ))}
-          </div>
 
-          <hr className="sep" />
+              <div className="grid-2">
+                <div>
+                  <label className="label">Salida</label>
+                  <input type="datetime-local" className="input" value={salida}
+                         onChange={e=>setSalida(e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Llegada</label>
+                  <input type="datetime-local" className="input" value={llegada}
+                         onChange={e=>setLlegada(e.target.value)} />
+                </div>
+              </div>
 
-          <div className="escala-row">
-            <label className="label" style={{display:"flex", gap:8, alignItems:"center"}}>
-              <input type="checkbox" checked={usarEscala} onChange={(e)=>setUsarEscala(e.target.checked)} />
-              Añadir 1 escala (opcional)
-            </label>
-          </div>
+              <h4 className="block-subtitle">Clases (ida)</h4>
+              <div className="grid-3">
+                {clases.map(c => (
+                  <div key={c.idClase} className={"clase " + (c.enabled ? "on" : "off")}>
+                    <label className="check">
+                      <input type="checkbox" checked={c.enabled} onChange={()=>toggleClase(setClases)(c.idClase)} />
+                      <span>{c.nombre}</span>
+                    </label>
+                    <div className="grid-2">
+                      <input className="input" placeholder="Cupo total" inputMode="numeric"
+                             value={c.cupo} onChange={e=>onClase(setClases)(c.idClase,"cupo",e.target.value)} />
+                      <input className="input" placeholder="Precio" inputMode="decimal"
+                             value={c.precio} onChange={e=>onClase(setClases)(c.idClase,"precio",e.target.value)} />
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-          {usarEscala && (
-            <div className="grid-3">
-              <div>
-                <label className="label">Ciudad</label>
-                <select className="input" value={escCiudad} onChange={(e)=>setEscCiudad(e.target.value)}>
-                  <option value="">-- Selecciona --</option>
-                  {ciudades.map(c => (
-                    <option key={c.idCiudad} value={c.idCiudad}>
-                      {c.pais} — {c.nombre}
-                    </option>
-                  ))}
-                </select>
+              <hr className="sep" />
+
+              <label className="check" style={{marginBottom:8}}>
+                <input type="checkbox" checked={usaEscala} onChange={e=>setUsaEscala(e.target.checked)} />
+                <span>Añadir 1 escala (opcional)</span>
+              </label>
+
+              {usaEscala && (
+                <div className="grid-3">
+                  <div>
+                    <label className="label">País de escala</label>
+                    <select className="input" value={paisEsc} onChange={e=>setPaisEsc(e.target.value)}>
+                      <option value="">-- Selecciona --</option>
+                      {paises.map(p => <option key={p.idPais} value={p.idPais}>{p.nombre}</option>)}
+                    </select>
+                    <label className="label" style={{marginTop:8}}>Ciudad de escala</label>
+                    <select className="input" value={idCiudadEsc}
+                            onChange={e=>setIdCiudadEsc(e.target.value)} disabled={!ciudadesEsc.length}>
+                      <option value="">-- Selecciona --</option>
+                      {ciudadesEsc.map(c => <option key={c.idCiudad} value={c.idCiudad}>{c.nombre}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Llegada escala</label>
+                    <input type="datetime-local" className="input" value={llegadaEsc}
+                           onChange={e=>setLlegadaEsc(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="label">Salida escala</label>
+                    <input type="datetime-local" className="input" value={salidaEsc}
+                           onChange={e=>setSalidaEsc(e.target.value)} />
+                    <div className="hint">Debe ser mayor o igual a la hora de llegada</div>
+                  </div>
+                </div>
+              )}
+
+              <hr className="sep" />
+
+              <label className="check" style={{marginBottom:8}}>
+                <input type="checkbox" checked={isRoundTrip} onChange={e=>setIsRoundTrip(e.target.checked)} />
+                <span>Ida y regreso</span>
+              </label>
+
+              {isRoundTrip && (
+                <>
+                  <h3 className="block-title">Regreso</h3>
+                  <div className="grid-2">
+                    <div>
+                      <label className="label">Código (regreso)</label>
+                      <input className="input" value={codigoR} readOnly />
+                      <div className="hint">Se genera automáticamente</div>
+                    </div>
+                    <div>
+                      <label className="label">Ruta (regreso)</label>
+                      <select className="input" value={idRutaR} onChange={e=>setIdRutaR(e.target.value)}>
+                        <option value="">-- Selecciona una ruta --</option>
+                        {rutas.map(r => (
+                          <option key={r.idRuta} value={r.idRuta}>
+                            {r.ciudadOrigen} → {r.ciudadDestino}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="hint">Se sugiere la ruta inversa de la ida</div>
+                    </div>
+                  </div>
+
+                  <div className="grid-2">
+                    <div>
+                      <label className="label">Salida (regreso)</label>
+                      <input type="datetime-local" className="input" value={salidaR}
+                             onChange={e=>setSalidaR(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="label">Llegada (regreso)</label>
+                      <input type="datetime-local" className="input" value={llegadaR}
+                             onChange={e=>setLlegadaR(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <label className="check" style={{marginTop:8, marginBottom:8}}>
+                    <input type="checkbox" checked={sameClasses} onChange={e=>setSameClasses(e.target.checked)} />
+                    <span>Usar las mismas clases y precios que la ida</span>
+                  </label>
+
+                  {!sameClasses && (
+                    <>
+                      <h4 className="block-subtitle">Clases (regreso)</h4>
+                      <div className="grid-3">
+                        {clasesR.map(c => (
+                          <div key={c.idClase} className={"clase " + (c.enabled ? "on" : "off")}>
+                            <label className="check">
+                              <input type="checkbox" checked={c.enabled} onChange={()=>toggleClase(setClasesR)(c.idClase)} />
+                              <span>{c.nombre}</span>
+                            </label>
+                            <div className="grid-2">
+                              <input className="input" placeholder="Cupo total" inputMode="numeric"
+                                     value={c.cupo} onChange={e=>onClase(setClasesR)(c.idClase,"cupo",e.target.value)} />
+                              <input className="input" placeholder="Precio" inputMode="decimal"
+                                     value={c.precio} onChange={e=>onClase(setClasesR)(c.idClase,"precio",e.target.value)} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  <hr className="sep" />
+                </>
+              )}
+
+              {err && <div className="error" role="alert">{err}</div>}
+              {ok  && <div className="ok">¡Vuelo(s) creado(s)!</div>}
+
+              <div className="actions">
+                <button className="btn btn-secondary" disabled={!canSave || saving}>
+                  {saving ? "Guardando..." : "Guardar"}
+                </button>
               </div>
-              <div>
-                <label className="label">Llegada</label>
-                <input className="input" type="datetime-local" value={escLlegada} onChange={(e)=>setEscLlegada(e.target.value)} />
-              </div>
-              <div>
-                <label className="label">Salida</label>
-                <input className="input" type="datetime-local" value={escSalida} onChange={(e)=>setEscSalida(e.target.value)} />
-              </div>
-            </div>
+            </form>
           )}
-
-          {err && <div className="error" role="alert">{err}</div>}
-          {ok  && <div className="ok">¡Vuelo creado!</div>}
-
-          <div className="actions">
-            <button className="btn btn-secondary" disabled={!canSubmit || saving}>
-              {saving ? "Guardando..." : "Crear vuelo"}
-            </button>
-            <Link to="/admin" className="btn btn-ghost">Cancelar</Link>
-          </div>
-        </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

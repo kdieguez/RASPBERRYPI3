@@ -78,7 +78,7 @@ public class DB {
           String svc  = nvl(firstNonBlank(get.apply("ORACLE_SERVICE"), get.apply("ORACLE_SERVICE_NAME"), get.apply("ORACLE_PDB")), "XEPDB1");
           cs = host + ":" + port + "/" + svc;
         } else if (!cs.contains(":")) {
-          cs = cs.replace("/", ":1521/"); // agrega puerto 1521 si faltaba
+          cs = cs.replace("/", ":1521/");
         }
         url = "jdbc:oracle:thin:@//" + cs;
       }

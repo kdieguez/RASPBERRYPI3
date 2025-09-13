@@ -11,18 +11,23 @@ public final class Auth {
   private Auth() {}
 
   public static Handler jwt() {
-    return ctx -> parseAndAttach(ctx); 
+    return ctx -> parseAndAttach(ctx);
   }
 
   public static Handler adminOrEmpleado() {
-    return ctx -> {
-      Map<String,Object> cl = parseAndAttach(ctx);
-      int rol = toInt(cl.get("rol"));
-      if (!(rol == 1)) {
-        throw new UnauthorizedResponse("requiere rol administrador/empleado");
-      }
-    };
-  }
+  return ctx -> {
+    String method = String.valueOf(ctx.method()); 
+    if ("OPTIONS".equalsIgnoreCase(method)) return;
+
+    Map<String, Object> cl = parseAndAttach(ctx);
+    int rol = toInt(cl.get("rol"));
+
+    if (rol != 1 ) {
+      throw new UnauthorizedResponse("requiere rol administrador");
+    }
+  };
+}
+
 
   @SuppressWarnings("unchecked")
   public static Map<String,Object> claims(Context ctx) {

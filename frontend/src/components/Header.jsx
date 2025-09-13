@@ -15,13 +15,6 @@ export default function Header(){
     return () => window.removeEventListener("auth:changed", onChange);
   }, []);
 
-  const links = [
-    { label: "Vuelos", href: "#" },
-    { label: "Rutas", href: "#" },
-    { label: "Flota", href: "#" },
-    { label: "Ofertas", href: "#" },
-  ];
-
   const isAdmin = !!user && Number(user.idRol) === 1;
 
   const logout = () => {
@@ -35,10 +28,12 @@ export default function Header(){
     if (!e.currentTarget.contains(e.relatedTarget)) setAdminOpen(false);
   };
 
+  const closeMenus = () => { setOpen(false); setAdminOpen(false); };
+
   return (
     <header className="hdr">
       <div className="container hdr__row">
-        <Link className="hdr__brand" to="/">
+        <Link className="hdr__brand" to="/" onClick={closeMenus}>
           <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true">
             <path fill="currentColor" d="M2 13c7-1 10-4 12-9l2 1-2 6 7 1 1 2-7 1 2 6-2 1c-2-5-5-8-12-9v-1Z"/>
           </svg>
@@ -46,18 +41,12 @@ export default function Header(){
         </Link>
 
         <nav className={`hdr__nav ${open ? "is-open" : ""}`} aria-label="Principal">
-          {links.map((item) => (
-            <a key={item.label} href={item.href} className="hdr__link">
-              {item.label}
-            </a>
-          ))}
+          <Link to="/vuelos" className="hdr__link" onClick={closeMenus}>
+            Vuelos
+          </Link>
 
           {isAdmin && (
-            <div
-              className="hdr__menu"
-              tabIndex={-1}
-              onBlur={closeAdminOnBlur}
-            >
+            <div className="hdr__menu" tabIndex={-1} onBlur={closeAdminOnBlur}>
               <button
                 type="button"
                 className="hdr__link hdr__menu-btn"
@@ -68,22 +57,22 @@ export default function Header(){
                 Admin ▾
               </button>
               <div className={`hdr__dropdown ${adminOpen ? "is-open" : ""}`} role="menu">
-                <Link to="/admin/usuarios" className="hdr__drop-item" role="menuitem" onClick={() => setAdminOpen(false)}>
-                  Usuarios
-                </Link>
-                <Link to="/admin/vuelos/nuevo" className="hdr__drop-item" role="menuitem" onClick={() => setAdminOpen(false)}>
-                  Crear vuelo
-                </Link>
+                <Link to="/admin/usuarios" className="hdr__drop-item" role="menuitem" onClick={closeMenus}>Usuarios</Link>
+                <Link to="/admin/vuelos/nuevo" className="hdr__drop-item" role="menuitem" onClick={closeMenus}>Crear vuelo</Link>
+                <Link to="/admin/paises" className="hdr__drop-item" role="menuitem" onClick={closeMenus}>Países</Link>
+                <Link to="/admin/ciudades" className="hdr__drop-item" role="menuitem" onClick={closeMenus}>Ciudades</Link>
+                <Link to="/admin/rutas" className="hdr__drop-item" role="menuitem" onClick={closeMenus}>Rutas</Link>
               </div>
             </div>
           )}
 
-          <a href="#" className="hdr__cta">Reservar</a>
+          <Link to="/vuelos" className="hdr__cta" onClick={closeMenus}>
+            Reservar
+          </Link>
 
-          {/* Sesión */}
           {isLoggedIn() ? (
             <div className="hdr__session">
-              <Link to="/perfil" className="hdr__avatar" title="Mi perfil">
+              <Link to="/perfil" className="hdr__avatar" title="Mi perfil" onClick={closeMenus}>
                 {firstLetter || (
                   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                     <path fill="currentColor" d="M12 12a5 5 0 1 0-5-5a5 5 0 0 0 5 5Zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5Z"/>
@@ -94,8 +83,9 @@ export default function Header(){
             </div>
           ) : (
             <div className="hdr__session">
-              <Link className="hdr__link" to="/login">Iniciar sesión</Link>
-              <Link className="hdr__cta hdr__cta--ghost" to="/registro">Crear cuenta</Link>
+              <Link className="hdr__link" to="/login" onClick={closeMenus}>Iniciar sesión</Link>
+              <Link className="hdr__cta hdr__cta--ghost" to="/registro" onClick={closeMenus}>Crear cuenta</Link>
+
             </div>
           )}
         </nav>
@@ -105,9 +95,7 @@ export default function Header(){
           aria-label="Abrir menú"
           onClick={() => setOpen(v=>!v)}
         >
-          <span/>
-          <span/>
-          <span/>
+          <span/><span/><span/>
         </button>
       </div>
     </header>
