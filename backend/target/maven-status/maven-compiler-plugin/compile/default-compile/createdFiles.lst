@@ -62,3 +62,4 @@ com\aerolineas\dto\ClaseDTOs.class
 com\aerolineas\dto\RutaDTOs$View.class
 com\aerolineas\middleware\Auth.class
 com\aerolineas\dto\AuthDTOs$LoginResponse.class
+com\aerolineas\dto\VueloDTO$ViewAdmin.class

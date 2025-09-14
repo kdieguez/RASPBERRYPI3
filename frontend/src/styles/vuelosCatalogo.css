@@ -60,3 +60,9 @@
 @keyframes sh{ 0%{background-position:100% 50%} 100%{background-position:0 50%} }
 
 .vitem__actions { display:flex; align-items:center; gap:8px; }
+
+.pill--danger {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}

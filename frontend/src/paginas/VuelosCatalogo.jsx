@@ -1,28 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { vuelosApi, clasesApi } from "../api/adminCatalogos"; 
+import { vuelosApi, clasesApi } from "../api/adminCatalogos";
 import { getUser } from "../lib/auth";
 import "../styles/vuelosCatalogo.css";
 
 const toDate = (val) => {
   if (val === null || val === undefined) return null;
-
   if (Array.isArray(val)) {
     const [Y, M, D, h = 0, m = 0, s = 0] = val;
     const d = new Date(Y, (M ?? 1) - 1, D ?? 1, h, m, s);
     return Number.isNaN(d.getTime()) ? null : d;
   }
-
   if (typeof val === "number") {
     const d = new Date(val);
     return Number.isNaN(d.getTime()) ? null : d;
   }
-
   if (typeof val === "string") {
     const s = val.trim();
     let d = new Date(s);
     if (!Number.isNaN(d.getTime())) return d;
-
     const m = s.match(
       /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:?\d{2})?$/i
     );
@@ -31,22 +27,18 @@ const toDate = (val) => {
       d = new Date(+Y, +Mo - 1, +D, +h, +mi, se ? +se : 0);
       if (!Number.isNaN(d.getTime())) return d;
     }
-
     const mm = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})$/);
     if (mm) {
       const d2 = new Date(`${mm[1]}T${mm[2]}:00`);
       return Number.isNaN(d2.getTime()) ? null : d2;
     }
   }
-
   return null;
 };
 
 const fmtDt = (val) => {
   const d = toDate(val);
-  return d
-    ? d.toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })
-    : "—";
+  return d ? d.toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" }) : "—";
 };
 
 const fmtMoney = (n) =>
@@ -56,9 +48,19 @@ const fmtMoney = (n) =>
     maximumFractionDigits: 2,
   });
 
+const EstadoPill = ({ estado }) => {
+  const s = (estado || "").toLowerCase();
+  const isCancel = s.includes("cancel"); 
+  return (
+    <span className={`pill ${isCancel ? "pill--danger" : "pill--ok"}`}>
+      {estado || "Programado"}
+    </span>
+  );
+};
+
 export default function VuelosCatalogo() {
   const [vuelos, setVuelos] = useState([]);
-  const [clases, setClases] = useState([]); 
+  const [clases, setClases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
@@ -75,25 +77,19 @@ export default function VuelosCatalogo() {
         setLoading(true);
         setErr("");
 
-        const clasesReq = clasesApi.list();
-
-        const vuelosReq = (async () => {
-          if (isAdmin) {
+        const [vuelosRes, clasesRes] = await Promise.all([
+          (async () => {
             try {
-              return await vuelosApi.listAdmin();
+              return (await (isAdmin ? vuelosApi.listAdmin() : vuelosApi.listPublic())).data;
             } catch {
-              return await vuelosApi.listPublic();
+              return (await vuelosApi.listPublic()).data;
             }
-          }
-          return await vuelosApi.listPublic(); 
-        })();
-
-        const [{ data: vuelosRes }, { data: clasesRes }] = await Promise.all([
-          vuelosReq,
-          clasesReq,
+          })(),
+          (await clasesApi.list()).data,
         ]);
 
-        setVuelos(vuelosRes || []);
+        const folded = foldPairsFromList(Array.isArray(vuelosRes) ? vuelosRes : []);
+        setVuelos(folded);
         setClases(clasesRes || []);
       } catch (e) {
         setErr(e?.response?.data?.error || "No se pudieron cargar los vuelos");
@@ -103,9 +99,40 @@ export default function VuelosCatalogo() {
     })();
   }, [isAdmin]);
 
+  const foldPairsFromList = (list) => {
+    const byId = new Map(list.map((v) => [v.idVuelo, { ...v }]));
+    const hidden = new Set();
+
+    for (const v of list) {
+      if (!v.idVueloPareja || hidden.has(v.idVuelo) || hidden.has(v.idVueloPareja)) continue;
+      const pair = byId.get(v.idVueloPareja);
+      if (!pair) continue;
+
+      const fs1 = toDate(v.fechaSalida);
+      const fs2 = toDate(pair.fechaSalida);
+      const ida = fs1 && fs2 && fs1 <= fs2 ? v : pair;
+      const regreso = ida === v ? pair : v;
+
+      const host = byId.get(ida.idVuelo);
+      if (host) {
+        host.pareja = {
+          idVuelo: regreso.idVuelo,
+          codigo: regreso.codigo,
+          origen: regreso.origen,
+          destino: regreso.destino,
+          fechaSalida: regreso.fechaSalida,
+          fechaLlegada: regreso.fechaLlegada,
+        };
+        byId.set(ida.idVuelo, host);
+      }
+      hidden.add(regreso.idVuelo);
+    }
+
+    return Array.from(byId.values()).filter((v) => !hidden.has(v.idVuelo));
+  };
+
   const claseName = (idClase) =>
-    clases.find((c) => Number(c.idClase) === Number(idClase))?.nombre ||
-    `Clase ${idClase}`;
+    clases.find((c) => Number(c.idClase) === Number(idClase))?.nombre || `Clase ${idClase}`;
 
   const filtered = useMemo(() => {
     const qx = q.trim().toLowerCase();
@@ -113,7 +140,7 @@ export default function VuelosCatalogo() {
     const dTo = hasta ? new Date(`${hasta}T23:59:59`) : null;
 
     return (vuelos || []).filter((v) => {
-      const txt = [v.codigo, v.origen, v.destino, v.idRuta && `ruta ${v.idRuta}`]
+      const txt = [v.codigo, v.origen, v.destino, v.estado, v.idRuta && `ruta ${v.idRuta}`]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -176,10 +203,13 @@ export default function VuelosCatalogo() {
                   <div className="vitem__route">
                     <div className="vitem__code">
                       <span className="badge">{v.codigo}</span>
-                      {v.activo === false ? (
-                        <span className="pill">Inactivo</span>
-                      ) : (
-                        <span className="pill pill--ok">Activo</span>
+
+                      <EstadoPill estado={v.estado} />
+
+                      {isAdmin && (
+                        v.activo === false
+                          ? <span className="pill">Inactivo</span>
+                          : <span className="pill pill--ok">Activo</span>
                       )}
                     </div>
 
@@ -213,6 +243,22 @@ export default function VuelosCatalogo() {
                           </span>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {v.pareja && (
+                    <div className="vitem__escalas">
+                      <div className="esc">
+                        <span className="label">Regreso</span>
+                        <span>
+                          <strong>{v.pareja.codigo}</strong>{" "}
+                          {v.pareja.origen && v.pareja.destino
+                            ? `${v.pareja.origen} → ${v.pareja.destino}`
+                            : ""}
+                          {" — "}
+                          {fmtDt(v.pareja.fechaSalida)} → {fmtDt(v.pareja.fechaLlegada)}
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>

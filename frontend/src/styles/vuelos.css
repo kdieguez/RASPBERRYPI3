@@ -13,3 +13,11 @@
   color:#0f172a;
   cursor:not-allowed;
 }
+
+.pill--bad { background:#ffe5e5; color:#b00020; border:1px solid #ffb3b3; }
+
+.btn-danger { background:#b00020; color:#fff; }
+.btn-danger:hover { filter:brightness(0.95); }
+.btn-danger:disabled { opacity:.6; cursor:not-allowed; }
+
+.success { background:#e9f7ef; color:#1e7e34; border:1px solid #c3e6cb; padding:.75rem 1rem; border-radius:.5rem; }

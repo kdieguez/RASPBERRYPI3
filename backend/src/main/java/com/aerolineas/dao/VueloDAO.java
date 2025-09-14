@@ -10,6 +10,7 @@ import static com.aerolineas.util.EstadosVuelo.*;
 
 public class VueloDAO {
 
+  // ======== CREAR ========
   public void crearVuelo(VueloDTO.Create dto) throws SQLException {
     try (Connection conn = DB.getConnection()) {
       conn.setAutoCommit(false);
@@ -42,6 +43,7 @@ public class VueloDAO {
     }
   }
 
+  // ======== VINCULAR IDA/REGRESO ========
   public void vincularPareja(long idIda, long idRegreso) throws SQLException {
     if (idIda <= 0 || idRegreso <= 0) throw new SQLException("IDs de vuelo inválidos");
     if (idIda == idRegreso) throw new SQLException("Un vuelo no puede ser pareja de sí mismo");
@@ -98,6 +100,7 @@ public class VueloDAO {
     }
   }
 
+  // ======== OBTENER UNO (catálogo) ========
   public VueloDTO.View obtenerVuelo(long id) throws Exception {
     String sql = """
         SELECT v.ID_VUELO,
@@ -108,6 +111,8 @@ public class VueloDAO {
                v.FECHA_SALIDA,
                v.FECHA_LLEGADA,
                NVL(v.ACTIVO,1) AS ACTIVO,
+               v.ID_ESTADO,
+               e.Estado AS ESTADO,
                sc.ID_CLASE,
                sc.CUPO_TOTAL,
                sc.PRECIO
@@ -115,6 +120,7 @@ public class VueloDAO {
         JOIN RUTA r    ON r.ID_RUTA = v.ID_RUTA
         JOIN CIUDAD co ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN
         JOIN CIUDAD cd ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO
+        JOIN ESTADOS e  ON e.ID_ESTADO = v.ID_ESTADO
         LEFT JOIN SALIDA_CLASE sc ON v.ID_VUELO = sc.ID_VUELO
         WHERE v.ID_VUELO = ?
         """;
@@ -129,6 +135,7 @@ public class VueloDAO {
       try (ResultSet rs = ps.executeQuery()) {
         while (rs.next()) {
           if (view == null) {
+            Integer idEstado = rs.getObject("ID_ESTADO") == null ? null : rs.getInt("ID_ESTADO");
             view = new VueloDTO.View(
                 rs.getLong("ID_VUELO"),
                 rs.getString("CODIGO"),
@@ -138,8 +145,11 @@ public class VueloDAO {
                 rs.getTimestamp("FECHA_SALIDA").toLocalDateTime(),
                 rs.getTimestamp("FECHA_LLEGADA").toLocalDateTime(),
                 rs.getInt("ACTIVO") == 1,
+                idEstado,
+                rs.getString("ESTADO"),
                 clases,
-                escalas
+                escalas,
+                null
             );
           }
           int idClase = rs.getInt("ID_CLASE");
@@ -182,6 +192,103 @@ public class VueloDAO {
     return view;
   }
 
+  // ======== OBTENER UNO (admin) ========
+  public VueloDTO.ViewAdmin obtenerVueloAdmin(long id) throws Exception {
+    String sql = """
+        SELECT v.ID_VUELO,
+               v.CODIGO,
+               v.ID_RUTA,
+               co.NOMBRE AS ORIGEN,
+               cd.NOMBRE AS DESTINO,
+               v.FECHA_SALIDA,
+               v.FECHA_LLEGADA,
+               NVL(v.ACTIVO,1) AS ACTIVO,
+               v.ID_ESTADO,
+               e.Estado AS ESTADO,
+               v.ID_VUELO_PAREJA AS PAREJA_ID,
+               vp.CODIGO AS PAREJA_CODIGO,
+               sc.ID_CLASE,
+               sc.CUPO_TOTAL,
+               sc.PRECIO
+        FROM VUELO v
+        JOIN RUTA r    ON r.ID_RUTA = v.ID_RUTA
+        JOIN CIUDAD co ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN
+        JOIN CIUDAD cd ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO
+        JOIN ESTADOS e  ON e.ID_ESTADO = v.ID_ESTADO
+        LEFT JOIN VUELO vp ON vp.ID_VUELO = v.ID_VUELO_PAREJA
+        LEFT JOIN SALIDA_CLASE sc ON sc.ID_VUELO = v.ID_VUELO
+        WHERE v.ID_VUELO = ?
+        """;
+
+    VueloDTO.ViewAdmin view = null;
+    List<VueloDTO.ClaseConfig> clases = new ArrayList<>();
+    List<VueloDTO.EscalaView>  escalas = new ArrayList<>();
+
+    try (Connection cn = DB.getConnection();
+         PreparedStatement ps = cn.prepareStatement(sql)) {
+      ps.setLong(1, id);
+      try (ResultSet rs = ps.executeQuery()) {
+        while (rs.next()) {
+          if (view == null) {
+            Integer idEstado = rs.getObject("ID_ESTADO") == null ? null : rs.getInt("ID_ESTADO");
+            view = new VueloDTO.ViewAdmin(
+                rs.getLong("ID_VUELO"),
+                rs.getString("CODIGO"),
+                rs.getLong("ID_RUTA"),
+                rs.getString("ORIGEN"),
+                rs.getString("DESTINO"),
+                rs.getTimestamp("FECHA_SALIDA").toLocalDateTime(),
+                rs.getTimestamp("FECHA_LLEGADA").toLocalDateTime(),
+                rs.getInt("ACTIVO") == 1,
+                idEstado,
+                rs.getString("ESTADO"),
+                clases,
+                escalas,
+                rs.getObject("PAREJA_ID") == null ? null : rs.getLong("PAREJA_ID"),
+                rs.getString("PAREJA_CODIGO")
+            );
+          }
+          int idClase = rs.getInt("ID_CLASE");
+          if (!rs.wasNull()) {
+            clases.add(new VueloDTO.ClaseConfig(
+                idClase,
+                rs.getInt("CUPO_TOTAL"),
+                rs.getDouble("PRECIO")
+            ));
+          }
+        }
+      }
+    }
+
+    if (view == null) return null;
+
+    String sqlEsc = """
+        SELECT ve.ID_CIUDAD, c.NOMBRE AS CIUDAD, p.NOMBRE AS PAIS,
+               ve.LLEGADA, ve.SALIDA
+        FROM VUELO_ESCALA ve
+        JOIN CIUDAD c ON c.ID_CIUDAD = ve.ID_CIUDAD
+        JOIN PAIS   p ON p.ID_PAIS   = c.ID_PAIS
+        WHERE ve.ID_VUELO = ?
+        """;
+    try (Connection cn = DB.getConnection();
+         PreparedStatement ps = cn.prepareStatement(sqlEsc)) {
+      ps.setLong(1, id);
+      try (ResultSet rs = ps.executeQuery()) {
+        while (rs.next()) {
+          escalas.add(new VueloDTO.EscalaView(
+              rs.getLong("ID_CIUDAD"),
+              rs.getString("CIUDAD"),
+              rs.getString("PAIS"),
+              rs.getTimestamp("LLEGADA").toLocalDateTime(),
+              rs.getTimestamp("SALIDA").toLocalDateTime()
+          ));
+        }
+      }
+    }
+    return view;
+  }
+
+  // ======== LISTAR ========
   public List<VueloDTO.View> listarVuelos(boolean soloActivos) throws SQLException {
     String sql =
         """
@@ -193,6 +300,9 @@ public class VueloDAO {
                v.FECHA_SALIDA,
                v.FECHA_LLEGADA,
                NVL(v.ACTIVO,1) AS ACTIVO,
+               v.ID_ESTADO,
+               e.Estado AS ESTADO,
+               v.ID_VUELO_PAREJA AS PAREJA,
                sc.ID_CLASE,
                sc.CUPO_TOTAL,
                sc.PRECIO
@@ -200,6 +310,7 @@ public class VueloDAO {
         JOIN RUTA r    ON r.ID_RUTA = v.ID_RUTA
         JOIN CIUDAD co ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN
         JOIN CIUDAD cd ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO
+        JOIN ESTADOS e  ON e.ID_ESTADO = v.ID_ESTADO
         JOIN SALIDA_CLASE sc ON v.ID_VUELO = sc.ID_VUELO
         """ +
         (soloActivos ? " WHERE NVL(v.ACTIVO,1)=1 " : "") +
@@ -222,6 +333,8 @@ public class VueloDAO {
         );
 
         if (view == null) {
+          Integer idEstado = rs.getObject("ID_ESTADO") == null ? null : rs.getInt("ID_ESTADO");
+          Long pareja = (rs.getObject("PAREJA") == null) ? null : rs.getLong("PAREJA");
           view = new VueloDTO.View(
               idVuelo,
               rs.getString("CODIGO"),
@@ -231,8 +344,11 @@ public class VueloDAO {
               rs.getTimestamp("FECHA_SALIDA").toLocalDateTime(),
               rs.getTimestamp("FECHA_LLEGADA").toLocalDateTime(),
               rs.getInt("ACTIVO") == 1,
+              idEstado,
+              rs.getString("ESTADO"),
               new ArrayList<>(List.of(clase)),
-              new ArrayList<>()
+              new ArrayList<>(),
+              pareja
           );
           vuelos.put(idVuelo, view);
         } else {
@@ -243,6 +359,7 @@ public class VueloDAO {
 
     if (vuelos.isEmpty()) return List.of();
 
+    // Escalas
     StringBuilder placeholders = new StringBuilder();
     int size = vuelos.size();
     for (int i = 0; i < size; i++) {
@@ -286,13 +403,15 @@ public class VueloDAO {
     return listarVuelos(false);
   }
 
-  public void actualizarEstado(long idVuelo, int idEstado) throws SQLException {
+  // ======== ESTADO (CANCELACION requiere motivo; no se puede revertir) ========
+  public void actualizarEstado(long idVuelo, int idEstado, String motivo) throws SQLException {
     if (!VALID.contains(idEstado)) {
       throw new SQLException("Estado inválido: " + idEstado);
     }
 
     String sqlSel = "SELECT ID_ESTADO FROM VUELO WHERE ID_VUELO = ?";
     String sqlUpd = "UPDATE VUELO SET ID_ESTADO = ? WHERE ID_VUELO = ?";
+    String sqlInsMotivo = "INSERT INTO VUELO_MOTIVO (ID_VUELO, TIPO, MOTIVO) VALUES (?,?,?)";
 
     try (Connection conn = DB.getConnection()) {
       conn.setAutoCommit(false);
@@ -310,6 +429,13 @@ public class VueloDAO {
         if (estadoActual == CANCELADO && idEstado != CANCELADO) {
           throw new SQLException("El vuelo ya está cancelado; no se permite cambiar a otro estado.");
         }
+
+        if (idEstado == CANCELADO) {
+          if (motivo == null || motivo.isBlank()) {
+            throw new SQLException("Debe proporcionar el motivo de cancelación.");
+          }
+        }
+
         if (estadoActual == idEstado) {
           conn.commit();
           return;
@@ -321,6 +447,15 @@ public class VueloDAO {
           ps.executeUpdate();
         }
 
+        if (idEstado == CANCELADO) {
+          try (PreparedStatement ps = conn.prepareStatement(sqlInsMotivo)) {
+            ps.setLong(1, idVuelo);
+            ps.setString(2, "CANCELACION");
+            ps.setString(3, motivo.trim());
+            ps.executeUpdate();
+          }
+        }
+
         conn.commit();
       } catch (Exception e) {
         conn.rollback();
@@ -330,87 +465,122 @@ public class VueloDAO {
     }
   }
 
+  // ======== UPDATE ADMIN (con motivo de MODIFICACION) ========
   public void actualizarVueloAdmin(long idVuelo, VueloDTO.UpdateAdmin dto) throws Exception {
-    try (Connection cn = DB.getConnection()) {
-      cn.setAutoCommit(false);
-      try {
-        String up = "UPDATE VUELO SET CODIGO=?, ID_RUTA=?, FECHA_SALIDA=?, FECHA_LLEGADA=?"
-                  + (dto.activo() != null ? ", ACTIVO=?" : "")
-                  + " WHERE ID_VUELO=?";
-        try (PreparedStatement ps = cn.prepareStatement(up)) {
-          int i = 1;
-          ps.setString(i++, dto.codigo().trim());
-          ps.setLong(i++, dto.idRuta());
-          ps.setTimestamp(i++, Timestamp.valueOf(dto.fechaSalida()));
-          ps.setTimestamp(i++, Timestamp.valueOf(dto.fechaLlegada()));
-          if (dto.activo() != null) {
-            ps.setInt(i++, dto.activo() ? 1 : 0); // 1 activo, 0 inactivo
-          }
-          ps.setLong(i++, idVuelo);
-          int n = ps.executeUpdate();
-          if (n == 0) throw new SQLException("Vuelo no existe: " + idVuelo);
+  try (Connection cn = DB.getConnection()) {
+    cn.setAutoCommit(false);
+    try {
+      // ⬇️ NUEVO: verificar que el vuelo NO esté cancelado
+      int estadoActual = -1;
+      try (PreparedStatement psChk = cn.prepareStatement(
+          "SELECT ID_ESTADO FROM VUELO WHERE ID_VUELO=?")) {
+        psChk.setLong(1, idVuelo);
+        try (ResultSet rs = psChk.executeQuery()) {
+          if (!rs.next()) throw new SQLException("Vuelo no existe: " + idVuelo);
+          estadoActual = rs.getInt(1);
         }
-
-        try (PreparedStatement del = cn.prepareStatement("DELETE FROM SALIDA_CLASE WHERE ID_VUELO=?")) {
-          del.setLong(1, idVuelo);
-          del.executeUpdate();
-        }
-        if (dto.clases() != null && !dto.clases().isEmpty()) {
-          String ins = "INSERT INTO SALIDA_CLASE (ID_VUELO, ID_CLASE, CUPO_TOTAL, PRECIO) VALUES (?,?,?,?)";
-          try (PreparedStatement ps = cn.prepareStatement(ins)) {
-            for (VueloDTO.ClaseConfig c : dto.clases()) {
-              ps.setLong(1, idVuelo);
-              ps.setInt (2, c.idClase());
-              ps.setInt (3, c.cupoTotal());
-              ps.setDouble(4, c.precio());
-              ps.addBatch();
-            }
-            ps.executeBatch();
-          }
-        } else {
-          throw new SQLException("Debe indicar al menos una clase");
-        }
-
-        if (dto.escalas() != null) {
-          try (PreparedStatement delE = cn.prepareStatement("DELETE FROM VUELO_ESCALA WHERE ID_VUELO=?")) {
-            delE.setLong(1, idVuelo);
-            delE.executeUpdate();
-          }
-          if (!dto.escalas().isEmpty()) {
-            if (dto.escalas().size() > 1) throw new SQLException("Solo se permite 1 escala por vuelo");
-            var e = dto.escalas().get(0);
-            if (e.llegada().isAfter(e.salida())) {
-              throw new SQLException("La hora de SALIDA de la escala debe ser >= LLEGADA");
-            }
-            String insE = "INSERT INTO VUELO_ESCALA (ID_VUELO, ID_CIUDAD, LLEGADA, SALIDA) VALUES (?,?,?,?)";
-            try (PreparedStatement psE = cn.prepareStatement(insE)) {
-              psE.setLong(1, idVuelo);
-              psE.setLong(2, e.idCiudad());
-              psE.setTimestamp(3, Timestamp.valueOf(e.llegada()));
-              psE.setTimestamp(4, Timestamp.valueOf(e.salida()));
-              psE.executeUpdate();
-            }
-          }
-        }
-
-        cn.commit();
-      } catch (Exception e) {
-        cn.rollback();
-        throw e;
-      } finally {
-        cn.setAutoCommit(true);
       }
+      if (estadoActual == CANCELADO) {
+        throw new SQLException("Vuelo cancelado: no se permite modificar.");
+      }
+      // ⬆️ FIN NUEVO
+
+      String up = "UPDATE VUELO SET CODIGO=?, ID_RUTA=?, FECHA_SALIDA=?, FECHA_LLEGADA=?"
+                + (dto.activo() != null ? ", ACTIVO=?" : "")
+                + " WHERE ID_VUELO=?";
+      try (PreparedStatement ps = cn.prepareStatement(up)) {
+        int i = 1;
+        ps.setString(i++, dto.codigo().trim());
+        ps.setLong(i++, dto.idRuta());
+        ps.setTimestamp(i++, Timestamp.valueOf(dto.fechaSalida()));
+        ps.setTimestamp(i++, Timestamp.valueOf(dto.fechaLlegada()));
+        if (dto.activo() != null) {
+          ps.setInt(i++, dto.activo() ? 1 : 0);
+        }
+        ps.setLong(i++, idVuelo);
+        int n = ps.executeUpdate();
+        if (n == 0) throw new SQLException("Vuelo no existe: " + idVuelo);
+      }
+
+      try (PreparedStatement del = cn.prepareStatement("DELETE FROM SALIDA_CLASE WHERE ID_VUELO=?")) {
+        del.setLong(1, idVuelo);
+        del.executeUpdate();
+      }
+      if (dto.clases() != null && !dto.clases().isEmpty()) {
+        String ins = "INSERT INTO SALIDA_CLASE (ID_VUELO, ID_CLASE, CUPO_TOTAL, PRECIO) VALUES (?,?,?,?)";
+        try (PreparedStatement ps = cn.prepareStatement(ins)) {
+          for (VueloDTO.ClaseConfig c : dto.clases()) {
+            ps.setLong(1, idVuelo);
+            ps.setInt (2, c.idClase());
+            ps.setInt (3, c.cupoTotal());
+            ps.setDouble(4, c.precio());
+            ps.addBatch();
+          }
+          ps.executeBatch();
+        }
+      } else {
+        throw new SQLException("Debe indicar al menos una clase");
+      }
+
+      if (dto.escalas() != null) {
+        try (PreparedStatement delE = cn.prepareStatement("DELETE FROM VUELO_ESCALA WHERE ID_VUELO=?")) {
+          delE.setLong(1, idVuelo);
+          delE.executeUpdate();
+        }
+        if (!dto.escalas().isEmpty()) {
+          if (dto.escalas().size() > 1) throw new SQLException("Solo se permite 1 escala por vuelo");
+          var e = dto.escalas().get(0);
+          if (e.llegada().isAfter(e.salida())) {
+            throw new SQLException("La hora de SALIDA de la escala debe ser >= LLEGADA");
+          }
+          String insE = "INSERT INTO VUELO_ESCALA (ID_VUELO, ID_CIUDAD, LLEGADA, SALIDA) VALUES (?,?,?,?)";
+          try (PreparedStatement psE = cn.prepareStatement(insE)) {
+            psE.setLong(1, idVuelo);
+            psE.setLong(2, e.idCiudad());
+            psE.setTimestamp(3, Timestamp.valueOf(e.llegada()));
+            psE.setTimestamp(4, Timestamp.valueOf(e.salida()));
+            psE.executeUpdate();
+          }
+        }
+      }
+
+      // Motivo de modificación (mantén lo que ya tenías)
+      if (dto.motivoCambio() != null && !dto.motivoCambio().isBlank()) {
+        try (PreparedStatement ps = cn.prepareStatement(
+            "INSERT INTO VUELO_MOTIVO (ID_VUELO, TIPO, MOTIVO) VALUES (?,?,?)")) {
+          ps.setLong(1, idVuelo);
+          ps.setString(2, "MODIFICACION");
+          ps.setString(3, dto.motivoCambio().trim());
+          ps.executeUpdate();
+        }
+      }
+
+      cn.commit();
+    } catch (Exception e) {
+      cn.rollback();
+      throw e;
+    } finally {
+      cn.setAutoCommit(true);
     }
   }
+}
 
+  // ======== Helpers internos ========
   private long crearVueloTx(Connection conn, VueloDTO.Create dto) throws Exception {
-    String sqlVuelo = "INSERT INTO VUELO (CODIGO, ID_RUTA, FECHA_SALIDA, FECHA_LLEGADA) VALUES (?,?,?,?)";
+    final boolean hasActivo = dto.activo() != null;
+    final String sqlVuelo = hasActivo
+        ? "INSERT INTO VUELO (CODIGO, ID_RUTA, FECHA_SALIDA, FECHA_LLEGADA, ACTIVO) VALUES (?,?,?,?,?)"
+        : "INSERT INTO VUELO (CODIGO, ID_RUTA, FECHA_SALIDA, FECHA_LLEGADA) VALUES (?,?,?,?)";
 
     try (PreparedStatement ps = conn.prepareStatement(sqlVuelo, new String[]{"ID_VUELO"})) {
-      ps.setString(1, dto.codigo());
-      ps.setLong(2, dto.idRuta());
-      ps.setTimestamp(3, Timestamp.valueOf(dto.fechaSalida()));
-      ps.setTimestamp(4, Timestamp.valueOf(dto.fechaLlegada()));
+      int i = 1;
+      ps.setString(i++, dto.codigo());
+      ps.setLong(i++, dto.idRuta());
+      ps.setTimestamp(i++, Timestamp.valueOf(dto.fechaSalida()));
+      ps.setTimestamp(i++, Timestamp.valueOf(dto.fechaLlegada()));
+      if (hasActivo) {
+        ps.setInt(i++, dto.activo() ? 1 : 0);
+      }
       ps.executeUpdate();
 
       try (ResultSet rs = ps.getGeneratedKeys()) {

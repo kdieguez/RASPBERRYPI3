@@ -21,12 +21,17 @@ export const clasesApi = {
 };
 
 export const vuelosApi = {
-
   listPublic: () => axios.get("/api/v1/vuelos"),
-  listAdmin:   ()       => axios.get("/api/v1/admin/vuelos"),
-  getAdmin:    (id)     => axios.get(`/api/v1/admin/vuelos/${id}`),
-  updateAdmin: (id,dto) => axios.put(`/api/v1/admin/vuelos/${id}`, dto),
+  listAdmin:  () => axios.get("/api/v1/admin/vuelos"),
 
-  create:         (dto) => axios.post("/api/v1/vuelos", dto),
-  createRoundTrip:(dto) => axios.post("/api/v1/vuelos/roundtrip", dto),
+  getAdmin:     (id)      => axios.get(`/api/v1/admin/vuelos/${id}`),
+  updateAdmin:  (id, dto) => axios.put(`/api/v1/admin/vuelos/${id}`, dto),
+  createAdmin:  (dto)     => axios.post("/api/v1/admin/vuelos", dto),
+
+  create:          (dto)  => axios.post("/api/v1/vuelos", dto),
+  createRoundTrip: (dto)  => axios.post("/api/v1/vuelos/roundtrip", dto),
+  link:            (body) => axios.post("/api/v1/vuelos/link", body),
+
+  updateEstado: (id, idEstado, motivo) =>
+    axios.put(`/api/v1/vuelos/${id}/estado`, { idEstado, motivo }),
 };

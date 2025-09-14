@@ -13,7 +13,7 @@ export default function AdminVuelosList() {
     (async () => {
       try {
         setLoading(true); setErr("");
-        const { data } = await vuelosApi.listAdmin(); // ← TODOS (activos + inactivos)
+        const { data } = await vuelosApi.listAdmin();
         setItems(data || []);
       } catch (e) {
         setErr(e?.response?.data?.error || "No se pudieron cargar los vuelos");

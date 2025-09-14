@@ -94,7 +94,6 @@ select.input{
   border-radius:12px; padding:10px 12px; margin-top:10px;
 }
 
-/* Skeleton */
 .skl{
   background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 37%,#f1f5f9 63%);
   background-size:400% 100%;

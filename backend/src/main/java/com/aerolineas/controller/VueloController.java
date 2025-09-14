@@ -9,6 +9,8 @@ import io.javalin.Javalin;
 import java.sql.SQLException;
 import java.util.Map;
 
+import static com.aerolineas.util.EstadosVuelo.*;
+
 public class VueloController {
   private final VueloDAO dao = new VueloDAO();
 
@@ -18,8 +20,7 @@ public class VueloController {
   public void routes(Javalin app) {
 
     app.get("/api/public/vuelos", ctx -> ctx.json(dao.listarVuelos(true)));
-
-    app.get("/api/v1/vuelos", ctx -> ctx.json(dao.listarVuelos(true)));
+    app.get("/api/v1/vuelos",     ctx -> ctx.json(dao.listarVuelos(true)));
 
     app.get("/api/v1/admin/vuelos", ctx -> {
       Auth.adminOrEmpleado().handle(ctx);
@@ -29,15 +30,27 @@ public class VueloController {
     app.get("/api/v1/admin/vuelos/{id}", ctx -> {
       Auth.adminOrEmpleado().handle(ctx);
       long id = ctx.pathParamAsClass("id", Long.class).get();
-      var v = dao.obtenerVuelo(id);
+      var v = dao.obtenerVueloAdmin(id);
       if (v == null) { ctx.status(404).json(Map.of("error","Vuelo no encontrado")); return; }
       ctx.json(v);
+    });
+
+    app.post("/api/v1/admin/vuelos", ctx -> {
+      Auth.adminOrEmpleado().handle(ctx);
+      VueloDTO.Create dto = ctx.bodyAsClass(VueloDTO.Create.class);
+      try {
+        long id = dao.crearVueloReturnId(dto);
+        ctx.status(201).json(Map.of("idVuelo", id));
+      } catch (Exception e) {
+        String msg = e.getMessage()==null? "" : e.getMessage();
+        ctx.status(400).json(Map.of("error", msg.isBlank() ? "No se pudo crear el vuelo" : msg));
+      }
     });
 
     app.put("/api/v1/admin/vuelos/{id}", ctx -> {
       Auth.adminOrEmpleado().handle(ctx);
       long id = ctx.pathParamAsClass("id", Long.class).get();
-      var dto = ctx.bodyAsClass(VueloDTO.UpdateAdmin.class); 
+      var dto = ctx.bodyAsClass(VueloDTO.UpdateAdmin.class);
 
       if (dto.codigo()==null || dto.codigo().isBlank()) {
         ctx.status(400).json(Map.of("error","Código requerido")); return;
@@ -48,15 +61,20 @@ public class VueloController {
       if (dto.clases()==null || dto.clases().isEmpty()) {
         ctx.status(400).json(Map.of("error","Debe indicar al menos una clase")); return;
       }
+      if (dto.motivoCambio()==null || dto.motivoCambio().isBlank()) {
+        ctx.status(400).json(Map.of("error","motivoCambio es requerido para modificar")); return;
+      }
 
       try {
         dao.actualizarVueloAdmin(id, dto);
         ctx.status(204);
       } catch (SQLException e) {
         String msg = e.getMessage()==null? "" : e.getMessage();
-        ctx.status(400).json(Map.of("error", msg.isBlank() ? "No se pudo actualizar" : msg));
-      } catch (Exception e) {
-        ctx.status(500).json(Map.of("error","Error al actualizar"));
+        if (msg.toLowerCase().contains("cancelado")) {
+          ctx.status(409).json(Map.of("error", msg));
+        } else {
+          ctx.status(400).json(Map.of("error", msg.isBlank() ? "No se pudo actualizar" : msg));
+        }
       }
     });
 
@@ -111,14 +129,21 @@ public class VueloController {
         ctx.status(400).json(Map.of("error", "idEstado es requerido"));
         return;
       }
+      if (dto.idEstado() == CANCELADO) {
+        String mot = dto.motivo();
+        if (mot == null || mot.isBlank()) {
+          ctx.status(400).json(Map.of("error", "motivo es requerido para cancelar"));
+          return;
+        }
+      }
       try {
-        dao.actualizarEstado(idVuelo, dto.idEstado());
+        dao.actualizarEstado(idVuelo, dto.idEstado(), dto.motivo());
         ctx.status(204);
       } catch (SQLException e) {
         String msg = e.getMessage() == null ? "" : e.getMessage();
         if (msg.contains("no existe")) {
           ctx.status(404).json(Map.of("error", msg));
-        } else if (msg.contains("cancelado") || msg.contains("inválido")) {
+        } else if (msg.contains("cancelado") || msg.contains("inválido") || msg.contains("motivo")) {
           ctx.status(409).json(Map.of("error", msg));
         } else {
           ctx.status(400).json(Map.of("error", msg));
