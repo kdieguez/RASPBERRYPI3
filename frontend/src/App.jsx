@@ -15,6 +15,7 @@ import AdminRutas from "./paginas/admin/Rutas";
 import VuelosCatalogo from "./paginas/VuelosCatalogo";
 import VueloEdit from "./paginas/admin/VueloEdit";
 import AdminVuelosList from "./paginas/admin/AdminVuelosList";
+import VueloDetalle from "./paginas/VueloDetalle";
 
 function Home() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/perfil" element={<Perfil />} />
           <Route path="/vuelos" element={<VuelosCatalogo/>} />
+          <Route path="/vuelos/:id" element={<VueloDetalle/>}/>
 
           {/* Rutas admin */}
           <Route element={<ProtectedRoute allowRoles={[1]} />}>

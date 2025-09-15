@@ -1,0 +1,79 @@
+.vd { padding: 18px; }
+
+.vd__header {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 6px;
+}
+.vd__avatar {
+  width: 48px; height: 48px;
+  border-radius: 14px;
+  display: grid; place-items: center;
+  background: #eef2ff; color: #1e40af;
+}
+.vd__code { letter-spacing: .5px; }
+
+.vd__chips { margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+.vd__grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+@media (max-width: 860px) { .vd__grid { grid-template-columns: 1fr; } }
+
+.vd__route {
+  display: grid;
+  grid-template-columns: 1fr 40px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.vd__arrow { text-align: center; font-size: 22px; color: #475569; }
+.vd__big { font-weight: 700; color: #0f172a; }
+
+.vd__timeline {
+  position: relative;
+  padding-left: 18px;
+  border-left: 2px dashed #e5e7eb;
+  display: grid; gap: 12px;
+}
+.vd__titem { display: grid; grid-template-columns: 10px 1fr; gap: 12px; align-items: start; }
+.vd__dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #2563eb; margin-left: -6px; margin-top: 6px;
+}
+.vd__tval { font-weight: 600; color: #0f172a; }
+
+.vd__classgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill,minmax(210px,1fr));
+  gap: 10px;
+}
+.vd__classcard {
+  border: 1px solid #e5e7eb; border-radius: 14px; padding: 10px;
+  background: #fff; box-shadow: 0 1px 0 rgba(0,0,0,.02);
+}
+.vd__classname { font-weight: 700; color: #0f172a; margin-bottom: 6px; }
+.vd__classmeta { color: #334155; }
+
+.vd__escala {
+  border: 1px solid #e5e7eb; border-radius: 14px; padding: 10px; background: #f8fafc;
+}
+.vd__esc__head { color: #0f172a; margin-bottom: 4px; }
+.vd__esc__times { display: flex; gap: 14px; flex-wrap: wrap; }
+
+.vd__pair { margin-top: 14px; color: #334155; }
+.link { color: #2563eb; text-decoration: none; }
+.link:hover { text-decoration: underline; }
+.vd__pair { margin-top: 18px; padding-top: 8px; border-top: 1px dashed #e5e7eb; }
+.vd__paircard {
+  display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
+  border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px;
+}
+.vd__paircol { min-width: 240px; }
+.vd__paircode { font-weight: 700; margin-bottom: 4px; }
+.vd__pairroute { color: #0f172a; }
+.vd__pairtimes { display: flex; gap: 22px; color: #0f172a; }

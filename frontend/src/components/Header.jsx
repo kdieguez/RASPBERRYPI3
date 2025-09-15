@@ -2,10 +2,26 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./header.css";
 import { isLoggedIn, getUser, clearAuth } from "../lib/auth";
+import { clasesApi } from "../api/adminCatalogos"; 
 
 export default function Header(){
   const [open, setOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  const [clases, setClases] = useState([]);
+  const [claseSel, setClaseSel] = useState("");
+
+  const [origen, setOrigen] = useState("");
+  const [destino, setDestino] = useState("");
+  const [fsd, setFsd] = useState(""); 
+  const [fsh, setFsh] = useState(""); 
+  const [frd, setFrd] = useState(""); 
+  const [frh, setFrh] = useState(""); 
+  const [pmin, setPmin] = useState("");
+  const [pmax, setPmax] = useState("");
+  const [direct, setDirect] = useState(false);
+
   const [user, setUser] = useState(getUser());
   const nav = useNavigate();
 
@@ -13,6 +29,17 @@ export default function Header(){
     const onChange = () => setUser(getUser());
     window.addEventListener("auth:changed", onChange);
     return () => window.removeEventListener("auth:changed", onChange);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await clasesApi.list();
+        setClases(Array.isArray(data) ? data : []);
+      } catch {
+        setClases([]);
+      }
+    })();
   }, []);
 
   const isAdmin = !!user && Number(user.idRol) === 1;
@@ -30,6 +57,39 @@ export default function Header(){
 
   const closeMenus = () => { setOpen(false); setAdminOpen(false); };
 
+  const toggleSearch = () => {
+    setSearchOpen(v => !v);
+    setOpen(false);
+    setAdminOpen(false);
+  };
+
+  const submitSearch = (e) => {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    const add = (k,v) => { if (v && String(v).trim() !== "") params.set(k, String(v).trim()); };
+    add("origen", origen);
+    add("destino", destino);
+    add("fsd", fsd);
+    add("fsh", fsh);
+    add("frd", frd);
+    add("frh", frh);
+    add("pmin", pmin);
+    add("pmax", pmax);
+    if (direct) params.set("direct","1");
+    if (claseSel) params.set("clase", claseSel); 
+
+    nav("/vuelos" + (params.toString() ? `?${params.toString()}` : ""));
+    setSearchOpen(false);
+  };
+
+  const clearSearch = () => {
+    setOrigen(""); setDestino("");
+    setFsd(""); setFsh(""); setFrd(""); setFrh("");
+    setPmin(""); setPmax("");
+    setDirect(false);
+    setClaseSel(""); 
+  };
+
   return (
     <header className="hdr">
       <div className="container hdr__row">
@@ -39,6 +99,21 @@ export default function Header(){
           </svg>
           <span>Aerolíneas</span>
         </Link>
+
+        {/* botón lupa */}
+        <button
+          className="hdr__iconbtn"
+          aria-label="Buscar vuelos"
+          title="Buscar vuelos"
+          onClick={toggleSearch}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+            <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="m21 21l-3.5-3.5"/>
+            </g>
+          </svg>
+        </button>
 
         <nav className={`hdr__nav ${open ? "is-open" : ""}`} aria-label="Principal">
           <Link to="/vuelos" className="hdr__link" onClick={closeMenus}>
@@ -85,7 +160,6 @@ export default function Header(){
             <div className="hdr__session">
               <Link className="hdr__link" to="/login" onClick={closeMenus}>Iniciar sesión</Link>
               <Link className="hdr__cta hdr__cta--ghost" to="/registro" onClick={closeMenus}>Crear cuenta</Link>
-
             </div>
           )}
         </nav>
@@ -97,6 +171,82 @@ export default function Header(){
         >
           <span/><span/><span/>
         </button>
+      </div>
+
+      {/* barra de búsqueda bajo el header */}
+      <div className={`hdr__search ${searchOpen ? "is-open" : ""}`}>
+        <form className="hdr__sform container" onSubmit={submitSearch}>
+          <div className="hdr__srow">
+            <div className="hdr__scol">
+              <label className="label">Origen</label>
+              <input
+                className="input"
+                placeholder="Ciudad o país"
+                value={origen}
+                onChange={(e)=>setOrigen(e.target.value)}
+              />
+            </div>
+            <div className="hdr__scol">
+              <label className="label">Destino</label>
+              <input
+                className="input"
+                placeholder="Ciudad o país"
+                value={destino}
+                onChange={(e)=>setDestino(e.target.value)}
+              />
+            </div>
+            <div className="hdr__scol">
+              <label className="label">Salida (de)</label>
+              <input className="input" type="date" value={fsd} onChange={(e)=>setFsd(e.target.value)} />
+            </div>
+            <div className="hdr__scol">
+              <label className="label">Salida (a)</label>
+              <input className="input" type="date" value={fsh} onChange={(e)=>setFsh(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="hdr__srow">
+            <div className="hdr__scol">
+              <label className="label">Regreso (de)</label>
+              <input className="input" type="date" value={frd} onChange={(e)=>setFrd(e.target.value)} />
+            </div>
+            <div className="hdr__scol">
+              <label className="label">Regreso (a)</label>
+              <input className="input" type="date" value={frh} onChange={(e)=>setFrh(e.target.value)} />
+            </div>
+
+            {/* 👇 Nuevo: Clase */}
+            <div className="hdr__scol">
+              <label className="label">Clase</label>
+              <select className="input" value={claseSel} onChange={(e)=>setClaseSel(e.target.value)}>
+                <option value="">Todas</option>
+                {clases.map((c) => (
+                  <option key={c.idClase} value={c.idClase}>{c.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="hdr__scol">
+              <label className="label">Precio mínimo</label>
+              <input className="input" type="number" min="0" inputMode="numeric" placeholder="0" value={pmin} onChange={(e)=>setPmin(e.target.value)} />
+            </div>
+            <div className="hdr__scol">
+              <label className="label">Precio máximo</label>
+              <input className="input" type="number" min="0" inputMode="numeric" placeholder="5000" value={pmax} onChange={(e)=>setPmax(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="hdr__srow hdr__srow--end">
+            <label className="check">
+              <input type="checkbox" checked={direct} onChange={(e)=>setDirect(e.target.checked)} />
+              <span>Solo directos</span>
+            </label>
+            <div className="actions">
+              <button type="button" className="btn" onClick={clearSearch}>Limpiar</button>
+              <button className="btn btn-secondary" type="submit">Buscar</button>
+            </div>
+          </div>
+        </form>
       </div>
     </header>
   );

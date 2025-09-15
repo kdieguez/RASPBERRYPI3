@@ -24,6 +24,8 @@ export const vuelosApi = {
   listPublic: () => axios.get("/api/v1/vuelos"),
   listAdmin:  () => axios.get("/api/v1/admin/vuelos"),
 
+  getPublic: (id) => axios.get(`/api/public/vuelos/${id}`),
+
   getAdmin:     (id)      => axios.get(`/api/v1/admin/vuelos/${id}`),
   updateAdmin:  (id, dto) => axios.put(`/api/v1/admin/vuelos/${id}`, dto),
   createAdmin:  (dto)     => axios.post("/api/v1/admin/vuelos", dto),

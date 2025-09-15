@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { vuelosApi, clasesApi } from "../api/adminCatalogos";
 import { getUser } from "../lib/auth";
 import "../styles/vuelosCatalogo.css";
@@ -38,24 +38,42 @@ const toDate = (val) => {
 
 const fmtDt = (val) => {
   const d = toDate(val);
-  return d ? d.toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" }) : "—";
+  return d
+    ? d.toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })
+    : "—";
 };
 
 const fmtMoney = (n) =>
-  Number(n).toLocaleString("es-MX", {
+  Number(n).toLocaleString("es-GT", {
     style: "currency",
-    currency: "MXN",
+    currency: "GTQ",
     maximumFractionDigits: 2,
   });
 
 const EstadoPill = ({ estado }) => {
   const s = (estado || "").toLowerCase();
-  const isCancel = s.includes("cancel"); 
+  const isCancel = s.includes("cancel");
   return (
     <span className={`pill ${isCancel ? "pill--danger" : "pill--ok"}`}>
       {estado || "Programado"}
     </span>
   );
+};
+
+const minPrecio = (vuelo) => {
+  if (!vuelo?.clases || vuelo.clases.length === 0) return null;
+  let m = Infinity;
+  for (const c of vuelo.clases) {
+    const p = Number(c.precio);
+    if (Number.isFinite(p)) m = Math.min(m, p);
+  }
+  return m === Infinity ? null : m;
+};
+
+const precioDeClase = (vuelo, idClase) => {
+  if (!vuelo?.clases) return null;
+  const c = vuelo.clases.find((x) => Number(x.idClase) === Number(idClase));
+  return c ? Number(c.precio) : null;
 };
 
 export default function VuelosCatalogo() {
@@ -64,12 +82,11 @@ export default function VuelosCatalogo() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  const [q, setQ] = useState("");
-  const [desde, setDesde] = useState(""); 
-  const [hasta, setHasta] = useState("");
-
   const user = getUser();
   const isAdmin = !!user && Number(user.idRol) === 1;
+
+  const [sp] = useSearchParams(); 
+  const nav = useNavigate();
 
   useEffect(() => {
     (async () => {
@@ -122,6 +139,8 @@ export default function VuelosCatalogo() {
           destino: regreso.destino,
           fechaSalida: regreso.fechaSalida,
           fechaLlegada: regreso.fechaLlegada,
+          clases: regreso.clases || [],
+          escalas: regreso.escalas || [],
         };
         byId.set(ida.idVuelo, host);
       }
@@ -132,27 +151,100 @@ export default function VuelosCatalogo() {
   };
 
   const claseName = (idClase) =>
-    clases.find((c) => Number(c.idClase) === Number(idClase))?.nombre || `Clase ${idClase}`;
+    clases.find((c) => Number(c.idClase) === Number(idClase))?.nombre ||
+    `Clase ${idClase}`;
+
+  const activeFilters = useMemo(() => {
+    const get = (k) => sp.get(k);
+    const af = [];
+    if (get("origen")) af.push({ k: "origen", v: get("origen") });
+    if (get("destino")) af.push({ k: "destino", v: get("destino") });
+    if (get("fsd") || get("fsh"))
+      af.push({ k: "salida", v: `${get("fsd") || "—"} → ${get("fsh") || "—"}` });
+    if (get("frd") || get("frh"))
+      af.push({ k: "regreso", v: `${get("frd") || "—"} → ${get("frh") || "—"}` });
+    if (get("clase")) {
+      const nm = claseName(get("clase"));
+      af.push({ k: "clase", v: nm });
+    }
+    if (get("pmin") || get("pmax"))
+      af.push({ k: "precio", v: `${get("pmin") || "0"} - ${get("pmax") || "∞"}` });
+    if (get("direct") === "1") af.push({ k: "directo", v: "Solo directos" });
+    return af;
+  }, [sp, clases]);
+
+  const clearFilters = () => nav("/vuelos", { replace: true });
 
   const filtered = useMemo(() => {
-    const qx = q.trim().toLowerCase();
-    const dFrom = desde ? new Date(`${desde}T00:00:00`) : null;
-    const dTo = hasta ? new Date(`${hasta}T23:59:59`) : null;
+    const spGet = (k) => (sp.get(k) || "").trim().toLowerCase();
+
+    const f_origen = spGet("origen");
+    const f_dest = spGet("destino");
+    const fsd = sp.get("fsd");
+    const fsh = sp.get("fsh");
+    const frd = sp.get("frd");
+    const frh = sp.get("frh");
+    const pmin = Number(sp.get("pmin"));
+    const pmax = Number(sp.get("pmax"));
+    const directOnly = sp.get("direct") === "1";
+    const claseSel = sp.get("clase"); 
+
+    const inDate = (d, fromStr, toStr) => {
+      const dt = toDate(d);
+      const from = fromStr ? new Date(`${fromStr}T00:00:00`) : null;
+      const to = toStr ? new Date(`${toStr}T23:59:59`) : null;
+      if (!dt) return false;
+      if (from && dt < from) return false;
+      if (to && dt > to) return false;
+      return true;
+    };
+
+    const str = (x) => (x || "").toLowerCase();
 
     return (vuelos || []).filter((v) => {
-      const txt = [v.codigo, v.origen, v.destino, v.estado, v.idRuta && `ruta ${v.idRuta}`]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      if (qx && !txt.includes(qx)) return false;
+      const rutaPaises = [str(v.origenPais), str(v.destinoPais)].join(" ");
+      const escalaPaises = Array.isArray(v.escalas)
+        ? v.escalas.map((e) => str(e.pais)).join(" ")
+        : "";
 
-      const fs = toDate(v.fechaSalida);
-      if (dFrom && fs && fs < dFrom) return false;
-      if (dTo && fs && fs > dTo) return false;
+      if (f_origen) {
+        const hit =
+          str(v.origen).includes(f_origen) ||
+          str(v.origenPais).includes(f_origen) ||
+          escalaPaises.includes(f_origen);
+        if (!hit) return false;
+      }
+      if (f_dest) {
+        const hit =
+          str(v.destino).includes(f_dest) ||
+          str(v.destinoPais).includes(f_dest) ||
+          escalaPaises.includes(f_dest);
+        if (!hit) return false;
+      }
+
+      if (claseSel) {
+        const tiene =
+          Array.isArray(v.clases) &&
+          v.clases.some((c) => Number(c.idClase) === Number(claseSel));
+        if (!tiene) return false;
+      }
+
+      if ((fsd || fsh) && !inDate(v.fechaSalida, fsd, fsh)) return false;
+
+      if ((frd || frh) && (!v.pareja || !inDate(v.pareja.fechaSalida, frd, frh)))
+        return false;
+
+      const precioBase = claseSel ? precioDeClase(v, claseSel) : minPrecio(v);
+      if (Number.isFinite(pmin) && !Number.isNaN(pmin) && pmin > 0 && precioBase !== null && precioBase < pmin)
+        return false;
+      if (Number.isFinite(pmax) && !Number.isNaN(pmax) && pmax > 0 && precioBase !== null && precioBase > pmax)
+        return false;
+
+      if (directOnly && Array.isArray(v.escalas) && v.escalas.length > 0) return false;
 
       return true;
     });
-  }, [vuelos, q, desde, hasta]);
+  }, [vuelos, sp]);
 
   return (
     <div className="container pag-vuelos-list">
@@ -160,29 +252,20 @@ export default function VuelosCatalogo() {
         <h1>
           Vuelos {isAdmin && <span className="pill" style={{ marginLeft: 8 }}>Admin: todos</span>}
         </h1>
-        <div className="vlist__filters">
-          <input
-            className="input"
-            placeholder="Buscar por código, ruta…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <input
-            className="input"
-            type="date"
-            value={desde}
-            onChange={(e) => setDesde(e.target.value)}
-            title="Desde"
-          />
-          <input
-            className="input"
-            type="date"
-            value={hasta}
-            onChange={(e) => setHasta(e.target.value)}
-            title="Hasta"
-          />
-        </div>
       </div>
+
+      {activeFilters.length > 0 && (
+        <div className="filter-chips" style={{ marginBottom: 10 }}>
+          {activeFilters.map((f, i) => (
+            <span key={i} className="pill">
+              {f.k}: <strong>{f.v}</strong>
+            </span>
+          ))}
+          <button className="btn btn-small" onClick={clearFilters} style={{ marginLeft: 8 }}>
+            Quitar filtros
+          </button>
+        </div>
+      )}
 
       <div className="card">
         {loading ? (
@@ -203,14 +286,13 @@ export default function VuelosCatalogo() {
                   <div className="vitem__route">
                     <div className="vitem__code">
                       <span className="badge">{v.codigo}</span>
-
                       <EstadoPill estado={v.estado} />
-
-                      {isAdmin && (
-                        v.activo === false
-                          ? <span className="pill">Inactivo</span>
-                          : <span className="pill pill--ok">Activo</span>
-                      )}
+                      {isAdmin &&
+                        (v.activo === false ? (
+                          <span className="pill">Inactivo</span>
+                        ) : (
+                          <span className="pill pill--ok">Activo</span>
+                        ))}
                     </div>
 
                     <div className="vitem__city">
@@ -219,6 +301,11 @@ export default function VuelosCatalogo() {
                           ? `${v.origen} → ${v.destino}`
                           : `Ruta #${v.idRuta}`}
                       </strong>
+                      {(v.origenPais || v.destinoPais) && (
+                        <div className="label" style={{ marginTop: 2 }}>
+                          {v.origenPais || "—"} → {v.destinoPais || "—"}
+                        </div>
+                      )}
                     </div>
 
                     <div className="vitem__times">
@@ -251,7 +338,9 @@ export default function VuelosCatalogo() {
                       <div className="esc">
                         <span className="label">Regreso</span>
                         <span>
-                          <strong>{v.pareja.codigo}</strong>{" "}
+                          <strong>
+                            <Link to={`/vuelos/${v.pareja.idVuelo}`}>{v.pareja.codigo}</Link>
+                          </strong>{" "}
                           {v.pareja.origen && v.pareja.destino
                             ? `${v.pareja.origen} → ${v.pareja.destino}`
                             : ""}
@@ -277,13 +366,20 @@ export default function VuelosCatalogo() {
                   ))}
                 </div>
 
-                {isAdmin && (
-                  <div className="vitem__actions">
-                    <Link className="btn btn-secondary" to={`/admin/vuelos/${v.idVuelo}`}>
+                <div className="vitem__actions">
+                  <Link className="btn" to={`/vuelos/${v.idVuelo}`}>
+                    Ver detalles
+                  </Link>
+                  {isAdmin && (
+                    <Link
+                      className="btn btn-secondary"
+                      to={`/admin/vuelos/${v.idVuelo}`}
+                      style={{ marginLeft: 8 }}
+                    >
                       Editar
                     </Link>
-                  </div>
-                )}
+                  )}
+                </div>
               </li>
             ))}
           </ul>

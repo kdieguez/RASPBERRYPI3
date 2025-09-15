@@ -22,6 +22,24 @@ public class VueloController {
     app.get("/api/public/vuelos", ctx -> ctx.json(dao.listarVuelos(true)));
     app.get("/api/v1/vuelos",     ctx -> ctx.json(dao.listarVuelos(true)));
 
+    app.get("/api/v1/vuelos/{id}", ctx -> {
+      long id = ctx.pathParamAsClass("id", Long.class).get();
+      var v = dao.obtenerVuelo(id);
+      if (v == null) { 
+        ctx.status(404).json(Map.of("error","Vuelo no encontrado")); 
+        return; 
+      } 
+      ctx.json(v);
+    });
+
+  app.get("/api/public/vuelos/{id}", ctx -> {
+    long idV = ctx.pathParamAsClass("id", Long.class).get();
+    var v = dao.obtenerVuelo(idV);
+    if (v == null) { ctx.status(404).json(Map.of("error", "Vuelo no encontrado")); return; }
+    ctx.json(v);
+  });
+
+
     app.get("/api/v1/admin/vuelos", ctx -> {
       Auth.adminOrEmpleado().handle(ctx);
       ctx.json(dao.listarVuelos(false));

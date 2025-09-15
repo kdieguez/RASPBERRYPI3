@@ -163,7 +163,6 @@ export default function VueloEdit() {
     })();
   }, [id]);
 
-  // clases handlers
   const onClase = (idClase, key, val) =>
     setClases(list => list.map(c => c.idClase === idClase ? { ...c, [key]: val.replace(/[^0-9.]/g,"") } : c));
   const toggleClase = (idClase) =>
@@ -200,11 +199,18 @@ export default function VueloEdit() {
     e.preventDefault();
     if (disableAll) { setErr("Este vuelo está cancelado y no puede modificarse."); return; }
 
-    setErr("");
-    setMsg("");
-
     const clasesOut = payloadClases();
     if (!clasesOut) { setErr("Revisa las clases (cupo y precio)."); return; }
+
+    let mot = window.prompt("Escribe el motivo de modificación:");
+    if (!mot || !mot.trim()) {
+      setErr("El motivo del cambio es requerido.");
+      return;
+    }
+    mot = mot.trim();
+
+    setErr("");
+    setMsg("");
 
     const escalasOut = !editEsc ? null : [{
       idCiudad: Number(escCiudad),
@@ -221,7 +227,7 @@ export default function VueloEdit() {
         activo,
         clases: clasesOut,
         escalas: escalasOut,
-        motivoCambio: "Edición de datos" 
+        motivoCambio: mot
       });
 
       if (hasReturn) {
@@ -233,7 +239,7 @@ export default function VueloEdit() {
           activo: rActivo,
           clases: clasesOut,
           escalas: [],
-          motivoCambio: "Edición de datos (regreso)"
+          motivoCambio: mot
         };
 
         if (returnId) {
@@ -254,7 +260,6 @@ export default function VueloEdit() {
     }
   };
 
-  // cancelar (ya lo tienes)
   const cancelarVuelo = async () => {
     if (esCancelado) return;
     const motivo = prompt("Escribe el motivo de cancelación:");
@@ -309,7 +314,6 @@ export default function VueloEdit() {
           </>
         ) : (
           <form className={`form ${disableAll ? "input-readonly" : ""}`} onSubmit={save}>
-            {/* IDA */}
             <div className="grid-2">
               <div>
                 <label className="label">Código</label>
@@ -344,7 +348,6 @@ export default function VueloEdit() {
               <span>Activo</span>
             </label>
 
-            {/* ESTADO */}
             <h3 className="block-title" style={{marginTop:16}}>Estado del vuelo</h3>
             <div className="grid-2" style={{alignItems:"end"}}>
               <div>
@@ -366,7 +369,52 @@ export default function VueloEdit() {
               </div>
             </div>
 
-            {/* ESCALA */}
+            <h3 className="block-title" style={{marginTop:16}}>Clases y precios</h3>
+            {!clases.length ? (
+              <p className="hint">No hay clases en catálogo.</p>
+            ) : (
+              <div className="grid-2">
+                {clases.map((c) => (
+                  <div key={c.idClase} className={`clase ${!c.enabled ? "off" : ""}`}>
+                    <label className="check" style={{marginBottom:8}}>
+                      <input
+                        type="checkbox"
+                        checked={c.enabled}
+                        onChange={() => toggleClase(c.idClase)}
+                        disabled={disableAll}
+                      />
+                      <span>{c.nombre}</span>
+                    </label>
+
+                    <div className="grid-2">
+                      <div>
+                        <label className="label">Cupo</label>
+                        <input
+                          className="input"
+                          value={c.cupoTotal}
+                          onChange={(e)=>onClase(c.idClase, "cupoTotal", e.target.value)}
+                          disabled={!c.enabled || disableAll}
+                          inputMode="numeric"
+                          placeholder="Ej. 20"
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Precio</label>
+                        <input
+                          className="input"
+                          value={c.precio}
+                          onChange={(e)=>onClase(c.idClase, "precio", e.target.value)}
+                          disabled={!c.enabled || disableAll}
+                          inputMode="decimal"
+                          placeholder="Ej. 499.00"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <h3 className="block-title" style={{marginTop:16}}>Escala (máx. 1)</h3>
             <label className="check" style={{marginBottom:8}}>
               <input type="checkbox" checked={editEsc} onChange={(e)=>setEditEsc(e.target.checked)} disabled={disableAll} />
@@ -405,7 +453,6 @@ export default function VueloEdit() {
               </>
             )}
 
-            {/* REGRESO */}
             <h3 className="block-title" style={{marginTop:24}}>Vuelo de regreso</h3>
             <label className="check" style={{marginBottom:8}}>
               <input
@@ -459,11 +506,17 @@ export default function VueloEdit() {
             {msg && <div className="success" role="status" style={{marginTop:12}}>{msg}</div>}
 
             <div className="actions" style={{marginTop:12}}>
-              <button className="btn btn-secondary" disabled={!canSaveIda} title={disableAll ? "Vuelo cancelado — edición deshabilitada" : ""}>
-                Guardar cambios
-              </button>
+              {!esCancelado && (
+                <button
+                  className="btn btn-secondary"
+                  disabled={!canSaveIda}
+                >
+                  Guardar cambios
+                </button>
+              )}
               <Link to="/vuelos" className="btn" style={{marginLeft:8}}>Cerrar</Link>
             </div>
+
           </form>
         )}
       </div>

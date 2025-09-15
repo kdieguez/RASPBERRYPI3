@@ -11,19 +11,19 @@ public class VueloDTO {
 
     public record Update( long idVuelo, LocalDateTime fechaSalida, LocalDateTime fechaLlegada, boolean activo) {}
 
-    public record View( long idVuelo, String codigo, long idRuta, String origen, String destino, LocalDateTime fechaSalida, LocalDateTime fechaLlegada, boolean activo, Integer idEstado, String estado, List<ClaseConfig> clases, List<EscalaView> escalas, Long idVueloPareja
+    public record View( long idVuelo, String codigo, long idRuta, String origen, String destino, LocalDateTime fechaSalida, LocalDateTime fechaLlegada, boolean activo, Integer idEstado, String estado, List<ClaseConfig> clases, List<EscalaView> escalas, Long idVueloPareja, String origenPais, String destinoPais
     ) {
         public View( long idVuelo, String codigo, long idRuta, LocalDateTime fechaSalida, LocalDateTime fechaLlegada, boolean activo, List<ClaseConfig> clases, List<EscalaView> escalas
         ) {
-            this(idVuelo, codigo, idRuta, null, null, fechaSalida, fechaLlegada, activo, null, null, clases, escalas, null);
+            this(idVuelo, codigo, idRuta, null, null, fechaSalida, fechaLlegada, activo, null, null, clases, escalas, null, null, null);
         }
         public View( long idVuelo, String codigo, long idRuta, String origen, String destino, LocalDateTime fechaSalida, LocalDateTime fechaLlegada, boolean activo, List<ClaseConfig> clases, List<EscalaView> escalas
         ) {
-            this(idVuelo, codigo, idRuta, origen, destino, fechaSalida, fechaLlegada, activo, null, null, clases, escalas, null);
+            this(idVuelo, codigo, idRuta, origen, destino, fechaSalida, fechaLlegada, activo, null, null, clases, escalas, null, null, null);
         }
     }
 
-    public record ViewAdmin( long idVuelo, String codigo, long idRuta, String origen, String destino, LocalDateTime fechaSalida, LocalDateTime fechaLlegada, boolean activo, Integer idEstado, String estado, List<ClaseConfig> clases, List<EscalaView> escalas, Long idVueloPareja, String codigoPareja ) {}
+    public record ViewAdmin( long idVuelo, String codigo, long idRuta, String origen, String destino, LocalDateTime fechaSalida, LocalDateTime fechaLlegada, boolean activo, Integer idEstado, String estado, List<ClaseConfig> clases, List<EscalaView> escalas, Long idVueloPareja, String codigoPareja, String origenPais, String destinoPais ) {}
 
     public static record EstadoUpdate(Integer idEstado, String motivo) {}
 
