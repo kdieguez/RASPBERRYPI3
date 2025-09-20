@@ -1,0 +1,58 @@
+:root{
+  --primary: #1E93AB;
+  --danger:  #b80d0d;
+  --success: #0a7b41;
+  --text:    #1a1a1a;
+  --muted:   #6b7280;
+  --bg:      #f7f7f8;
+  --card:    #ffffff;
+  --border:  #e5e7eb;
+}
+
+*{ box-sizing: border-box; }
+html, body { margin:0; padding:0; height:100%; background: var(--bg); color: var(--text); }
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, Ubuntu, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji", "Segoe UI Symbol"; }
+
+.header { background: #fff; border-bottom: 1px solid var(--border); }
+.header .wrap { max-width: 1100px; margin: 0 auto; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; }
+.brand { font-weight: 700; letter-spacing: .2px; }
+
+.container { max-width: 1100px; margin: 24px auto; padding: 0 18px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+.card.hero { padding: 28px; }
+.help { color: var(--muted); font-size: .95rem; }
+
+.grid { display: flex; flex-wrap: wrap; gap: 12px; }
+.col-12 { flex: 0 0 100%; }
+.col-6  { flex: 0 0 calc(50% - 6px); }
+.col-3  { flex: 0 0 calc(25% - 9px); }
+@media (max-width: 768px){
+  .col-6, .col-3 { flex: 0 0 100%; }
+}
+
+.input {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: 10px; background: #fff; outline: none; font-size: 0.98rem;
+}
+.input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(30,147,171,.12); }
+
+.btn {
+  appearance: none; border: 1px solid var(--border); background: #fff; color: var(--text);
+  padding: 9px 14px; border-radius: 12px; cursor: pointer; font-weight: 600;
+  transition: transform .06s ease, box-shadow .12s ease, background .2s ease, border .2s ease;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,.06); }
+.btn:active { transform: translateY(0); box-shadow: none; }
+
+.btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn.ghost   { background: #fff; }
+.btn.danger  { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+.status-ok { color: var(--success); }
+.status-err { color: var(--danger); }
+
+/* Footer */
+.footer { background:#fff; border-top:1px solid var(--border); margin-top:24px; }
+.footer .wrap { max-width:1100px; margin:0 auto; padding:16px 18px; display:flex; align-items:center; justify-content:space-between; }
+.footer .link { text-decoration:none; color:var(--text); }
+.footer .link:hover { text-decoration:underline; }
