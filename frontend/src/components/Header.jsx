@@ -100,7 +100,6 @@ export default function Header(){
           <span>Aerolíneas</span>
         </Link>
 
-        {/* botón lupa */}
         <button
           className="hdr__iconbtn"
           aria-label="Buscar vuelos"
@@ -119,6 +118,17 @@ export default function Header(){
           <Link to="/vuelos" className="hdr__link" onClick={closeMenus}>
             Vuelos
           </Link>
+
+          {isLoggedIn() && (
+            <>
+              <Link to="/compras/historial" className="hdr__link" onClick={closeMenus}>
+                Historial
+              </Link>
+              <Link to="/compras/carrito" className="hdr__link" onClick={closeMenus}>
+                Carrito
+              </Link>
+            </>
+          )}
 
           {isAdmin && (
             <div className="hdr__menu" tabIndex={-1} onBlur={closeAdminOnBlur}>
@@ -141,10 +151,6 @@ export default function Header(){
             </div>
           )}
 
-          <Link to="/vuelos" className="hdr__cta" onClick={closeMenus}>
-            Reservar
-          </Link>
-
           {isLoggedIn() ? (
             <div className="hdr__session">
               <Link to="/perfil" className="hdr__avatar" title="Mi perfil" onClick={closeMenus}>
@@ -158,8 +164,7 @@ export default function Header(){
             </div>
           ) : (
             <div className="hdr__session">
-              <Link className="hdr__link" to="/login" onClick={closeMenus}>Iniciar sesión</Link>
-              <Link className="hdr__cta hdr__cta--ghost" to="/registro" onClick={closeMenus}>Crear cuenta</Link>
+              <Link className="hdr__cta hdr__cta--ghost" to="/login" onClick={closeMenus}>Iniciar Sesión</Link>
             </div>
           )}
         </nav>
@@ -173,7 +178,6 @@ export default function Header(){
         </button>
       </div>
 
-      {/* barra de búsqueda bajo el header */}
       <div className={`hdr__search ${searchOpen ? "is-open" : ""}`}>
         <form className="hdr__sform container" onSubmit={submitSearch}>
           <div className="hdr__srow">
@@ -215,7 +219,6 @@ export default function Header(){
               <input className="input" type="date" value={frh} onChange={(e)=>setFrh(e.target.value)} />
             </div>
 
-            {/* 👇 Nuevo: Clase */}
             <div className="hdr__scol">
               <label className="label">Clase</label>
               <select className="input" value={claseSel} onChange={(e)=>setClaseSel(e.target.value)}>

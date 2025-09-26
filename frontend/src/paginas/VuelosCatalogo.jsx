@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { vuelosApi, clasesApi } from "../api/adminCatalogos";
 import { getUser } from "../lib/auth";
+import { comprasApi } from "../api/compras";
 import "../styles/vuelosCatalogo.css";
 
 const toDate = (val) => {
@@ -85,7 +86,7 @@ export default function VuelosCatalogo() {
   const user = getUser();
   const isAdmin = !!user && Number(user.idRol) === 1;
 
-  const [sp] = useSearchParams(); 
+  const [sp] = useSearchParams();
   const nav = useNavigate();
 
   useEffect(() => {
@@ -106,7 +107,13 @@ export default function VuelosCatalogo() {
         ]);
 
         const folded = foldPairsFromList(Array.isArray(vuelosRes) ? vuelosRes : []);
-        setVuelos(folded);
+        setVuelos(
+          folded.map((v) => ({
+            ...v,
+            _idClaseSel: v?.clases?.[0]?.idClase ?? null,
+            _cant: 1,
+          }))
+        );
         setClases(clasesRes || []);
       } catch (e) {
         setErr(e?.response?.data?.error || "No se pudieron cargar los vuelos");
@@ -187,7 +194,7 @@ export default function VuelosCatalogo() {
     const pmin = Number(sp.get("pmin"));
     const pmax = Number(sp.get("pmax"));
     const directOnly = sp.get("direct") === "1";
-    const claseSel = sp.get("clase"); 
+    const claseSel = sp.get("clase");
 
     const inDate = (d, fromStr, toStr) => {
       const dt = toDate(d);
@@ -245,6 +252,39 @@ export default function VuelosCatalogo() {
       return true;
     });
   }, [vuelos, sp]);
+  
+  const onChangeClase = (idVuelo, idClase) => {
+    setVuelos((prev) =>
+      prev.map((v) => (v.idVuelo === idVuelo ? { ...v, _idClaseSel: Number(idClase) } : v))
+    );
+  };
+  const onChangeCant = (idVuelo, cant) => {
+    const n = Math.max(1, Math.min(9, Number(cant) || 1));
+    setVuelos((prev) =>
+      prev.map((v) => (v.idVuelo === idVuelo ? { ...v, _cant: n } : v))
+    );
+  };
+  const comprar = async (vuelo) => {
+    const u = getUser();
+    if (!u) { alert("Primero inicia sesión."); nav("/login"); return; }
+    const s = (vuelo.estado || "").toLowerCase();
+    if (s.includes("cancel") || vuelo.activo === false) {
+      alert("Este vuelo no está disponible para compra.");
+      return;
+    }
+    const idClase = vuelo._idClaseSel ?? vuelo?.clases?.[0]?.idClase;
+    if (!idClase) { alert("Selecciona una clase."); return; }
+    try {
+      await comprasApi.addItem({
+        idVuelo: Number(vuelo.idVuelo),
+        idClase: Number(idClase),
+        cantidad: Number(vuelo._cant || 1),
+      });
+      nav(`/compras/carrito`);
+    } catch (e) {
+      alert(e?.response?.data?.error || e?.message || "No se pudo agregar al carrito");
+    }
+  };
 
   return (
     <div className="container pag-vuelos-list">
@@ -370,6 +410,44 @@ export default function VuelosCatalogo() {
                   <Link className="btn" to={`/vuelos/${v.idVuelo}`}>
                     Ver detalles
                   </Link>
+
+                  <select
+                    className="input"
+                    value={v._idClaseSel ?? ""}
+                    onChange={(e) => onChangeClase(v.idVuelo, e.target.value)}
+                    style={{ marginLeft: 8 }}
+                  >
+                    {v.clases.map((c) => (
+                      <option key={c.idClase} value={c.idClase}>
+                        {claseName(c.idClase)}
+                      </option>
+                    ))}
+                  </select>
+
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    max={9}
+                    value={v._cant}
+                    onChange={(e) => onChangeCant(v.idVuelo, e.target.value)}
+                    style={{ width: 64, marginLeft: 8 }}
+                  />
+
+                  <button
+                    className="btn btn-secondary"
+                    style={{ marginLeft: 8 }}
+                    onClick={() => comprar(v)}
+                    disabled={
+                      !v.clases ||
+                      v.clases.length === 0 ||
+                      (v.estado || "").toLowerCase().includes("cancel") ||
+                      v.activo === false
+                    }
+                  >
+                    Comprar
+                  </button>
+
                   {isAdmin && (
                     <Link
                       className="btn btn-secondary"

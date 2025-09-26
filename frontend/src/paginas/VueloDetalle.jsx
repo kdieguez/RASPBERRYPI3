@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { vuelosApi, clasesApi } from "../api/adminCatalogos";
+import { getUser } from "../lib/auth";
+import { comprasApi } from "../api/compras";
 import "../styles/vueloDetalle.css";
 
 const toDate = (val) => {
@@ -52,11 +54,16 @@ const fmtMoney = (n) =>
 
 export default function VueloDetalle() {
   const { id } = useParams();
+  const nav = useNavigate();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [v, setV] = useState(null);
   const [clasesCat, setClasesCat] = useState([]);
-  const [regreso, setRegreso] = useState(null); 
+  const [regreso, setRegreso] = useState(null);
+
+  const [idClaseSel, setIdClaseSel] = useState(null);
+  const [cant, setCant] = useState(1);
+
   useEffect(() => {
     (async () => {
       try {
@@ -64,12 +71,13 @@ export default function VueloDetalle() {
         setErr("");
 
         const [{ data: vuelo }, { data: catClases }] = await Promise.all([
-          vuelosApi.getPublic(id), 
+          vuelosApi.getPublic(id),
           clasesApi.list(),
         ]);
 
         setV(vuelo);
         setClasesCat(Array.isArray(catClases) ? catClases : []);
+        setIdClaseSel(vuelo?.clases?.[0]?.idClase ?? null);
 
         if (vuelo?.idVueloPareja && Number(vuelo.idVueloPareja) !== Number(id)) {
           try {
@@ -118,6 +126,27 @@ export default function VueloDetalle() {
   const esCancelado = (v.estado || "").toLowerCase().includes("cancel");
   const salida = fmtDateTime(v.fechaSalida);
   const llegada = fmtDateTime(v.fechaLlegada);
+
+  const comprar = async () => {
+    const u = getUser();
+    if (!u) { alert("Primero inicia sesión."); nav("/login"); return; }
+    if (esCancelado || v.activo === false) {
+      alert("Este vuelo no está disponible para compra.");
+      return;
+    }
+    const idClase = idClaseSel ?? v?.clases?.[0]?.idClase;
+    if (!idClase) { alert("Selecciona una clase."); return; }
+    try {
+      await comprasApi.addItem({
+        idVuelo: Number(v.idVuelo),
+        idClase: Number(idClase),
+        cantidad: Number(cant || 1),
+      });
+      nav(`/compras/carrito`);
+    } catch (e) {
+      alert(e?.response?.data?.error || e?.message || "No se pudo agregar al carrito");
+    }
+  };
 
   return (
     <div className="container pag-vuelo">
@@ -198,7 +227,7 @@ export default function VueloDetalle() {
                     <div className="vd__classname">{claseName(c.idClase)}</div>
                     <div className="vd__classmeta">
                       <span className="label">Cupo {c.cupoTotal}</span>
-                      <span className="label">Precio: {" "}{fmtMoney(c.precio)}</span>
+                      <span className="label">Precio: {fmtMoney(c.precio)}</span>
                     </div>
                   </div>
                 ))}
@@ -232,50 +261,44 @@ export default function VueloDetalle() {
           </section>
         </div>
 
-        {regreso && (
-          <section className="vd__pair">
-            <h3 className="block-title">Vuelo de regreso</h3>
-
-            {"error" in regreso ? (
-              <p>
-                Ver{" "}
-                <Link className="link" to={`/vuelos/${v.idVueloPareja}`}>
-                  detalles del regreso
-                </Link>
-                .
-              </p>
-            ) : (
-              <div className="vd__paircard">
-                <div className="vd__paircol">
-                  <div className="vd__paircode">
-                    <Link to={`/vuelos/${regreso.idVuelo}`}>
-                      {regreso.codigo}
-                    </Link>
-                  </div>
-                  <div className="vd__pairroute">
-                    <strong>{regreso.origen}</strong> →{" "}
-                    <strong>{regreso.destino}</strong>
-                  </div>
-                </div>
-                <div className="vd__pairtimes">
-                  <div>
-                    <span className="label">Sale</span>{" "}
-                    {fmtDateTime(regreso.fechaSalida)}
-                  </div>
-                  <div>
-                    <span className="label">Llega</span>{" "}
-                    {fmtDateTime(regreso.fechaLlegada)}
-                  </div>
-                </div>
-              </div>
-            )}
-          </section>
-        )}
-
-        <div className="actions" style={{ marginTop: 12 }}>
+        <div className="actions" style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
           <Link to="/vuelos" className="btn">
             Cerrar
           </Link>
+
+          {v?.clases?.length > 0 && (
+            <>
+              <select
+                className="input"
+                value={idClaseSel ?? ""}
+                onChange={(e) => setIdClaseSel(Number(e.target.value))}
+              >
+                {v.clases.map((c) => (
+                  <option key={c.idClase} value={c.idClase}>
+                    {claseName(c.idClase)}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                className="input"
+                type="number"
+                min={1}
+                max={9}
+                value={cant}
+                onChange={(e) => setCant(Math.max(1, Math.min(9, Number(e.target.value) || 1)))}
+                style={{ width: 64 }}
+              />
+
+              <button
+                className="btn btn-secondary"
+                onClick={comprar}
+                disabled={esCancelado || v.activo === false || !v?.clases?.length}
+              >
+                Comprar
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

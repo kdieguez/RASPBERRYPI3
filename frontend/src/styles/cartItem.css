@@ -1,0 +1,11 @@
+.citem { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid #eee; }
+.citem__title { display: flex; align-items: center; gap: 6px; font-weight: 600; margin-bottom: 6px; }
+.citem__times { display: flex; gap: 16px; font-size: 14px; color: #333; }
+
+.citem__right {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 12px;
+  align-items: center;
+}
+.citem__price, .citem__qty, .citem__subtotal { text-align: right; }

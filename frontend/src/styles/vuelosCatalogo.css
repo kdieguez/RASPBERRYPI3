@@ -66,3 +66,34 @@
   color: #b91c1c;
   border: 1px solid #fecaca;
 }
+
+.vitem__actions {
+  margin-top: 0.8rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.vitem__actions .btn {
+  background-color: #1E93AB; 
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  text-decoration: none;
+}
+
+.vitem__actions .btn:hover {
+  background-color: #176f80;
+}
+
+.vitem__actions .btn-secondary {
+  background-color: #E62727; 
+}
+
+.vitem__actions .btn-secondary:hover {
+  background-color: #b81d1d;
+}
+

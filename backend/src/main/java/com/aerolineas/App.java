@@ -2,6 +2,7 @@ package com.aerolineas;
 
 import com.aerolineas.config.DB;
 import com.aerolineas.controller.*;
+import com.aerolineas.http.JsonErrorHandler;
 import com.aerolineas.middleware.Auth;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
@@ -13,7 +14,7 @@ public class App {
 
   private static void requireAuth(Context ctx, Handler next) throws Exception {
     Auth.jwt().handle(ctx);
-    if (ctx.attribute("claims") == null) return; // no autenticado
+    if (ctx.attribute("claims") == null) return;
     next.handle(ctx);
   }
 
@@ -28,13 +29,14 @@ public class App {
 
   private static void requireAdmin(Context ctx, Handler next) throws Exception {
     Auth.jwt().handle(ctx);
-    if (ctx.attribute("claims") == null) return; // no autenticado
+    if (ctx.attribute("claims") == null) return;
     if (!isAdmin(ctx)) { ctx.status(403).json(Map.of("error","solo administradores")); return; }
     next.handle(ctx);
   }
 
   public static void main(String[] args) {
     var app = Javalin.create(cfg -> cfg.http.defaultContentType = "application/json").start(8080);
+
     app.exception(IllegalArgumentException.class, (e, ctx) -> {
       ctx.status(400).json(Map.of("error", e.getMessage()));
     });
@@ -46,14 +48,37 @@ public class App {
 
     app.before(ctx -> {
       ctx.header("Access-Control-Allow-Origin", "*");
-      ctx.header("Access-Control-Allow-Headers", "Authorization, Content-Type");
-      ctx.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+      ctx.header("Vary", "Origin");
+      ctx.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS,PATCH");
+
+      String reqHeaders = ctx.header("Access-Control-Request-Headers");
+      String allowHeaders = (reqHeaders != null && !reqHeaders.isBlank())
+          ? reqHeaders
+          : "Authorization, Content-Type, X-User-Id";
+      ctx.header("Access-Control-Allow-Headers", allowHeaders);
+
+      ctx.header("Access-Control-Max-Age", "86400");
     });
-    app.options("/*", ctx -> ctx.status(204));
+
+    app.options("/*", ctx -> {
+      ctx.header("Access-Control-Allow-Origin", "*");
+      ctx.header("Vary", "Origin");
+      ctx.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS,PATCH");
+
+      String reqHeaders = ctx.header("Access-Control-Request-Headers");
+      String allowHeaders = (reqHeaders != null && !reqHeaders.isBlank())
+          ? reqHeaders
+          : "Authorization, Content-Type, X-User-Id";
+      ctx.header("Access-Control-Allow-Headers", allowHeaders);
+
+      ctx.header("Access-Control-Max-Age", "86400");
+      ctx.status(204);
+    });
 
     var authCtrl   = new AuthController();
     var perfilCtrl = new PerfilController();
-    var adminUsr   = new AdminUsuarioController(); 
+    var adminUsr   = new AdminUsuarioController();
+
     app.get("/health", ctx -> ctx.result("OK"));
     app.get("/api/db/ping", ctx -> ctx.json(DB.ping() ? "DB OK" : "DB FAIL"));
 
@@ -73,5 +98,6 @@ public class App {
     new RutaController().routes(app);
     new VueloController().routes(app);
     new ClaseController().routes(app);
+    new ComprasController().register(app);
   }
 }

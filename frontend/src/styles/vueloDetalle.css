@@ -77,3 +77,35 @@
 .vd__paircode { font-weight: 700; margin-bottom: 4px; }
 .vd__pairroute { color: #0f172a; }
 .vd__pairtimes { display: flex; gap: 22px; color: #0f172a; }
+
+.actions {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 0.8rem;
+  justify-content: flex-end;
+}
+
+.actions .btn {
+  background-color: #1E93AB;
+  color: #fff;
+  border: none;
+  padding: 0.7rem 1.2rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: background-color 0.3s ease;
+}
+
+.actions .btn:hover {
+  background-color: #176f80;
+}
+
+.actions .btn-secondary {
+  background-color: #E62727;
+  color: #fff;
+}
+
+.actions .btn-secondary:hover {
+  background-color: #b81d1d;
+}

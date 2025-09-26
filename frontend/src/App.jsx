@@ -16,6 +16,12 @@ import VuelosCatalogo from "./paginas/VuelosCatalogo";
 import VueloEdit from "./paginas/admin/VueloEdit";
 import AdminVuelosList from "./paginas/admin/AdminVuelosList";
 import VueloDetalle from "./paginas/VueloDetalle";
+import Carrito from "./paginas/Carrito";
+import CheckoutAgradecimiento from "./paginas/CheckoutAgradecimiento";
+import Checkout from "./paginas/CheckOut";
+import HistorialCompras from "./paginas/HistorialCompras";
+import ReservaDetalle from "./paginas/ReservaDetalle";
+
 
 function Home() {
   return (
@@ -38,6 +44,12 @@ export default function App() {
           <Route path="/perfil" element={<Perfil />} />
           <Route path="/vuelos" element={<VuelosCatalogo/>} />
           <Route path="/vuelos/:id" element={<VueloDetalle/>}/>
+          <Route path="/compras/carrito" element={<Carrito />} />
+          <Route path="/compras/checkout" element={<Checkout />} />
+          <Route path="/compras/checkout/:id" element={<CheckoutAgradecimiento />} />
+          <Route path="/compras/historial" element={<HistorialCompras/>} />
+          <Route path="/compras/reservas/:id" element={<ReservaDetalle/>}/>
+          
 
           {/* Rutas admin */}
           <Route element={<ProtectedRoute allowRoles={[1]} />}>

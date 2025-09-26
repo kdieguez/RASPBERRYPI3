@@ -34,7 +34,26 @@
       <artifactId>javalin</artifactId>
       <version>${javalin.version}</version>
     </dependency>
+    
+    <dependency>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>pdfbox</artifactId>
+      <version>2.0.30</version>
+    </dependency>
 
+    <dependency>
+      <groupId>com.sun.activation</groupId>
+      <artifactId>javax.activation</artifactId>
+      <version>1.2.0</version>
+    </dependency>
+
+    <!-- Correo: JavaMail (paquete javax.mail.*) -->
+    <dependency>
+      <groupId>com.sun.mail</groupId>
+      <artifactId>javax.mail</artifactId>
+      <version>1.6.2</version>
+    </dependency>
+    
     <!-- Pool de conexiones -->
     <dependency>
       <groupId>com.zaxxer</groupId>
@@ -73,6 +92,13 @@
       <groupId>com.fasterxml.jackson.datatype</groupId>
       <artifactId>jackson-datatype-jsr310</artifactId>
       <version>${jackson.version}</version>
+    </dependency>
+
+    <!-- Jakarta Mail (implementación de JavaMail) -->
+    <dependency>
+      <groupId>com.sun.mail</groupId>
+      <artifactId>jakarta.mail</artifactId>
+      <version>2.0.1</version>
     </dependency>
 
     <!-- BCrypt para hash de contraseñas -->

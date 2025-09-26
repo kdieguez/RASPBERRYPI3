@@ -1,0 +1,18 @@
+.carrito .c-head {
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;
+}
+.carrito .c-card { padding:12px; }
+
+.c-list { list-style:none; margin:0; padding:0; }
+.c-footer{
+  margin-top:12px; display:flex; justify-content:space-between; align-items:center;
+  border-top:1px solid #eee; padding-top:12px;
+}
+.c-total{ font-size:18px; }
+
+.input{ padding:6px 8px; border-radius:8px; border:1px solid #ddd; width:70px; }
+
+.skl.title{ height:20px; background:#eee; border-radius:6px; margin-bottom:10px; }
+.skl.row{ height:14px; background:#f0f0f0; border-radius:6px; margin:8px 0; }
+.error{ color:var(--primary); }
+.empty{ color:#666; }

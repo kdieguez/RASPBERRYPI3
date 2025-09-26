@@ -8,6 +8,7 @@ C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\VueloDTO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\VueloController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\middleware\Cors.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\ComprasController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\CiudadDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\RutaDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\PerfilController.java
@@ -27,7 +28,10 @@ C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\PaisDTOs.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\CiudadDTOs.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\ClaseDTOs.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\util\Mailer.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\ComprasDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\App.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\PaisDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\UsuarioAdminDTOs.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\CompraDTO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\VueloDAO.java
