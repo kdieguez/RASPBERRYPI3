@@ -14,14 +14,15 @@ set BCRYPT_COST=10
 
 set RECAPTCHA_SECRET=6LdcFMArAAAAAGa1QLVlFnxkuldScup3xuGfaJil
 
-:: ===== SMTP - GMAIL =====
+:: SMTP - GMAIL
 set "MAIL_HOST=smtp.gmail.com"
 set "MAIL_PORT=587"
 set "MAIL_USER=kds2games@gmail.com"
-set "MAIL_PASS=ncsa noau lkcd gics"
+set "MAIL_PASS=ncsanoaulkcdgics"
 set "MAIL_FROM=Aerolíneas <kds2games@gmail.com>"
 set "MAIL_TLS=true"
 set "MAIL_AUTH=true"
+set "MAIL_DEBUG=true"
 
 :: Ejecutar backend
 java -jar target\aerolineas-backend-1.0.0.jar

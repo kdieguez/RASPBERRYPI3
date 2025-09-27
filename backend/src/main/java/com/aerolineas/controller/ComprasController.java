@@ -19,6 +19,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Map;
 
+import com.aerolineas.util.Mailer;
+
 public class ComprasController {
 
   private final ComprasDAO dao = new ComprasDAO();
@@ -33,7 +35,7 @@ public class ComprasController {
       if (id == null) id = claims.get("sub");
       if (id != null) try { return Long.parseLong(String.valueOf(id)); } catch (Exception ignore) {}
     }
-    String h = ctx.header("X-User-Id"); 
+    String h = ctx.header("X-User-Id");
     if (h != null && !h.isBlank()) return Long.parseLong(h);
     throw new IllegalStateException("Usuario no autenticado");
   }
@@ -63,6 +65,19 @@ public class ComprasController {
   }
 
   public void register(Javalin app) {
+
+    app.get("/api/dev/test-mail", ctx -> {
+      String to = ctx.queryParam("to");
+      if (to == null || to.isBlank()) {
+        to = ctx.header("X-User-Email");
+      }
+      if (to == null || to.isBlank()) {
+        ctx.status(400).result("Falta ?to=destinatario o header X-User-Email");
+        return;
+      }
+      Mailer.send(to, "Prueba SMTP", "<h3>Hola 👋</h3><p>Esto es una prueba desde el backend.</p>");
+      ctx.result("OK enviado a " + to);
+    });
 
     app.get("/api/compras/carrito", ctx -> {
       try {
@@ -162,7 +177,7 @@ public class ComprasController {
       Map<String, Object> claims = ctx.attribute("claims");
       String to = claims != null ? String.valueOf(claims.getOrDefault("email", "")) : "";
       if (to == null || to.isBlank()) {
-        to = ctx.header("X-User-Email"); 
+        to = ctx.header("X-User-Email");
         if (to == null || to.isBlank()) return;
       }
 
@@ -172,8 +187,6 @@ public class ComprasController {
       html.append("<ul style='padding-left:16px'>");
       if (resumen.items != null) {
         for (var it : resumen.items) {
-          String cod = String.valueOf(it.codigoVuelo);
-          String clase = String.valueOf(it.clase);
           String salida = dt(String.valueOf(it.fechaSalida));
           String llegada = dt(String.valueOf(it.fechaLlegada));
           String paisO = getOpt(it, "paisOrigen");
@@ -181,14 +194,24 @@ public class ComprasController {
           String ciuO  = getOpt(it, "ciudadOrigen");
           String ciuD  = getOpt(it, "ciudadDestino");
 
-          String origen = (ciuO.isBlank() && paisO.isBlank()) ? "" : (" — Origen: " + (ciuO.isBlank()?paisO:(ciuO+", "+paisO)));
-          String destino= (ciuD.isBlank() && paisD.isBlank()) ? "" : (" — Destino: " + (ciuD.isBlank()?paisD:(ciuD+", "+paisD)));
+          StringBuilder extra = new StringBuilder();
+          if (!(ciuO.isBlank() && paisO.isBlank()) || !(ciuD.isBlank() && paisD.isBlank())) {
+            extra.append("<br/><small>");
+            if (!(ciuO.isBlank() && paisO.isBlank())) {
+              extra.append("Origen: ").append(ciuO.isBlank() ? paisO : (ciuO + ", " + paisO));
+            }
+            if (!(ciuD.isBlank() && paisD.isBlank())) {
+              if (extra.length() > 13) extra.append(" • ");
+              extra.append("Destino: ").append(ciuD.isBlank() ? paisD : (ciuD + ", " + paisD));
+            }
+            extra.append("</small>");
+          }
 
           html.append("<li style='margin:6px 0'>")
-              .append("<strong>").append(cod).append("</strong> (").append(clase).append(")")
-              .append("<br/><small>Salida: ").append(salida)
-              .append(" • Llegada: ").append(llegada).append("</small>")
-              .append("<br/><small>").append(origen).append(destino).append("</small>")
+              .append("<strong>").append(String.valueOf(it.codigoVuelo)).append("</strong>")
+              .append(" (").append(String.valueOf(it.clase)).append(")")
+              .append("<br/><small>Salida: ").append(salida).append(" • Llegada: ").append(llegada).append("</small>")
+              .append(extra)
               .append("<br/><strong>").append(money(it.subtotal)).append("</strong>")
               .append("</li>");
         }
@@ -197,11 +220,11 @@ public class ComprasController {
       html.append("<p>Total: <strong>").append(money(resumen.total)).append("</strong></p>");
       html.append("<p>¡Buen viaje!<br/>Aerolíneas</p>");
 
-      Class<?> mailer = Class.forName("com.aerolineas.util.Mailer");
-      var m = mailer.getMethod("send", String.class, String.class, String.class);
-      m.invoke(null, to, "Confirmación de reserva #" + idReserva, html.toString());
-    } catch (ClassNotFoundException cnf) {
+      Mailer.send(to, "Confirmación de reserva #" + idReserva, html.toString());
     } catch (Exception ex) {
+      if (Boolean.parseBoolean(System.getenv("MAIL_DEBUG"))) {
+        System.out.println("[MAIL] Error enviando correo: " + ex.getMessage());
+      }
     }
   }
 }

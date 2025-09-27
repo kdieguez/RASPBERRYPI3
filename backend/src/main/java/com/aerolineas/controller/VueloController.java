@@ -4,6 +4,7 @@ import com.aerolineas.dao.VueloDAO;
 import com.aerolineas.dto.VueloDTO;
 import com.aerolineas.http.JsonErrorHandler;
 import com.aerolineas.middleware.Auth;
+import com.aerolineas.service.NotificacionesService;
 import io.javalin.Javalin;
 
 import java.sql.SQLException;
@@ -13,6 +14,7 @@ import static com.aerolineas.util.EstadosVuelo.*;
 
 public class VueloController {
   private final VueloDAO dao = new VueloDAO();
+  private final NotificacionesService notifySvc = new NotificacionesService();
 
   static record RoundtripReq(VueloDTO.Create ida, VueloDTO.Create regreso) {}
   static record LinkReq(Long idIda, Long idRegreso) {}
@@ -25,20 +27,19 @@ public class VueloController {
     app.get("/api/v1/vuelos/{id}", ctx -> {
       long id = ctx.pathParamAsClass("id", Long.class).get();
       var v = dao.obtenerVuelo(id);
-      if (v == null) { 
-        ctx.status(404).json(Map.of("error","Vuelo no encontrado")); 
-        return; 
-      } 
+      if (v == null) {
+        ctx.status(404).json(Map.of("error","Vuelo no encontrado"));
+        return;
+      }
       ctx.json(v);
     });
 
-  app.get("/api/public/vuelos/{id}", ctx -> {
-    long idV = ctx.pathParamAsClass("id", Long.class).get();
-    var v = dao.obtenerVuelo(idV);
-    if (v == null) { ctx.status(404).json(Map.of("error", "Vuelo no encontrado")); return; }
-    ctx.json(v);
-  });
-
+    app.get("/api/public/vuelos/{id}", ctx -> {
+      long idV = ctx.pathParamAsClass("id", Long.class).get();
+      var v = dao.obtenerVuelo(idV);
+      if (v == null) { ctx.status(404).json(Map.of("error", "Vuelo no encontrado")); return; }
+      ctx.json(v);
+    });
 
     app.get("/api/v1/admin/vuelos", ctx -> {
       Auth.adminOrEmpleado().handle(ctx);
@@ -86,6 +87,11 @@ public class VueloController {
       try {
         dao.actualizarVueloAdmin(id, dto);
         ctx.status(204);
+
+        new Thread(() -> {
+          try { notifySvc.notificarCambio(id, dto.motivoCambio()); } catch (Exception ignore) {}
+        }, "mail-cambio-vuelo-" + id).start();
+
       } catch (SQLException e) {
         String msg = e.getMessage()==null? "" : e.getMessage();
         if (msg.toLowerCase().contains("cancelado")) {
@@ -157,6 +163,13 @@ public class VueloController {
       try {
         dao.actualizarEstado(idVuelo, dto.idEstado(), dto.motivo());
         ctx.status(204);
+
+        if (dto.idEstado() == CANCELADO) {
+          new Thread(() -> {
+            try { notifySvc.notificarCancelacion(idVuelo, dto.motivo()); } catch (Exception ignore) {}
+          }, "mail-cancel-vuelo-" + idVuelo).start();
+        }
+
       } catch (SQLException e) {
         String msg = e.getMessage() == null ? "" : e.getMessage();
         if (msg.contains("no existe")) {

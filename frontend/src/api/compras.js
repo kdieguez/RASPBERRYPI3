@@ -76,7 +76,6 @@ export const comprasApi = {
   },
 
   cancelReserva(id) {
-  return api.post(`/api/compras/reservas/${id}/cancelar`, {}, { headers: authHeaders() });
-},
-
+    return api.post(`/api/compras/reservas/${id}/cancelar`, {}, { headers: authHeaders() });
+  },
 };

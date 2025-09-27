@@ -12,7 +12,7 @@
 
   <properties>
     <java.version>17</java.version>
-    <maven.compiler.release>${java.version}</maven.compiler.release>  
+    <maven.compiler.release>${java.version}</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     <javalin.version>6.2.0</javalin.version>
@@ -34,26 +34,25 @@
       <artifactId>javalin</artifactId>
       <version>${javalin.version}</version>
     </dependency>
-    
+
     <dependency>
       <groupId>org.apache.pdfbox</groupId>
       <artifactId>pdfbox</artifactId>
       <version>2.0.30</version>
     </dependency>
 
-    <dependency>
-      <groupId>com.sun.activation</groupId>
-      <artifactId>javax.activation</artifactId>
-      <version>1.2.0</version>
-    </dependency>
-
-    <!-- Correo: JavaMail (paquete javax.mail.*) -->
+    <!-- Jakarta Mail 2.x (NO mezclar con javax.mail) -->
     <dependency>
       <groupId>com.sun.mail</groupId>
-      <artifactId>javax.mail</artifactId>
-      <version>1.6.2</version>
+      <artifactId>jakarta.mail</artifactId>
+      <version>2.0.1</version>
     </dependency>
-    
+    <dependency>
+      <groupId>com.sun.activation</groupId>
+      <artifactId>jakarta.activation</artifactId>
+      <version>2.0.1</version>
+    </dependency>
+
     <!-- Pool de conexiones -->
     <dependency>
       <groupId>com.zaxxer</groupId>
@@ -94,14 +93,7 @@
       <version>${jackson.version}</version>
     </dependency>
 
-    <!-- Jakarta Mail (implementación de JavaMail) -->
-    <dependency>
-      <groupId>com.sun.mail</groupId>
-      <artifactId>jakarta.mail</artifactId>
-      <version>2.0.1</version>
-    </dependency>
-
-    <!-- BCrypt para hash de contraseñas -->
+    <!-- BCrypt -->
     <dependency>
       <groupId>org.mindrot</groupId>
       <artifactId>jbcrypt</artifactId>
@@ -114,7 +106,6 @@
       <artifactId>jjwt-api</artifactId>
       <version>0.12.5</version>
     </dependency>
-  
     <dependency>
       <groupId>io.jsonwebtoken</groupId>
       <artifactId>jjwt-impl</artifactId>
@@ -141,7 +132,7 @@
         </configuration>
       </plugin>
 
-      <!-- Ejecutar en desarrollo: mvn exec:java -Dexec.mainClass=com.aerolineas.App -->
+      <!-- Dev: mvn exec:java -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
@@ -151,7 +142,7 @@
         </configuration>
       </plugin>
 
-      <!-- Empaquetar un uber-jar con dependencias -->
+      <!-- Uber-jar -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -159,9 +150,7 @@
         <executions>
           <execution>
             <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
+            <goals><goal>shade</goal></goals>
             <configuration>
               <createDependencyReducedPom>false</createDependencyReducedPom>
               <transformers>

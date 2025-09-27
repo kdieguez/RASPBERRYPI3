@@ -10,6 +10,7 @@ com\aerolineas\dto\CompraDTO$PaymentReq$Facturacion.class
 com\aerolineas\controller\CiudadController.class
 com\aerolineas\dao\CiudadDAO.class
 com\aerolineas\dto\PaisDTOs$Create.class
+com\aerolineas\service\NotificacionesService.class
 com\aerolineas\dto\PaisDTOs$View.class
 com\aerolineas\dto\VueloDTO$Create.class
 com\aerolineas\App.class
@@ -46,6 +47,7 @@ com\aerolineas\controller\PerfilController.class
 com\aerolineas\dto\CiudadDTOs$View.class
 com\aerolineas\dto\VueloDTO$EstadoUpdate.class
 com\aerolineas\dto\AuthDTOs$RegisterRequest.class
+com\aerolineas\service\NotificacionesService$Destinatario.class
 com\aerolineas\middleware\Cors.class
 com\aerolineas\util\Mailer$1.class
 com\aerolineas\controller\PerfilController$PasajeroView.class
