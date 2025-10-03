@@ -31,6 +31,14 @@ function authHeaders() {
     h["X-User-Email"] = String(email).trim();
   }
 
+  const name = 
+    u?.nombre ?? 
+    u?.name ?? 
+    u?.fullName ?? 
+    u?.usuario ?? 
+    u?.username;
+  if (name && String(name).trim()) h["X-User-Name"] = String(name).trim();
+
   return h;
 }
 
@@ -77,5 +85,12 @@ export const comprasApi = {
 
   cancelReserva(id) {
     return api.post(`/api/compras/reservas/${id}/cancelar`, {}, { headers: authHeaders() });
+  },
+
+  downloadBoleto(id) {
+    return api.get(`/api/compras/reservas/${id}/boleto.pdf`, {
+      headers: authHeaders(),
+      responseType: "blob",
+    });
   },
 };

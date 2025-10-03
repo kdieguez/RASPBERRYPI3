@@ -20,6 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import com.aerolineas.util.Mailer;
+import com.aerolineas.util.PdfBoleto;
 
 public class ComprasController {
 
@@ -68,14 +69,12 @@ public class ComprasController {
 
     app.get("/api/dev/test-mail", ctx -> {
       String to = ctx.queryParam("to");
-      if (to == null || to.isBlank()) {
-        to = ctx.header("X-User-Email");
-      }
+      if (to == null || to.isBlank()) to = ctx.header("X-User-Email");
       if (to == null || to.isBlank()) {
         ctx.status(400).result("Falta ?to=destinatario o header X-User-Email");
         return;
       }
-      Mailer.send(to, "Prueba SMTP", "<h3>Hola 👋</h3><p>Esto es una prueba desde el backend.</p>");
+      Mailer.send(to, "Prueba SMTP", "<p>Esto es una prueba desde el backend.</p>");
       ctx.result("OK enviado a " + to);
     });
 
@@ -168,6 +167,73 @@ public class ComprasController {
       } catch (Exception e) {
         ctx.status(400).json(Map.of("error", e.getMessage()));
       }
+    });
+
+    app.get("/api/compras/reservas/{id}/boleto.pdf", ctx -> {
+      try {
+        long userId = getUserId(ctx);
+        long id = Long.parseLong(ctx.pathParam("id"));
+
+        var det = dao.getReservaDetalle(userId, id);
+        if (det == null) { ctx.status(404).json(Map.of("error","Reserva no encontrada")); return; }
+
+        String codigo = null;
+        try {
+          var f = det.getClass().getDeclaredField("codigo");
+          f.setAccessible(true);
+          Object v = f.get(det);
+          codigo = (v == null) ? null : String.valueOf(v);
+        } catch (NoSuchFieldException ignore) {}
+        if (codigo == null || codigo.isBlank()) {
+          try (var cn = com.aerolineas.config.DB.getConnection();
+               var ps = cn.prepareStatement(
+                   "SELECT CODIGO FROM AEROLINEA.RESERVA WHERE ID_RESERVA = ? AND ID_USUARIO = ?")) {
+            ps.setLong(1, id);
+            ps.setLong(2, userId);
+            try (var rs = ps.executeQuery()) {
+              if (rs.next()) codigo = rs.getString(1);
+            }
+          }
+        }
+        if (codigo == null || codigo.isBlank()) codigo = String.valueOf(id);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> claims = ctx.attribute("claims");
+
+        String email = null;
+        String nombre = null;
+
+        if (claims != null) {
+          Object em = claims.get("email");
+          if (em != null) email = String.valueOf(em);
+
+          Object nm = claims.get("nombre");
+          if (nm == null) nm = claims.get("name");
+          if (nm == null) nm = claims.get("fullName");
+          if (nm == null) nm = claims.get("usuario");
+          if (nm == null) nm = claims.get("username");
+          if (nm != null) nombre = String.valueOf(nm);
+        }
+
+        if (email == null || email.isBlank()) email  = ctx.header("X-User-Email");
+        if (nombre == null || nombre.isBlank()) nombre = ctx.header("X-User-Name");
+
+        if ((nombre == null || nombre.isBlank()) && email != null && email.contains("@")) {
+          nombre = email.substring(0, email.indexOf('@'));
+        }
+        if (nombre == null || nombre.isBlank()) nombre = "Cliente";
+
+        byte[] pdf = PdfBoleto.build(det, codigo, nombre, email);
+
+        String safe = codigo.replaceAll("[^A-Za-z0-9._-]", "_");
+        ctx.header("Content-Type", "application/pdf");
+        ctx.header("Content-Disposition", "attachment; filename=\"boleto-" + safe + ".pdf\"");
+        ctx.header("Cache-Control", "no-store");
+        ctx.result(pdf);
+      } catch (Exception e) {
+    e.printStackTrace();
+    ctx.status(400).json(Map.of("error", e.getClass().getSimpleName() + ": " + (e.getMessage()==null? "Error generando PDF" : e.getMessage())));
+  }
     });
   }
 

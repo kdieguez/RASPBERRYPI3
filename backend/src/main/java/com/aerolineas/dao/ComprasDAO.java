@@ -263,7 +263,7 @@ public class ComprasDAO {
 
     try (Connection cn = getConn()) {
       try (PreparedStatement ps = cn.prepareStatement(
-           "SELECT ID_USUARIO, ID_ESTADO, TOTAL, CREADA_EN " +
+           "SELECT ID_USUARIO, ID_ESTADO, TOTAL, CREADA_EN, CODIGO " +
            "FROM AEROLINEA.RESERVA WHERE ID_RESERVA = ?")) {
         ps.setLong(1, idReserva);
         try (ResultSet rs = ps.executeQuery()) {
@@ -276,6 +276,7 @@ public class ComprasDAO {
           det.total     = rs.getBigDecimal("TOTAL");
           Timestamp ts = rs.getTimestamp("CREADA_EN");
           det.creadaEn  = ts != null ? ts.toInstant().toString() : null;
+          det.codigo    = rs.getString("CODIGO");
         }
       }
 

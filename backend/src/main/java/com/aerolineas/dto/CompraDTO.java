@@ -59,8 +59,9 @@ public class CompraDTO {
     public BigDecimal subtotal;
     public String ciudadOrigen;
     public String paisOrigen;
-  public String ciudadDestino;
-  }public String paisDestino;
+    public String ciudadDestino;
+    public String paisDestino;
+  }
 
   public static class ReservaListItem {
     public long idReserva;
@@ -76,6 +77,7 @@ public class CompraDTO {
     public int idEstado;
     public BigDecimal total;
     public String creadaEn;
+    public String codigo;         
     public List<ReservaItem> items;
   }
 

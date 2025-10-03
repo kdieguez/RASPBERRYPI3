@@ -31,6 +31,7 @@ com\aerolineas\dto\VueloDTO$View.class
 com\aerolineas\dto\CompraDTO$CarritoResp.class
 com\aerolineas\controller\ClaseController.class
 com\aerolineas\util\EstadosVuelo.class
+com\aerolineas\util\PdfBoleto.class
 com\aerolineas\controller\VueloController$LinkReq.class
 com\aerolineas\dto\CompraDTO$PaymentReq$Tarjeta.class
 com\aerolineas\dao\PasajeroDAO.class
