@@ -10,6 +10,8 @@ import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 public final class PdfBoleto {
@@ -52,11 +54,12 @@ public final class PdfBoleto {
     for (int i = 0; i < s.length(); i++) {
       char ch = s.charAt(i);
       if (ch == '\n' || ch == '\r' || ch == '\t') { out.append(' '); continue; }
-      if (ch == 0x2013 || ch == 0x2014) { out.append('-'); continue; }     
-      if (ch == 0x2018 || ch == 0x2019) { out.append('\''); continue; }    
-      if (ch == 0x201C || ch == 0x201D) { out.append('"'); continue; }     
-      if (ch == 0x2022) { out.append('*'); continue; }                     
-      if (ch >= 0x2500 && ch <= 0x25FF) { out.append('-'); continue; }     
+      if (ch == 0x2192) { out.append("->"); continue; }             
+      if (ch == 0x2013 || ch == 0x2014) { out.append('-'); continue; } 
+      if (ch == 0x2018 || ch == 0x2019) { out.append('\''); continue; }
+      if (ch == 0x201C || ch == 0x201D) { out.append('"');  continue; }
+      if (ch == 0x2022) { out.append('*'); continue; }
+      if (ch >= 0x2500 && ch <= 0x25FF) { out.append('-'); continue; }
       if (ch >= 32 && ch <= 255) { out.append(ch); } else { out.append('?'); }
     }
     return out.toString();
@@ -136,15 +139,131 @@ public final class PdfBoleto {
     strokeRect(cs, x, y - h + 2, w, h, BORDER, 0.6f);
     text(cs, x + padX, y - 10, PDType1Font.HELVETICA_BOLD, 9.5f, label);
   }
+  private static float badgeWidth(String label) throws Exception {
+  return textW(PDType1Font.HELVETICA_BOLD, 9.5f, sanitize(label)) + 12f;
+}
 
-  private static void itineraryCard(PDDocument doc, PDPage[] pageRef, PDPageContentStream[] csRef,
-                                    float margin, float contentW, float y, CompraDTO.ReservaItem it) throws Exception {
+  private static List<String> wrapLines(PDType1Font font, float size, String text, float maxWidth) throws Exception {
+    text = sanitize(text == null ? "-" : text);
+    if (text.isBlank()) text = "-";
+    String[] words = text.split("\\s+");
+    List<String> lines = new ArrayList<>();
+    StringBuilder cur = new StringBuilder();
+
+    for (String w : words) {
+      String tryLine = cur.length() == 0 ? w : cur + " " + w;
+      if (textW(font, size, tryLine) <= maxWidth) {
+        cur.setLength(0); cur.append(tryLine);
+      } else {
+        if (cur.length() == 0) { 
+          lines.add(tryLine);
+          cur.setLength(0);
+        } else {
+          lines.add(cur.toString());
+          cur.setLength(0);
+          cur.append(w);
+        }
+      }
+    }
+    if (cur.length() > 0) lines.add(cur.toString());
+    return lines;
+  }
+
+  private static float drawWrapped(
+      PDPageContentStream cs, float x, float y,
+      PDType1Font font, float size, float[] color,
+      String text, float maxWidth, float lineH
+  ) throws Exception {
+    List<String> lines = wrapLines(font, size, text, maxWidth);
+    float curY = y;
+    for (String ln : lines) {
+      text(cs, x, curY, font, size, color, ln);
+      curY -= lineH;
+    }
+    return curY;
+  }
+
+  private static float drawKeyValWrapped(
+      PDPageContentStream cs, float x, float y,
+      String key, String value,
+      float maxWidth, float lineH
+  ) throws Exception {
+    String k = key + ": ";
+    float kw = textW(PDType1Font.HELVETICA, 11, k);
+    text(cs, x, y, PDType1Font.HELVETICA, 11, MUTED, k);
+    return drawWrapped(cs, x + kw, y, PDType1Font.HELVETICA_BOLD, 11, BLACK, value, maxWidth - kw, lineH);
+  }
+
+  private static float itineraryCard(
+      PDDocument doc, PDPage[] pageRef, PDPageContentStream[] csRef,
+      float margin, float contentW, float y, CompraDTO.ReservaItem it
+  ) throws Exception {
+
     PDPageContentStream cs = csRef[0];
-    float cardH = 102;
+
+    String paisO = getOpt(it, "paisOrigen");
+    String paisD = getOpt(it, "paisDestino");
+    String ciuO  = getOpt(it, "ciudadOrigen");
+    String ciuD  = getOpt(it, "ciudadDestino");
+    String origen  = (!ciuO.isBlank() || !paisO.isBlank()) ? (ciuO.isBlank()? paisO : (ciuO + ", " + paisO)) : "-";
+    String destino = (!ciuD.isBlank() || !paisD.isBlank()) ? (ciuD.isBlank()? paisD : (ciuD + ", " + paisD)) : "-";
+
+    String escalaCiudad  = getOpt(it, "escalaCiudad");
+    String escalaPais    = getOpt(it, "escalaPais");
+    String escalaLlegada = getOpt(it, "escalaLlegada");
+    String escalaSalida  = getOpt(it, "escalaSalida");
+    boolean hasEscala = !( (escalaCiudad==null?"":escalaCiudad)
+            + (escalaPais==null?"":escalaPais)
+            + (escalaLlegada==null?"":escalaLlegada)
+            + (escalaSalida==null?"":escalaSalida) ).isBlank();
+
+    String escalaRuta = "-";
+    if (hasEscala) {
+      String rc = (escalaCiudad == null ? "" : escalaCiudad.trim());
+      String rp = (escalaPais   == null ? "" : escalaPais.trim());
+      escalaRuta = (!rc.isBlank() && !rp.isBlank()) ? (rc + ", " + rp)
+              : (!rc.isBlank() ? rc : (!rp.isBlank() ? rp : "-"));
+    }
+    String escalaTexto = hasEscala
+        ? (escalaRuta + " — " + dt(escalaLlegada) + " -> " + dt(escalaSalida))
+        : "-";
+
+    String regCod = getOpt(it, "regresoCodigo");
+    String regCO  = getOpt(it, "regresoCiudadOrigen");
+    String regPO  = getOpt(it, "regresoPaisOrigen");
+    String regCD  = getOpt(it, "regresoCiudadDestino");
+    String regPD  = getOpt(it, "regresoPaisDestino");
+    String regFS  = getOpt(it, "regresoFechaSalida");
+    String regFL  = getOpt(it, "regresoFechaLlegada");
+
+    boolean hasRegreso = !( (regCod==null?"":regCod) + (regCO==null?"":regCO) + (regPO==null?"":regPO)
+            + (regCD==null?"":regCD) + (regPD==null?"":regPD)
+            + (regFS==null?"":regFS) + (regFL==null?"":regFL) ).isBlank();
+
+    String regresoOrigen  = (!regCO.isBlank() || !regPO.isBlank()) ? (regCO.isBlank()? regPO : (regCO + ", " + regPO)) : "-";
+    String regresoDestino = (!regCD.isBlank() || !regPD.isBlank()) ? (regCD.isBlank()? regPD : (regCD + ", " + regPD)) : "-";
+    String regresoRuta    = (regresoOrigen.equals("-") && regresoDestino.equals("-")) ? "-" : (regresoOrigen + " -> " + regresoDestino);
+    String regresoHorario = (regFS.isBlank() && regFL.isBlank()) ? "-" : (dt(regFS) + " -> " + dt(regFL));
+
+    float lineH = 14f;
+    float extrasMaxW = contentW - 28;            
+    float escalaLabelW  = textW(PDType1Font.HELVETICA, 11, "Escala: ");
+    float regresoLabelW = textW(PDType1Font.HELVETICA, 11, "Regreso: ");
+    float horarioLabelW = textW(PDType1Font.HELVETICA, 11, "Horario: ");
+    int escalaLines     = hasEscala  ? wrapLines(PDType1Font.HELVETICA_BOLD, 11, escalaTexto,  extrasMaxW - escalaLabelW).size()  : 0;
+    int regresoLines    = hasRegreso ? wrapLines(PDType1Font.HELVETICA_BOLD, 11, regresoRuta,  extrasMaxW - regresoLabelW).size()
+                                     + wrapLines(PDType1Font.HELVETICA_BOLD, 11, regresoHorario, extrasMaxW - horarioLabelW).size() : 0;
+
+    float baseH    = 118f;
+    float escalaH  = hasEscala  ? (escalaLines  * lineH + 8) : 0f;
+    float regresoH = hasRegreso ? (regresoLines * lineH + 12): 0f;
+    float cardH    = baseH + escalaH + regresoH;
+
     y = ensureSpace(doc, pageRef, csRef, y, cardH + 16, margin);
     cs = csRef[0];
 
     float cardY = y - cardH;
+
     fillRect(cs, margin, cardY, contentW, cardH, WHITE);
     strokeRect(cs, margin, cardY, contentW, cardH, BORDER, 0.8f);
     fillRect(cs, margin, cardY + cardH - 24, contentW, 24, LIGHT);
@@ -156,32 +275,56 @@ public final class PdfBoleto {
     float b1w = textW(PDType1Font.HELVETICA_BOLD, 9.5f, cod) + 12;
     badge(cs, margin + 16 + b1w, badgesY, it.clase != null ? it.clase : "Clase");
 
-    String paisO = getOpt(it, "paisOrigen");
-    String paisD = getOpt(it, "paisDestino");
-    String ciuO  = getOpt(it, "ciudadOrigen");
-    String ciuD  = getOpt(it, "ciudadDestino");
-    String origen  = (!ciuO.isBlank() || !paisO.isBlank()) ? (ciuO.isBlank()? paisO : (ciuO + ", " + paisO)) : "-";
-    String destino = (!ciuD.isBlank() || !paisD.isBlank()) ? (ciuD.isBlank()? paisD : (ciuD + ", " + paisD)) : "-";
-
-    float leftX = margin + 14;
+    float leftX  = margin + 14;
     float rightX = margin + contentW - 14;
 
-    text(cs, leftX,               cardY + cardH - 40, PDType1Font.HELVETICA_BOLD, 12, BLACK, origen);
-    rightText(cs, rightX,         cardY + cardH - 40, PDType1Font.HELVETICA_BOLD, 12, BLACK, destino);
-
+    text(cs, leftX,       cardY + cardH - 40, PDType1Font.HELVETICA_BOLD, 12, BLACK, origen);
+    rightText(cs, rightX, cardY + cardH - 40, PDType1Font.HELVETICA_BOLD, 12, BLACK, destino);
     String arrow = "-->";
     float arrowW = textW(PDType1Font.HELVETICA, 11, arrow);
     float centerX = margin + (contentW / 2f);
     text(cs, centerX - (arrowW / 2f), cardY + cardH - 41, PDType1Font.HELVETICA, 11, MUTED, arrow);
 
-    keyVal(cs, leftX,          cardY + cardH - 58, "Salida",  dt(String.valueOf(it.fechaSalida)));
-    keyVal(cs, leftX,          cardY + cardH - 74, "Llegada", dt(String.valueOf(it.fechaLlegada)));
+    keyVal(cs, leftX,        cardY + cardH - 60, "Salida",  dt(String.valueOf(it.fechaSalida)));
+    keyVal(cs, leftX,        cardY + cardH - 76, "Llegada", dt(String.valueOf(it.fechaLlegada)));
 
-    keyVal(cs, rightX - 220,   cardY + cardH - 58, "Cantidad",   String.valueOf(it.cantidad));
-    keyVal(cs, rightX - 220,   cardY + cardH - 74, "P. unitario", money(it.precioUnitario));
-    keyVal(cs, rightX - 220,   cardY + cardH - 90, "Subtotal",    money(it.subtotal));
+    keyVal(cs, rightX - 220, cardY + cardH - 60, "Cantidad",   String.valueOf(it.cantidad));
+    keyVal(cs, rightX - 220, cardY + cardH - 76, "P. unitario", money(it.precioUnitario));
+    keyVal(cs, rightX - 220, cardY + cardH - 92, "Subtotal",    money(it.subtotal));
+
+    line(cs, margin + 10, cardY + cardH - 104, margin + contentW - 10, BORDER, 0.6f);
+    float nextY = cardY + cardH - 116;
+
+    if (hasEscala) {
+      nextY = drawKeyValWrapped(cs, leftX, nextY, "Escala", escalaTexto, extrasMaxW, lineH) - 8;
+    }
+
+if (hasRegreso) {
+  String k = "Regreso: ";
+  float kw = textW(PDType1Font.HELVETICA, 11, k);
+
+  text(cs, leftX, nextY, PDType1Font.HELVETICA, 11, MUTED, k);
+
+  float startX = leftX + kw;
+  float afterBadgeX = startX;
+
+  if (!regCod.isBlank()) {
+    float bw = badgeWidth(regCod);
+    badge(cs, startX, nextY + 14, regCod);
+    afterBadgeX = startX + bw + 6f;  
+  }
+
+  float maxWValue = (margin + contentW - 14) - afterBadgeX; 
+  nextY = drawWrapped(cs, afterBadgeX, nextY, PDType1Font.HELVETICA_BOLD, 11, BLACK,
+                      regresoRuta, maxWValue, lineH) - 6;
+
+  nextY = drawKeyValWrapped(cs, leftX, nextY, "Horario", regresoHorario,
+                            contentW - 28, lineH);
+}
+
 
     line(cs, margin, cardY - 6, margin + contentW, BORDER, 0.6f);
+    return cardY - 16;
   }
 
   public static byte[] build(CompraDTO.ReservaDetalle det, String codigo, String comprador, String email) throws Exception {
@@ -214,9 +357,7 @@ public final class PdfBoleto {
 
       if (det.items != null && !det.items.isEmpty()) {
         for (var it : det.items) {
-          y = ensureSpace(doc, pageRef, csRef, y, 130, margin);
-          itineraryCard(doc, pageRef, csRef, margin, contentW, y, it);
-          y -= 130;
+          y = itineraryCard(doc, pageRef, csRef, margin, contentW, y, it);  
         }
       } else {
         text(cs, margin, y, PDType1Font.HELVETICA, 11, MUTED, "No hay vuelos en esta reserva.");

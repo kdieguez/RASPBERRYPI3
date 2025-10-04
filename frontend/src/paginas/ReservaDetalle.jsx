@@ -12,8 +12,17 @@ const dt = (s) =>
   s ? new Date(s).toLocaleString("es-GT", { dateStyle: "medium", timeStyle: "short" }) : "—";
 
 const estadoName = (id) =>
-  ({ 1: "Confirmada", 2: "Cancelada", 3: "Reembolsada", 4: "Expirada" }[Number(id)] ||
+  ({ 1: "Confirmada", 2: "Pagada", 3: "Reembolsada", 4: "Expirada" }[Number(id)] ||
     `Estado ${id}`);
+
+const route = (ciudad, pais) => {
+  const c = (ciudad || "").trim();
+  const p = (pais || "").trim();
+  if (!c && !p) return "—";
+  if (!c) return p;
+  if (!p) return c;
+  return `${c}, ${p}`;
+};
 
 export default function ReservaDetalle() {
   const { id } = useParams();
@@ -71,12 +80,7 @@ export default function ReservaDetalle() {
     <div className="container historial">
       <div className="h-head">
         <h1>
-          Reserva #{id}
-          {det?.codigo ? (
-            <span className="pill" style={{ marginLeft: 8 }}>
-              Código: {det.codigo}
-            </span>
-          ) : null}
+          Reserva {det?.codigo ? det.codigo : `#${id}`}
         </h1>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn btn-primary" onClick={onDownload} disabled={downloading || loading}>
@@ -123,7 +127,6 @@ export default function ReservaDetalle() {
                       <span className="pill">{it.clase}</span>
                     </div>
 
-                    {/* Línea de ruta: origen/destino (usa campos ciudad/pais que envía el backend) */}
                     <RouteLine item={it} />
 
                     <div className="rd-times">
@@ -134,7 +137,32 @@ export default function ReservaDetalle() {
                         <span className="label">Llegada</span> {dt(it.fechaLlegada)}
                       </div>
                     </div>
+
+                    {(it.escalaCiudad || it.escalaPais || it.escalaLlegada || it.escalaSalida) && (
+                      <div className="rd-extra">
+                        <div className="label" style={{ marginBottom: 4 }}>Escala</div>
+                        <div className="text-muted">
+                          {route(it.escalaCiudad, it.escalaPais)} — {dt(it.escalaLlegada)} → {dt(it.escalaSalida)}
+                        </div>
+                      </div>
+                    )}
+
+                    {it.regresoCodigo && (
+                      <div className="rd-extra">
+                        <div className="label" style={{ marginBottom: 4 }}>Regreso</div>
+                        <div className="rd-code" style={{ marginBottom: 6 }}>
+                          <span className="badge">{it.regresoCodigo}</span>
+                        </div>
+                        <div className="text-muted">
+                          {route(it.regresoCiudadOrigen, it.regresoPaisOrigen)} → {route(it.regresoCiudadDestino, it.regresoPaisDestino)}
+                        </div>
+                        <div className="text-muted">
+                          {dt(it.regresoFechaSalida)} → {dt(it.regresoFechaLlegada)}
+                        </div>
+                      </div>
+                    )}
                   </div>
+
                   <div className="rd-money">
                     <div>
                       <span className="label">Cantidad</span> {it.cantidad}

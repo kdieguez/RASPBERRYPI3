@@ -21,12 +21,12 @@ public class VueloController {
 
   public void routes(Javalin app) {
 
-    app.get("/api/public/vuelos", ctx -> ctx.json(dao.listarVuelos(true)));
-    app.get("/api/v1/vuelos",     ctx -> ctx.json(dao.listarVuelos(true)));
+    app.get("/api/public/vuelos", ctx -> ctx.json(dao.listarVuelosPublic()));
+    app.get("/api/v1/vuelos",     ctx -> ctx.json(dao.listarVuelosPublic()));
 
     app.get("/api/v1/vuelos/{id}", ctx -> {
       long id = ctx.pathParamAsClass("id", Long.class).get();
-      var v = dao.obtenerVuelo(id);
+      var v = dao.obtenerVueloPublic(id);
       if (v == null) {
         ctx.status(404).json(Map.of("error","Vuelo no encontrado"));
         return;
@@ -36,7 +36,7 @@ public class VueloController {
 
     app.get("/api/public/vuelos/{id}", ctx -> {
       long idV = ctx.pathParamAsClass("id", Long.class).get();
-      var v = dao.obtenerVuelo(idV);
+      var v = dao.obtenerVueloPublic(idV);
       if (v == null) { ctx.status(404).json(Map.of("error", "Vuelo no encontrado")); return; }
       ctx.json(v);
     });

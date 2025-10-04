@@ -6,7 +6,7 @@ import "../styles/historial.css";
 
 const money = (n) => Number(n || 0).toLocaleString("es-GT", { style: "currency", currency: "GTQ" });
 const dt = (s) => s ? new Date(s).toLocaleString("es-GT", { dateStyle: "medium", timeStyle: "short" }) : "—";
-const estadoName = (id) => ({ 1:"Confirmada", 2:"Pagada", 3:"Reembolsada" }[Number(id)] || `Estado ${id}`);
+const estadoName = (id) => ({ 1:"Confirmada", 2:"Pagada", 3:"Reembolsada", 4:"Expirada" }[Number(id)] || `Estado ${id}`);
 
 export default function HistorialCompras() {
   const nav = useNavigate();
@@ -55,6 +55,7 @@ export default function HistorialCompras() {
           <table className="h-table">
             <thead>
               <tr>
+                <th>Código</th>
                 <th>ID</th>
                 <th>Fecha</th>
                 <th>Estado</th>
@@ -65,6 +66,9 @@ export default function HistorialCompras() {
             <tbody>
               {list.map((r) => (
                 <tr key={r.idReserva}>
+                  <td>
+                    {r.codigo ? <span className="pill">{r.codigo}</span> : "—"}
+                  </td>
                   <td>#{r.idReserva}</td>
                   <td>{dt(r.creadaEn)}</td>
                   <td>

@@ -69,6 +69,7 @@ public class CompraDTO {
     public int idEstado;
     public BigDecimal total;
     public String creadaEn;
+    public String codigo;        
   }
 
   public static class ReservaDetalle {
@@ -96,5 +97,16 @@ public class CompraDTO {
     public String paisOrigen;
     public String ciudadDestino;
     public String paisDestino;
+    public String escalaCiudad;
+    public String escalaPais;
+    public String escalaLlegada;   // ISO-8601
+    public String escalaSalida;    // ISO-8601
+    public String regresoCodigo;
+    public String regresoFechaSalida;   // ISO-8601
+    public String regresoFechaLlegada;  // ISO-8601
+    public String regresoCiudadOrigen;
+    public String regresoPaisOrigen;
+    public String regresoCiudadDestino;
+    public String regresoPaisDestino;
   }
 }
