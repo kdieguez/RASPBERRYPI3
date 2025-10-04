@@ -6,12 +6,14 @@ C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\util\JwtUtil.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\AdminUsuarioController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\VueloDTO.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\ConfigDTO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\VueloController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\middleware\Cors.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\ComprasController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\CiudadDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\RutaDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\PerfilController.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\ConfigController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\middleware\Auth.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\http\JsonErrorHandler.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\AuthDTOs.java
@@ -25,6 +27,7 @@ C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\util\PasswordUtil.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\CiudadController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\config\DB.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\ConfigDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\util\EstadosVuelo.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\ClaseDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\PaisDTOs.java

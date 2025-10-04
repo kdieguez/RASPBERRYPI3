@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./header.css";
 import { isLoggedIn, getUser, clearAuth } from "../lib/auth";
-import { clasesApi } from "../api/adminCatalogos"; 
+import { clasesApi } from "../api/adminCatalogos";
+import { configApi } from "../api/config";
 
 export default function Header(){
   const [open, setOpen] = useState(false);
@@ -14,15 +15,16 @@ export default function Header(){
 
   const [origen, setOrigen] = useState("");
   const [destino, setDestino] = useState("");
-  const [fsd, setFsd] = useState(""); 
-  const [fsh, setFsh] = useState(""); 
-  const [frd, setFrd] = useState(""); 
-  const [frh, setFrh] = useState(""); 
+  const [fsd, setFsd] = useState("");
+  const [fsh, setFsh] = useState("");
+  const [frd, setFrd] = useState("");
+  const [frh, setFrh] = useState("");
   const [pmin, setPmin] = useState("");
   const [pmax, setPmax] = useState("");
   const [direct, setDirect] = useState(false);
 
   const [user, setUser] = useState(getUser());
+  const [brand, setBrand] = useState({ nombre: "Aerolíneas", logo: "" });
   const nav = useNavigate();
 
   useEffect(() => {
@@ -38,6 +40,17 @@ export default function Header(){
         setClases(Array.isArray(data) ? data : []);
       } catch {
         setClases([]);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const cfg = await configApi.getHeader();
+        setBrand(cfg);
+      } catch (e) {
+        console.warn("No se pudo cargar /api/config/header", e);
       }
     })();
   }, []);
@@ -76,7 +89,7 @@ export default function Header(){
     add("pmin", pmin);
     add("pmax", pmax);
     if (direct) params.set("direct","1");
-    if (claseSel) params.set("clase", claseSel); 
+    if (claseSel) params.set("clase", claseSel);
 
     nav("/vuelos" + (params.toString() ? `?${params.toString()}` : ""));
     setSearchOpen(false);
@@ -87,17 +100,26 @@ export default function Header(){
     setFsd(""); setFsh(""); setFrd(""); setFrh("");
     setPmin(""); setPmax("");
     setDirect(false);
-    setClaseSel(""); 
+    setClaseSel("");
   };
 
   return (
     <header className="hdr">
       <div className="container hdr__row">
         <Link className="hdr__brand" to="/" onClick={closeMenus}>
-          <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="currentColor" d="M2 13c7-1 10-4 12-9l2 1-2 6 7 1 1 2-7 1 2 6-2 1c-2-5-5-8-12-9v-1Z"/>
-          </svg>
-          <span>Aerolíneas</span>
+          {brand.logo ? (
+            <img
+              src={brand.logo}
+              alt={brand.nombre}
+              className="hdr__brand-logo"
+              onError={(e)=>{ e.currentTarget.style.display = "none"; }}
+            />
+          ) : (
+            <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M2 13c7-1 10-4 12-9l2 1-2 6 7 1 1 2-7 1 2 6-2 1c-2-5-5-8-12-9v-1Z"/>
+            </svg>
+          )}
+          <span>{brand.nombre}</span>
         </Link>
 
         <button
@@ -147,6 +169,8 @@ export default function Header(){
                 <Link to="/admin/paises" className="hdr__drop-item" role="menuitem" onClick={closeMenus}>Países</Link>
                 <Link to="/admin/ciudades" className="hdr__drop-item" role="menuitem" onClick={closeMenus}>Ciudades</Link>
                 <Link to="/admin/rutas" className="hdr__drop-item" role="menuitem" onClick={closeMenus}>Rutas</Link>
+                <Link to="/admin/config" className="hdr__drop-item" role="menuitem" onClick={closeMenus}> Header & Footer </Link>
+
               </div>
             </div>
           )}

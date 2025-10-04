@@ -38,11 +38,13 @@ com\aerolineas\dao\PasajeroDAO.class
 com\aerolineas\dto\CiudadDTOs$Create.class
 com\aerolineas\dao\RutaDAO.class
 com\aerolineas\util\JwtUtil.class
+com\aerolineas\controller\ConfigController.class
 com\aerolineas\controller\VueloController.class
 com\aerolineas\dto\CompraDTO$CheckoutResp.class
 com\aerolineas\dto\UsuarioAdminDTOs$UpdateAdmin.class
 com\aerolineas\dto\CompraDTO$UpdateQtyReq.class
 com\aerolineas\util\Mailer.class
+com\aerolineas\dao\ConfigDAO.class
 com\aerolineas\util\CaptchaUtil.class
 com\aerolineas\controller\PerfilController.class
 com\aerolineas\dto\CiudadDTOs$View.class
@@ -69,6 +71,7 @@ com\aerolineas\controller\VueloController$RoundtripReq.class
 com\aerolineas\dto\CompraDTO.class
 com\aerolineas\dto\VueloDTO$CreatePair.class
 com\aerolineas\dao\UsuarioDAO.class
+com\aerolineas\dto\ConfigDTO.class
 com\aerolineas\util\PasswordUtil.class
 com\aerolineas\dao\ClaseDAO.class
 com\aerolineas\controller\PaisController.class

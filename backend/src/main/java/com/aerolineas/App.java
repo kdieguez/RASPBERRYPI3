@@ -78,6 +78,7 @@ public class App {
     var authCtrl   = new AuthController();
     var perfilCtrl = new PerfilController();
     var adminUsr   = new AdminUsuarioController();
+    var configCtrl = new ConfigController();
 
     app.get("/health", ctx -> ctx.result("OK"));
     app.get("/api/db/ping", ctx -> ctx.json(DB.ping() ? "DB OK" : "DB FAIL"));
@@ -92,6 +93,9 @@ public class App {
     app.get("/api/admin/usuarios",            ctx -> requireAdmin(ctx, adminUsr::list));
     app.get("/api/admin/usuarios/{id}",       ctx -> requireAdmin(ctx, adminUsr::get));
     app.put("/api/admin/usuarios/{id}",       ctx -> requireAdmin(ctx, adminUsr::update));
+    app.get("/api/config",                 configCtrl::getAll);
+    app.get("/api/config/{section}",       configCtrl::getBySection);
+    app.put("/api/admin/config/{section}", ctx -> requireAdmin(ctx, configCtrl::upsertSection));
 
     new PaisController().routes(app);
     new CiudadController().routes(app);

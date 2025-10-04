@@ -21,6 +21,7 @@ import CheckoutAgradecimiento from "./paginas/CheckoutAgradecimiento";
 import Checkout from "./paginas/CheckOut";
 import HistorialCompras from "./paginas/HistorialCompras";
 import ReservaDetalle from "./paginas/ReservaDetalle";
+import ConfigSitio from "./paginas/admin/ConfigSitio";
 
 
 function Home() {
@@ -61,6 +62,7 @@ export default function App() {
             <Route path="/admin/rutas" element={<AdminRutas />} />
             <Route path="/admin/vuelos" element={<AdminVuelosList />} />
             <Route path="/admin/vuelos/:id" element={<VueloEdit />} />
+            <Route path="/admin/config" element={<ConfigSitio/>}/>
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

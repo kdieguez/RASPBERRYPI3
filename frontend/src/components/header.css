@@ -19,11 +19,15 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  font-size: 1.50rem;
   font-weight: 700;
   letter-spacing: .2px;
   color: var(--color-primary);
 }
 .hdr__brand svg{ color: var(--color-secondary); }
+.hdr__brand-logo{
+  height: 60px; width: auto; object-fit: contain; display: block;
+}
 
 .hdr__nav{
   display: flex;
