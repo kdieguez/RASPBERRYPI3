@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { vuelosApi, clasesApi } from "../api/adminCatalogos";
-import { getUser } from "../lib/auth";
+import { isLoggedIn, getUser } from "../lib/auth";
 import { comprasApi } from "../api/compras";
 import "../styles/vuelosCatalogo.css";
 
@@ -85,6 +85,13 @@ export default function VuelosCatalogo() {
 
   const user = getUser();
   const isAdmin = !!user && Number(user.idRol) === 1;
+
+  const [logged, setLogged] = useState(isLoggedIn());
+  useEffect(() => {
+    const onChange = () => setLogged(isLoggedIn());
+    window.addEventListener("auth:changed", onChange);
+    return () => window.removeEventListener("auth:changed", onChange);
+  }, []);
 
   const [sp] = useSearchParams();
   const nav = useNavigate();
@@ -209,7 +216,6 @@ export default function VuelosCatalogo() {
     const str = (x) => (x || "").toLowerCase();
 
     return (vuelos || []).filter((v) => {
-      const rutaPaises = [str(v.origenPais), str(v.destinoPais)].join(" ");
       const escalaPaises = Array.isArray(v.escalas)
         ? v.escalas.map((e) => str(e.pais)).join(" ")
         : "";
@@ -266,7 +272,7 @@ export default function VuelosCatalogo() {
   };
   const comprar = async (vuelo) => {
     const u = getUser();
-    if (!u) { alert("Primero inicia sesión."); nav("/login"); return; }
+    if (!u) { nav("/login"); return; }
     const s = (vuelo.estado || "").toLowerCase();
     if (s.includes("cancel") || vuelo.activo === false) {
       alert("Este vuelo no está disponible para compra.");
@@ -411,42 +417,54 @@ export default function VuelosCatalogo() {
                     Ver detalles
                   </Link>
 
-                  <select
-                    className="input"
-                    value={v._idClaseSel ?? ""}
-                    onChange={(e) => onChangeClase(v.idVuelo, e.target.value)}
-                    style={{ marginLeft: 8 }}
-                  >
-                    {v.clases.map((c) => (
-                      <option key={c.idClase} value={c.idClase}>
-                        {claseName(c.idClase)}
-                      </option>
-                    ))}
-                  </select>
+                  {logged ? (
+                    <>
+                      <select
+                        className="input"
+                        value={v._idClaseSel ?? ""}
+                        onChange={(e) => onChangeClase(v.idVuelo, e.target.value)}
+                        style={{ marginLeft: 8 }}
+                      >
+                        {v.clases.map((c) => (
+                          <option key={c.idClase} value={c.idClase}>
+                            {claseName(c.idClase)}
+                          </option>
+                        ))}
+                      </select>
 
-                  <input
-                    className="input"
-                    type="number"
-                    min={1}
-                    max={9}
-                    value={v._cant}
-                    onChange={(e) => onChangeCant(v.idVuelo, e.target.value)}
-                    style={{ width: 64, marginLeft: 8 }}
-                  />
+                      <input
+                        className="input"
+                        type="number"
+                        min={1}
+                        max={9}
+                        value={v._cant}
+                        onChange={(e) => onChangeCant(v.idVuelo, e.target.value)}
+                        style={{ width: 64, marginLeft: 8 }}
+                      />
 
-                  <button
-                    className="btn btn-secondary"
-                    style={{ marginLeft: 8 }}
-                    onClick={() => comprar(v)}
-                    disabled={
-                      !v.clases ||
-                      v.clases.length === 0 ||
-                      (v.estado || "").toLowerCase().includes("cancel") ||
-                      v.activo === false
-                    }
-                  >
-                    Comprar
-                  </button>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ marginLeft: 8 }}
+                        onClick={() => comprar(v)}
+                        disabled={
+                          !v.clases ||
+                          v.clases.length === 0 ||
+                          (v.estado || "").toLowerCase().includes("cancel") ||
+                          v.activo === false
+                        }
+                      >
+                        Añadir a carrito
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="btn btn-secondary"
+                      style={{ marginLeft: 8 }}
+                      onClick={() => nav("/login")}
+                    >
+                      Añadir a carrito
+                    </button>
+                  )}
 
                   {isAdmin && (
                     <Link

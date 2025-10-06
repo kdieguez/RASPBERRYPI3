@@ -45,6 +45,7 @@ public final class Auth {
     var c = JwtUtil.parse(token);
     Map<String,Object> claims = Map.of(
         "sub",   c.get("sub"),
+        "idUsuario", c.get("sub"),
         "email", c.get("email"),
         "rol",   c.get("rol"),
         "name",  c.get("name")

@@ -21,7 +21,7 @@ export const clasesApi = {
 };
 
 export const vuelosApi = {
-  listPublic: () => axios.get("/api/v1/vuelos"),
+  listPublic: () => axios.get("/api/public/vuelos"),
   listAdmin:  () => axios.get("/api/v1/admin/vuelos"),
 
   getPublic: (id) => axios.get(`/api/public/vuelos/${id}`),
