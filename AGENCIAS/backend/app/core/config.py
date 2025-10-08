@@ -14,13 +14,12 @@ def getenv_list(name: str, default=None):
         return default if default is not None else []
     return [x.strip() for x in raw.split(",") if x.strip()]
 
-
 MONGO_URI = os.getenv("MONGO_URI")
 
 if not MONGO_URI:
     user = quote_plus(os.getenv("MONGO_USER", ""))
     pwd  = quote_plus(os.getenv("MONGO_PASS", ""))
-    cluster = os.getenv("MONGO_CLUSTER", "") 
+    cluster = os.getenv("MONGO_CLUSTER", "")
     appname = quote_plus(os.getenv("MONGO_APPNAME", "AgenciaApp"))
     if user and pwd and cluster:
         MONGO_URI = (
@@ -45,6 +44,13 @@ CAPTCHA_DISABLED = getenv_bool("CAPTCHA_DISABLED", True)
 
 APP_NAME = os.getenv("APP_NAME", "Agencia API")
 
+AEROLINEAS_API_URL = (os.getenv("AEROLINEAS_API_URL", "http://localhost:8080") or "").rstrip("/")
+
+ESTADO_CANCELADO_ID  = int(os.getenv("ESTADO_CANCELADO_ID", "2"))
+ESTADO_CANCELADO_TXT = os.getenv("ESTADO_CANCELADO_TXT", "CANCELADO").strip().lower()
+
+AEROLINEAS_TIMEOUT = float(os.getenv("AEROLINEAS_TIMEOUT", "20"))
+
 __all__ = [
     "MONGO_URI",
     "MONGO_DB",
@@ -52,4 +58,8 @@ __all__ = [
     "CAPTCHA_SECRET",
     "CAPTCHA_DISABLED",
     "APP_NAME",
+    "AEROLINEAS_API_URL",
+    "ESTADO_CANCELADO_ID",
+    "ESTADO_CANCELADO_TXT",
+    "AEROLINEAS_TIMEOUT",
 ]

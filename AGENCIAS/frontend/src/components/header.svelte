@@ -5,10 +5,11 @@
   export let current = 'home';
 
   const dispatch = createEventDispatcher();
-  const gotoHome = () => dispatch('gotoHome');
+  const gotoHome     = () => dispatch('gotoHome');
   const gotoRegister = () => dispatch('gotoRegister');
-  const gotoLogin = () => dispatch('gotoLogin');
-  const gotoUsers = () => dispatch('gotoUsers');
+  const gotoLogin    = () => dispatch('gotoLogin');
+  const gotoUsers    = () => dispatch('gotoUsers');
+  const gotoVuelos   = () => dispatch('gotoVuelos');
 
   $: isStaff = ['admin', 'empleado'].includes(($user?.rol || '').toLowerCase());
 </script>
@@ -27,11 +28,20 @@
         Inicio
       </button>
 
+      <button
+        type="button"
+        class="btn {current === 'vuelos' ? 'primary' : 'ghost'}"
+        aria-current={current === 'vuelos' ? 'page' : undefined}
+        on:click={gotoVuelos}
+      >
+        Vuelos
+      </button>
+
       {#if $isLoggedIn}
         {#if isStaff}
           <button
             type="button"
-            class="btn {current === 'users' ? 'primary' : ''}" 
+            class="btn {current === 'users' ? 'primary' : 'ghost'}" 
             aria-current={current === 'users' ? 'page' : undefined}
             on:click={gotoUsers}
           >
@@ -44,7 +54,7 @@
       {:else}
         <button
           type="button"
-          class="btn {current === 'register' ? 'primary' : ''}"
+          class="btn {current === 'register' ? 'primary' : 'ghost'}"
           aria-current={current === 'register' ? 'page' : undefined}
           on:click={gotoRegister}
         >
@@ -53,7 +63,7 @@
 
         <button
           type="button"
-          class="btn {current === 'login' ? 'primary' : ''}"
+          class="btn {current === 'login' ? 'primary' : 'ghost'}"
           aria-current={current === 'login' ? 'page' : undefined}
           on:click={gotoLogin}
         >
@@ -65,11 +75,12 @@
 </header>
 
 <style>
-  .header { display:flex; border-bottom: 1px solid #1f2937; background: rgba(17,24,39,.6); backdrop-filter: blur(6px); position: sticky; top: 0; z-index:10; }
+  .header { display:flex; border-bottom: 1px solid #b04c6f; background: #d26e91; backdrop-filter: blur(6px); position: sticky; top: 0; z-index:10; }
   .wrap { max-width: 960px; margin: 0 auto; width: 100%; padding: 12px 16px; display:flex; align-items:center; justify-content:space-between; }
   .brand { font-weight: 600; letter-spacing: .4px; cursor:pointer; background:none; border:none; color:inherit; padding:0; }
+
   .btn { border: 1px solid #1f2937; background: #0b1020; color: #e5e7eb; padding: 8px 12px; border-radius: 10px; cursor: pointer; }
-  .btn.primary { border-color: #0b3c46; background: #0b2a32; }
   .btn.ghost { background: transparent; }
+  .btn.primary { border-color: #000000; background: #277b29; color: #fff; }
   .btn.danger { border-color: #4b0b0b; background: #2a0b0b; color: #ffd6d6; }
 </style>

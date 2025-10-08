@@ -19,9 +19,9 @@ async function request(path, opts = {}) {
   const res = await fetch((BASE || '') + path, {
     method,
     headers: {
-      'Accept': 'application/json',
+      Accept: 'application/json',
       ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(headers || {})
     },
     body: body ? JSON.stringify(body) : undefined,
@@ -49,7 +49,7 @@ async function request(path, opts = {}) {
 function qs(obj = {}) {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(obj)) {
-    if (v === undefined || v === null || v === '') continue;
+    if (v === undefined || v === null || String(v).trim() === '') continue;
     p.set(k, String(v));
   }
   const s = p.toString();
@@ -68,6 +68,27 @@ export const UsersAPI = {
   create: (body)          => request('/api/v1/users', { method: 'POST',  body }),
   update: (id, body)      => request(`/api/v1/users/${id}`, { method: 'PATCH', body }),
   remove: (id)            => request(`/api/v1/users/${id}`, { method: 'DELETE' }),
+};
+
+/** @typedef {{origin?: string, destination?: string, date?: string, pax?: number}} SearchParams */
+
+export const VuelosAPI = {
+  /** @param {SearchParams=} params */
+  search: (params = {}) => {
+    const { origin, destination, date, pax } = params;
+    return request('/vuelos' + qs({ origin, destination, date, pax }));
+  },
+
+  /** @param {number} id @param {number=} pax */
+  detail: (id, pax = 1) =>
+    request(`/vuelos/${id}` + qs({ pax })),
+
+  /** @returns {Promise<string[]>} */
+  origins: () => request('/vuelos/origins'),
+
+  /** @param {string} origin */
+  destinations: (origin) =>
+    request('/vuelos/destinations' + qs({ origin })),
 };
 
 export { request };

@@ -6,10 +6,14 @@
   import Footer from "./components/footer.svelte";
   import AdminUsers from "./components/admin/users.svelte";
 
-  import { path, navigate } from "./lib/router.js";
+  import Catalog from "./components/vuelos/catalog.svelte";
+  import Detail from "./components/vuelos/detail.svelte";
+
+  import { path, navigate, match } from "./lib/router.js";
   import { isLoggedIn } from "./lib/auth";
 
   $: current = $path;
+
   $: if ($isLoggedIn && $path === '/login') navigate('/');
 
   function headerCurrent(p) {
@@ -17,8 +21,12 @@
     if (p === '/register') return 'register';
     if (p === '/login') return 'login';
     if (p === '/admin/users') return 'users';
+    if (match('/vuelos', p).ok || match('/vuelos/:id', p).ok) return 'vuelos';
     return '';
   }
+
+  $: isVuelosCatalog = match('/vuelos', current).ok;
+  $: isVuelosDetail  = match('/vuelos/:id', current).ok;
 </script>
 
 <Header
@@ -27,10 +35,17 @@
   on:gotoRegister={() => navigate('/register')}
   on:gotoLogin={() => navigate('/login')}
   on:gotoUsers={() => navigate('/admin/users')}
+  on:gotoVuelos={() => navigate('/vuelos')}
 />
 
 {#if current === '/'}
   <Home />
+
+{:else if isVuelosCatalog}
+  <Catalog />
+
+{:else if isVuelosDetail}
+  <Detail />
 
 {:else if current === '/admin/users'}
   <AdminUsers />
