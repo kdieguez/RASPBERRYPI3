@@ -103,5 +103,7 @@ public class App {
     new VueloController().routes(app);
     new ClaseController().routes(app);
     new ComprasController().register(app);
+    new ComentarioController().routes(app);
+    new RatingController().routes(app);
   }
 }

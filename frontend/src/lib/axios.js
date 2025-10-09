@@ -14,10 +14,19 @@ axios.interceptors.request.use((config) => {
 axios.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err?.response?.status === 401) {
-      clearAuth();
-      if (!location.pathname.startsWith("/login")) location.assign("/login");
+    const status = err?.response?.status;
+    const url = err?.config?.url || "";
+
+    // solo actuamos en rutas protegidas
+    if (status === 401 && url.startsWith("/api/v1/")) {
+      // si YA no hay token (expiró o lo borraste), entonces sí redirige/login
+      if (!getToken()) {
+        clearAuth();
+        if (!location.pathname.startsWith("/login")) location.assign("/login");
+      }
+      // si hay token vigente, NO borres sesión: deja que la pantalla muestre el error
     }
+
     return Promise.reject(err);
   }
 );
