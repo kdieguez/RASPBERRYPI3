@@ -35,7 +35,6 @@
     finally { loading = false; }
   }
 
-  // IDs para asociar labels
   const idOrigin = "fld-origin";
   const idDestination = "fld-destination";
   const idDate = "fld-date";
