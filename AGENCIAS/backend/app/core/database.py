@@ -8,7 +8,7 @@ async def connect_to_mongo() -> None:
     global client, db
     client = AsyncIOMotorClient(
         MONGO_URI,
-        serverSelectionTimeoutMS=8000,
+        serverSelectionTimeoutMS=8001,
         uuidRepresentation="standard"
     )
     db = client[MONGO_DB]
@@ -27,4 +27,9 @@ def get_db() -> AsyncIOMotorDatabase:
 
 async def ensure_indexes() -> None:
     d = get_db()
+
     await d["usuarios"].create_index("email", unique=True, name="uq_email")
+    await d["ui_settings"].create_index(
+        [("type", 1)],
+        name="ix_ui_type"
+    )

@@ -81,3 +81,36 @@ export function updateUser(patch) {
   auth.set(next);
   return next;
 }
+
+export function isAdmin() {
+  const u = getUser();
+  const r = u?.rol ?? u?.role ?? null;
+
+  if (typeof r === 'string') {
+    return r.trim().toLowerCase() === 'admin';
+  }
+  if (typeof r === 'number') {
+    return r === 1;
+  }
+  if (u?.is_admin === true) return true;
+  return false;
+}
+
+export function isStaff() {
+  const u = getUser();
+  const r = u?.rol ?? u?.role ?? null;
+
+  if (typeof r === 'string') {
+    const s = r.trim().toLowerCase();
+    return s === 'admin' || s === 'empleado' || s === 'staff';
+  }
+  if (typeof r === 'number') {
+    return r === 1 || r === 2;
+  }
+  return !!u?.is_staff;
+}
+
+export function authHeader() {
+  const t = getToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}

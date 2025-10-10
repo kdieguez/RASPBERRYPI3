@@ -1,75 +1,70 @@
-import { writable } from 'svelte/store';
+import { writable } from "svelte/store";
 
-export const path = writable('/');
-
+/* === Normalización === */
 function normalize(p) {
-  p = (p || '/').toString().replace(/^#/, '');
-  if (!p.startsWith('/')) p = '/' + p;
-  if (p === '/registro') p = '/register';
-  if (p === '/ingresar' || p === '/iniciar-sesion') p = '/login';
-  return p.replace(/\/{2,}/g, '/');
+  p = (p || "/").toString().replace(/^#/, "");
+  if (!p.startsWith("/")) p = "/" + p;
+
+  // alias amigables
+  if (p === "/registro") p = "/register";
+  if (p === "/ingresar" || p === "/iniciar-sesion") p = "/login";
+
+  return p.replace(/\/{2,}/g, "/");
+}
+function getHashPath() {
+  return normalize(window.location.hash.slice(1) || "/");
 }
 
-export function navigate(to) {
-  const p = normalize(to);
-  if (location.hash !== '#' + p) location.hash = p;
-  else path.set(p);
+/* === Store de ruta === */
+export const path = writable(getHashPath());
+function apply() { path.set(getHashPath()); }
+
+/* === Navegación programática (por si la usas) === */
+export function navigate(to, opts = {}) {
+  const next = normalize(to);
+  const current = getHashPath();
+
+  if (next !== current) {
+    if (opts.replace) window.location.replace("#" + next);
+    else window.location.hash = next;
+  } else {
+    path.set(next); // misma ruta: fuerza reacción
+  }
+  queueMicrotask(apply); // asegura sync inmediata
 }
 
-function updateFromLocation() {
-  const raw = location.hash.slice(1) || '/';
-  path.set(normalize(raw));
-}
+/* === Listeners globales === */
+window.addEventListener("hashchange", apply);
+window.addEventListener("popstate", apply);
+window.addEventListener("load", apply);
+queueMicrotask(apply); // tick inicial
 
-window.addEventListener('hashchange', updateFromLocation);
-updateFromLocation();
-
-/** @type {Record<string, string>} */
+/* === Helpers === */
 const EMPTY_PARAMS = {};
-
-/**
- * 
- * @param {string} pattern
- * @param {string} currentPath
- * @returns {{ ok: boolean, params: Record<string,string> }}
- */
 export function match(pattern, currentPath) {
   const [pa] = splitPathAndQuery(normalize(pattern));
   const [pb] = splitPathAndQuery(normalize(currentPath));
-  const A = pa.split('/').filter(Boolean);
-  const B = pb.split('/').filter(Boolean);
+  const A = pa.split("/").filter(Boolean);
+  const B = pb.split("/").filter(Boolean);
   if (A.length !== B.length) return { ok: false, params: EMPTY_PARAMS };
-  /** @type {Record<string,string>} */
   const params = {};
   for (let i = 0; i < A.length; i++) {
-    if (A[i].startsWith(':')) params[A[i].slice(1)] = B[i];
+    if (A[i].startsWith(":")) params[A[i].slice(1)] = B[i];
     else if (A[i] !== B[i]) return { ok: false, params: EMPTY_PARAMS };
   }
   return { ok: true, params };
 }
-
-/**
- * 
- * @param {string} currentPath
- * @returns {URLSearchParams}
- */
 export function getQuery(currentPath) {
   const [, qs] = splitPathAndQuery(normalize(currentPath));
   return new URLSearchParams(qs);
 }
-
 function splitPathAndQuery(p) {
-  const idx = p.indexOf('?');
-  return idx >= 0 ? [p.slice(0, idx), p.slice(idx + 1)] : [p, ''];
+  const idx = p.indexOf("?");
+  return idx >= 0 ? [p.slice(0, idx), p.slice(idx + 1)] : [p, ""];
 }
-
-/**
- *
- * @param {(p:string)=>void} cb
- * @returns {() => void} 
- */
 export function onNavigate(cb) {
-  const handler = () => cb(normalize(location.hash.slice(1) || '/'));
-  window.addEventListener('hashchange', handler);
-  return () => window.removeEventListener('hashchange', handler);
+  const handler = () => cb(getHashPath());
+  window.addEventListener("hashchange", handler);
+  queueMicrotask(() => cb(getHashPath())); // emite estado actual
+  return () => window.removeEventListener("hashchange", handler);
 }
