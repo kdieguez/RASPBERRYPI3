@@ -11,8 +11,10 @@ import java.text.NumberFormat;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public final class PdfBoleto {
 
@@ -31,6 +33,7 @@ public final class PdfBoleto {
   private PdfBoleto() {}
 
   private static String money(BigDecimal n) { if (n == null) n = BigDecimal.ZERO; return NF.format(n); }
+
   private static String dt(String s) {
     try {
       Instant ins = Instant.parse(s);
@@ -38,6 +41,7 @@ public final class PdfBoleto {
       return ldt.format(DTF);
     } catch (Exception e) { return s != null ? s : "-"; }
   }
+
   private static String getOpt(Object bean, String field) {
     if (bean == null) return "";
     try {
@@ -54,8 +58,8 @@ public final class PdfBoleto {
     for (int i = 0; i < s.length(); i++) {
       char ch = s.charAt(i);
       if (ch == '\n' || ch == '\r' || ch == '\t') { out.append(' '); continue; }
-      if (ch == 0x2192) { out.append("->"); continue; }             
-      if (ch == 0x2013 || ch == 0x2014) { out.append('-'); continue; } 
+      if (ch == 0x2192) { out.append("->"); continue; }
+      if (ch == 0x2013 || ch == 0x2014) { out.append('-'); continue; }
       if (ch == 0x2018 || ch == 0x2019) { out.append('\''); continue; }
       if (ch == 0x201C || ch == 0x201D) { out.append('"');  continue; }
       if (ch == 0x2022) { out.append('*'); continue; }
@@ -72,12 +76,15 @@ public final class PdfBoleto {
     int b = Integer.parseInt(h.substring(4,6),16);
     return new float[]{ r/255f, g/255f, b/255f };
   }
+
   private static void fillRect(PDPageContentStream cs, float x, float y, float w, float h, float[] c) throws Exception {
     cs.setNonStrokingColor(c[0], c[1], c[2]); cs.addRect(x,y,w,h); cs.fill();
   }
+
   private static void strokeRect(PDPageContentStream cs, float x, float y, float w, float h, float[] c, float lw) throws Exception {
     cs.setStrokingColor(c[0], c[1], c[2]); cs.setLineWidth(lw); cs.addRect(x,y,w,h); cs.stroke();
   }
+
   private static void line(PDPageContentStream cs, float x1, float y, float x2, float[] c, float lw) throws Exception {
     cs.setStrokingColor(c[0], c[1], c[2]); cs.setLineWidth(lw); cs.moveTo(x1,y); cs.lineTo(x2,y); cs.stroke();
   }
@@ -93,6 +100,7 @@ public final class PdfBoleto {
     cs.showText(s);
     cs.endText();
   }
+
   private static void text(PDPageContentStream cs, float x, float y,
                            PDType1Font font, float size, String s) throws Exception {
     text(cs, x, y, font, size, null, s);
@@ -101,9 +109,11 @@ public final class PdfBoleto {
   private static float textW(PDType1Font f, float size, String s) throws Exception {
     return f.getStringWidth(sanitize(s)) / 1000f * size;
   }
+
   private static void rightText(PDPageContentStream cs, float rightX, float y, PDType1Font f, float size, float[] c, String s) throws Exception {
     float w = textW(f, size, s); text(cs, rightX - w, y, f, size, c, s);
   }
+
   private static float ensureSpace(PDDocument doc, PDPage[] pageRef, PDPageContentStream[] csRef, float y, float needed, float margin) throws Exception {
     PDPage page = pageRef[0];
     if (y - needed < margin) {
@@ -124,14 +134,17 @@ public final class PdfBoleto {
     text(cs, margin, page.getMediaBox().getHeight() - 31, PDType1Font.HELVETICA_BOLD, 16, WHITE, "Aerolíneas - Boleto");
     rightText(cs, W - margin, page.getMediaBox().getHeight() - 31, PDType1Font.HELVETICA_BOLD, 14, WHITE, "CÓDIGO: " + codigo);
   }
+
   private static void sectionTitle(PDPageContentStream cs, float x, float y, String title) throws Exception {
     text(cs, x, y, PDType1Font.HELVETICA_BOLD, 12.5f, BLACK, title.toUpperCase());
   }
+
   private static void keyVal(PDPageContentStream cs, float x, float y, String k, String v) throws Exception {
     text(cs, x, y, PDType1Font.HELVETICA, 11, MUTED, k + ": ");
     float kw = textW(PDType1Font.HELVETICA, 11, k + ": ");
     text(cs, x + kw, y, PDType1Font.HELVETICA_BOLD, 11, BLACK, (v == null || v.isBlank()) ? "-" : v);
   }
+
   private static void badge(PDPageContentStream cs, float x, float y, String label) throws Exception {
     float padX = 6, h = 16;
     float w = textW(PDType1Font.HELVETICA_BOLD, 9.5f, label) + padX * 2;
@@ -139,9 +152,10 @@ public final class PdfBoleto {
     strokeRect(cs, x, y - h + 2, w, h, BORDER, 0.6f);
     text(cs, x + padX, y - 10, PDType1Font.HELVETICA_BOLD, 9.5f, label);
   }
+
   private static float badgeWidth(String label) throws Exception {
-  return textW(PDType1Font.HELVETICA_BOLD, 9.5f, sanitize(label)) + 12f;
-}
+    return textW(PDType1Font.HELVETICA_BOLD, 9.5f, sanitize(label)) + 12f;
+  }
 
   private static List<String> wrapLines(PDType1Font font, float size, String text, float maxWidth) throws Exception {
     text = sanitize(text == null ? "-" : text);
@@ -155,7 +169,7 @@ public final class PdfBoleto {
       if (textW(font, size, tryLine) <= maxWidth) {
         cur.setLength(0); cur.append(tryLine);
       } else {
-        if (cur.length() == 0) { 
+        if (cur.length() == 0) {
           lines.add(tryLine);
           cur.setLength(0);
         } else {
@@ -196,7 +210,7 @@ public final class PdfBoleto {
 
   private static float itineraryCard(
       PDDocument doc, PDPage[] pageRef, PDPageContentStream[] csRef,
-      float margin, float contentW, float y, CompraDTO.ReservaItem it
+      float margin, float contentW, float y, CompraDTO.ReservaItem it, Set<String> allCodes
   ) throws Exception {
 
     PDPageContentStream cs = csRef[0];
@@ -212,10 +226,10 @@ public final class PdfBoleto {
     String escalaPais    = getOpt(it, "escalaPais");
     String escalaLlegada = getOpt(it, "escalaLlegada");
     String escalaSalida  = getOpt(it, "escalaSalida");
-    boolean hasEscala = !( (escalaCiudad==null?"":escalaCiudad)
+    boolean hasEscala = !((escalaCiudad==null?"":escalaCiudad)
             + (escalaPais==null?"":escalaPais)
             + (escalaLlegada==null?"":escalaLlegada)
-            + (escalaSalida==null?"":escalaSalida) ).isBlank();
+            + (escalaSalida==null?"":escalaSalida)).isBlank();
 
     String escalaRuta = "-";
     if (hasEscala) {
@@ -236,9 +250,16 @@ public final class PdfBoleto {
     String regFS  = getOpt(it, "regresoFechaSalida");
     String regFL  = getOpt(it, "regresoFechaLlegada");
 
-    boolean hasRegreso = !( (regCod==null?"":regCod) + (regCO==null?"":regCO) + (regPO==null?"":regPO)
+    boolean hasRegresoBase = !((regCod==null?"":regCod) + (regCO==null?"":regCO) + (regPO==null?"":regPO)
             + (regCD==null?"":regCD) + (regPD==null?"":regPD)
-            + (regFS==null?"":regFS) + (regFL==null?"":regFL) ).isBlank();
+            + (regFS==null?"":regFS) + (regFL==null?"":regFL)).isBlank();
+    boolean showInlineReturn = hasRegresoBase;
+    if (showInlineReturn) {
+      String rc = regCod == null ? "" : regCod.trim();
+      if (!rc.isEmpty() && allCodes != null && allCodes.contains(rc)) {
+        showInlineReturn = false; 
+      }
+    }
 
     String regresoOrigen  = (!regCO.isBlank() || !regPO.isBlank()) ? (regCO.isBlank()? regPO : (regCO + ", " + regPO)) : "-";
     String regresoDestino = (!regCD.isBlank() || !regPD.isBlank()) ? (regCD.isBlank()? regPD : (regCD + ", " + regPD)) : "-";
@@ -246,17 +267,17 @@ public final class PdfBoleto {
     String regresoHorario = (regFS.isBlank() && regFL.isBlank()) ? "-" : (dt(regFS) + " -> " + dt(regFL));
 
     float lineH = 14f;
-    float extrasMaxW = contentW - 28;            
+    float extrasMaxW = contentW - 28;
     float escalaLabelW  = textW(PDType1Font.HELVETICA, 11, "Escala: ");
     float regresoLabelW = textW(PDType1Font.HELVETICA, 11, "Regreso: ");
     float horarioLabelW = textW(PDType1Font.HELVETICA, 11, "Horario: ");
-    int escalaLines     = hasEscala  ? wrapLines(PDType1Font.HELVETICA_BOLD, 11, escalaTexto,  extrasMaxW - escalaLabelW).size()  : 0;
-    int regresoLines    = hasRegreso ? wrapLines(PDType1Font.HELVETICA_BOLD, 11, regresoRuta,  extrasMaxW - regresoLabelW).size()
-                                     + wrapLines(PDType1Font.HELVETICA_BOLD, 11, regresoHorario, extrasMaxW - horarioLabelW).size() : 0;
+    int escalaLines     = hasEscala       ? wrapLines(PDType1Font.HELVETICA_BOLD, 11, escalaTexto,   extrasMaxW - escalaLabelW).size()  : 0;
+    int regresoLines    = showInlineReturn? wrapLines(PDType1Font.HELVETICA_BOLD, 11, regresoRuta,   extrasMaxW - regresoLabelW).size()
+                                           + wrapLines(PDType1Font.HELVETICA_BOLD, 11, regresoHorario, extrasMaxW - horarioLabelW).size() : 0;
 
     float baseH    = 118f;
-    float escalaH  = hasEscala  ? (escalaLines  * lineH + 8) : 0f;
-    float regresoH = hasRegreso ? (regresoLines * lineH + 12): 0f;
+    float escalaH  = hasEscala        ? (escalaLines  * lineH + 8) : 0f;
+    float regresoH = showInlineReturn ? (regresoLines * lineH + 12): 0f;
     float cardH    = baseH + escalaH + regresoH;
 
     y = ensureSpace(doc, pageRef, csRef, y, cardH + 16, margin);
@@ -299,29 +320,28 @@ public final class PdfBoleto {
       nextY = drawKeyValWrapped(cs, leftX, nextY, "Escala", escalaTexto, extrasMaxW, lineH) - 8;
     }
 
-if (hasRegreso) {
-  String k = "Regreso: ";
-  float kw = textW(PDType1Font.HELVETICA, 11, k);
+    if (showInlineReturn) {
+      String k = "Regreso: ";
+      float kw = textW(PDType1Font.HELVETICA, 11, k);
 
-  text(cs, leftX, nextY, PDType1Font.HELVETICA, 11, MUTED, k);
+      text(cs, leftX, nextY, PDType1Font.HELVETICA, 11, MUTED, k);
 
-  float startX = leftX + kw;
-  float afterBadgeX = startX;
+      float startX = leftX + kw;
+      float afterBadgeX = startX;
 
-  if (!regCod.isBlank()) {
-    float bw = badgeWidth(regCod);
-    badge(cs, startX, nextY + 14, regCod);
-    afterBadgeX = startX + bw + 6f;  
-  }
+      if (!regCod.isBlank()) {
+        float bw = badgeWidth(regCod);
+        badge(cs, startX, nextY + 14, regCod);
+        afterBadgeX = startX + bw + 6f;
+      }
 
-  float maxWValue = (margin + contentW - 14) - afterBadgeX; 
-  nextY = drawWrapped(cs, afterBadgeX, nextY, PDType1Font.HELVETICA_BOLD, 11, BLACK,
-                      regresoRuta, maxWValue, lineH) - 6;
+      float maxWValue = (margin + contentW - 14) - afterBadgeX;
+      nextY = drawWrapped(cs, afterBadgeX, nextY, PDType1Font.HELVETICA_BOLD, 11, BLACK,
+                          regresoRuta, maxWValue, lineH) - 6;
 
-  nextY = drawKeyValWrapped(cs, leftX, nextY, "Horario", regresoHorario,
-                            contentW - 28, lineH);
-}
-
+      nextY = drawKeyValWrapped(cs, leftX, nextY, "Horario", regresoHorario,
+                                contentW - 28, lineH);
+    }
 
     line(cs, margin, cardY - 6, margin + contentW, BORDER, 0.6f);
     return cardY - 16;
@@ -356,8 +376,14 @@ if (hasRegreso) {
       y -= 12;
 
       if (det.items != null && !det.items.isEmpty()) {
+        
+        Set<String> allCodes = new HashSet<>();
         for (var it : det.items) {
-          y = itineraryCard(doc, pageRef, csRef, margin, contentW, y, it);  
+          String c = String.valueOf(getOpt(it, "codigoVuelo")).trim();
+          if (!c.isEmpty()) allCodes.add(c);
+        }
+        for (var it : det.items) {
+          y = itineraryCard(doc, pageRef, csRef, margin, contentW, y, it, allCodes);
         }
       } else {
         text(cs, margin, y, PDType1Font.HELVETICA, 11, MUTED, "No hay vuelos en esta reserva.");

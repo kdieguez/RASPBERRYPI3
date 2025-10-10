@@ -43,6 +43,24 @@ const ensureSeconds = (s) => (!s ? "" : s.length === 16 ? `${s}:00` : s);
 
 const CANCELADO_ID = 2;
 
+function isCanceladoNombre(nombre) {
+  return (nombre || "").toLowerCase().includes("cancel");
+}
+function filtrarCandidatos(vuelos, vueloIda) {
+  if (!vueloIda) return [];
+  const llegadaIda = toDate(vueloIda.fechaLlegada);
+  return (vuelos || []).filter(v => {
+    if (!v.activo) return false;
+    if (isCanceladoNombre(v.estado)) return false;
+    if (v.idVueloPareja != null) return false;
+    if (Number(v.idVuelo) === Number(vueloIda.idVuelo)) return false;
+    if ((v.origen || "").trim().toLowerCase() !== (vueloIda.destino || "").trim().toLowerCase()) return false;
+    const fs = toDate(v.fechaSalida);
+    if (llegadaIda && fs && fs < llegadaIda) return false;
+    return true;
+  });
+}
+
 export default function VueloEdit() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -78,6 +96,10 @@ export default function VueloEdit() {
   const [rSalida, setRSalida]     = useState("");
   const [rLlegada, setRLlegada]   = useState("");
   const [rActivo, setRActivo]     = useState(true);
+
+  const [useExistingReturn, setUseExistingReturn] = useState(false);
+  const [allVuelos, setAllVuelos] = useState([]);
+  const [candidatos, setCandidatos] = useState([]);
 
   const esCancelado = idEstado === CANCELADO_ID || (estadoNombre || "").toLowerCase().includes("cancel");
   const disableAll = esCancelado;
@@ -163,6 +185,33 @@ export default function VueloEdit() {
     })();
   }, [id]);
 
+  useEffect(() => {
+    (async () => {
+      if (!hasReturn || !useExistingReturn || esCancelado) {
+        setAllVuelos([]);
+        setCandidatos([]);
+        return;
+      }
+      try {
+        let lista;
+        if (vuelosApi.listAdmin) {
+          const { data } = await vuelosApi.listAdmin();
+          lista = data || [];
+        } else {
+          const r = await fetch("/api/v1/admin/vuelos");
+          lista = await r.json();
+        }
+        const { data: vIda } = await vuelosApi.getAdmin(id);
+        const cands = filtrarCandidatos(lista, vIda);
+        setAllVuelos(lista || []);
+        setCandidatos(cands);
+      } catch {
+        setAllVuelos([]);
+        setCandidatos([]);
+      }
+    })();
+  }, [hasReturn, useExistingReturn, id, esCancelado]);
+
   const onClase = (idClase, key, val) =>
     setClases(list => list.map(c => c.idClase === idClase ? { ...c, [key]: val.replace(/[^0-9.]/g,"") } : c));
   const toggleClase = (idClase) =>
@@ -231,24 +280,32 @@ export default function VueloEdit() {
       });
 
       if (hasReturn) {
-        const regresoDto = {
-          codigo: (rCodigo || "").trim().toUpperCase(),
-          idRuta: Number(rRuta),
-          fechaSalida: ensureSeconds(rSalida),
-          fechaLlegada: ensureSeconds(rLlegada),
-          activo: rActivo,
-          clases: clasesOut,
-          escalas: [],
-          motivoCambio: mot
-        };
-
-        if (returnId) {
-          await vuelosApi.updateAdmin(returnId, regresoDto);
+        if (useExistingReturn) {
+          if (!returnId) {
+            setErr("Selecciona un vuelo de regreso existente para vincular.");
+            return;
+          }
+          await vuelosApi.link({ idIda: Number(id), idRegreso: Number(returnId) });
         } else {
-          const { data } = await vuelosApi.createAdmin(regresoDto);
-          const nuevoId = data?.idVuelo;
-          if (!nuevoId) throw new Error("No se obtuvo id del vuelo de regreso");
-          await vuelosApi.link({ idIda: Number(id), idRegreso: Number(nuevoId) });
+          const regresoDto = {
+            codigo: (rCodigo || "").trim().toUpperCase(),
+            idRuta: Number(rRuta),
+            fechaSalida: ensureSeconds(rSalida),
+            fechaLlegada: ensureSeconds(rLlegada),
+            activo: rActivo,
+            clases: clasesOut,
+            escalas: [],
+            motivoCambio: mot
+          };
+
+          if (returnId) {
+            await vuelosApi.updateAdmin(returnId, regresoDto);
+          } else {
+            const { data } = await vuelosApi.createAdmin(regresoDto);
+            const nuevoId = data?.idVuelo;
+            if (!nuevoId) throw new Error("No se obtuvo id del vuelo de regreso");
+            await vuelosApi.link({ idIda: Number(id), idRegreso: Number(nuevoId) });
+          }
         }
       }
 
@@ -464,41 +521,76 @@ export default function VueloEdit() {
               <span>{returnId ? `Editar regreso #${returnId}` : "Añadir vuelo de regreso"}</span>
             </label>
 
+            {hasReturn && !returnId && (
+              <div className="grid-2" style={{marginTop:8, alignItems:"center"}}>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={useExistingReturn}
+                    onChange={(e)=>setUseExistingReturn(e.target.checked)}
+                    disabled={disableAll}
+                  />
+                  <span>Usar vuelo de regreso existente (vincular)</span>
+                </label>
+
+                {useExistingReturn && (
+                  <select
+                    className="input"
+                    value={returnId ?? ""}
+                    onChange={(e)=>setReturnId(e.target.value ? Number(e.target.value) : null)}
+                    disabled={disableAll || !candidatos.length}
+                    title={!candidatos.length ? "No hay candidatos compatibles" : "Selecciona un vuelo"}
+                  >
+                    <option value="">-- Selecciona vuelo de regreso --</option>
+                    {candidatos.map(v => (
+                      <option key={v.idVuelo} value={v.idVuelo}>
+                        {v.codigo} — {v.origen} → {v.destino} ({toDate(v.fechaSalida)?.toLocaleString?.() ?? v.fechaSalida})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
             {hasReturn && (
               <>
-                <div className="grid-2">
-                  <div>
-                    <label className="label">Código (regreso)</label>
-                    <input className="input" value={rCodigo} onChange={(e)=>setRCodigo(e.target.value)} disabled={disableAll} />
-                  </div>
-                  <div>
-                    <label className="label">Ruta (regreso)</label>
-                    <select className="input" value={rRuta} onChange={(e)=>setRRuta(e.target.value)} disabled={disableAll}>
-                      <option value="">-- Selecciona una ruta --</option>
-                      {rutas.map(r => (
-                        <option key={r.idRuta} value={r.idRuta}>
-                          {r.ciudadOrigen} → {r.ciudadDestino}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                {!useExistingReturn && (
+                  <>
+                    <div className="grid-2">
+                      <div>
+                        <label className="label">Código (regreso)</label>
+                        <input className="input" value={rCodigo} onChange={(e)=>setRCodigo(e.target.value)} disabled={disableAll} />
+                      </div>
+                      <div>
+                        <label className="label">Ruta (regreso)</label>
+                        <select className="input" value={rRuta} onChange={(e)=>setRRuta(e.target.value)} disabled={disableAll}>
+                          <option value="">-- Selecciona una ruta --</option>
+                          {rutas.map(r => (
+                            <option key={r.idRuta} value={r.idRuta}>
+                              {r.ciudadOrigen} → {r.ciudadDestino}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
 
-                <div className="grid-2">
-                  <div>
-                    <label className="label">Salida (regreso)</label>
-                    <input type="datetime-local" className="input" value={rSalida} onChange={(e)=>setRSalida(e.target.value)} disabled={disableAll} />
-                  </div>
-                  <div>
-                    <label className="label">Llegada (regreso)</label>
-                    <input type="datetime-local" className="input" value={rLlegada} onChange={(e)=>setRLlegada(e.target.value)} disabled={disableAll} />
-                  </div>
-                </div>
+                    <div className="grid-2">
+                      <div>
+                        <label className="label">Salida (regreso)</label>
+                        <input type="datetime-local" className="input" value={rSalida} onChange={(e)=>setRSalida(e.target.value)} disabled={disableAll} />
+                      </div>
+                      <div>
+                        <label className="label">Llegada (regreso)</label>
+                        <input type="datetime-local" className="input" value={rLlegada} onChange={(e)=>setRLlegada(e.target.value)} disabled={disableAll} />
+                      </div>
+                    </div>
 
-                <label className="check" style={{marginTop:8}}>
-                  <input type="checkbox" checked={rActivo} onChange={(e)=>setRActivo(e.target.checked)} disabled={disableAll} />
-                  <span>Activo (regreso)</span>
-                </label>
+                    <label className="check" style={{marginTop:8}}>
+                      <input type="checkbox" checked={rActivo} onChange={(e)=>setRActivo(e.target.checked)} disabled={disableAll} />
+                      <span>Activo (regreso)</span>
+                    </label>
+                  </>
+                )}
               </>
             )}
 

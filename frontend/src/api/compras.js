@@ -13,66 +13,58 @@ function authHeaders() {
   if (t) h.Authorization = `Bearer ${t}`;
 
   const uid =
-    u?.idUsuario ??
-    u?.id ??
-    u?.userId ??
-    u?.ID_Usuario ??
-    u?.userid;
+    u?.idUsuario ?? u?.id ?? u?.userId ?? u?.ID_Usuario ?? u?.userid;
   if (uid) h["X-User-Id"] = String(uid);
 
-  const email =
-    u?.email ??
-    u?.correo ??
-    u?.mail ??
-    u?.Email ??
-    u?.Correo ??
-    u?.EMAIL;
-  if (email && String(email).includes("@")) {
-    h["X-User-Email"] = String(email).trim();
-  }
+  const email = u?.email ?? u?.correo ?? u?.mail ?? u?.Email ?? u?.Correo ?? u?.EMAIL;
+  if (email && String(email).includes("@")) h["X-User-Email"] = String(email).trim();
 
-  const name = 
-    u?.nombre ?? 
-    u?.name ?? 
-    u?.fullName ?? 
-    u?.usuario ?? 
-    u?.username;
+  const name = u?.nombre ?? u?.name ?? u?.fullName ?? u?.usuario ?? u?.username;
   if (name && String(name).trim()) h["X-User-Name"] = String(name).trim();
 
   return h;
 }
+
+const qs = (obj = {}) => {
+  const p = new URLSearchParams();
+  Object.entries(obj).forEach(([k, v]) => {
+    if (v === true) p.set(k, "true");
+    if (v && v !== true) p.set(k, String(v));
+  });
+  const s = p.toString();
+  return s ? `?${s}` : "";
+};
 
 export const comprasApi = {
   getCart() {
     return api.get("/api/compras/carrito", { headers: authHeaders() });
   },
 
-  addItem({ idVuelo, idClase, cantidad = 1 }) {
+  addItem({ idVuelo, idClase, cantidad = 1 }, opts = {}) {
     return api.post(
-      "/api/compras/items",
+      `/api/compras/items${qs({ pair: opts.pair })}`,
       { idVuelo, idClase, cantidad },
       { headers: authHeaders() }
     );
   },
 
-  updateItem(idItem, cantidad) {
+  updateItem(idItem, cantidad, opts = {}) {
     return api.put(
-      `/api/compras/items/${idItem}`,
+      `/api/compras/items/${idItem}${qs({ syncPareja: opts.syncPareja })}`,
       { cantidad },
       { headers: authHeaders() }
     );
   },
 
-  removeItem(idItem) {
-    return api.delete(`/api/compras/items/${idItem}`, {
-      headers: authHeaders(),
-    });
+  removeItem(idItem, opts = {}) {
+    return api.delete(
+      `/api/compras/items/${idItem}${qs({ syncPareja: opts.syncPareja })}`,
+      { headers: authHeaders() }
+    );
   },
 
   checkout(payload) {
-    return api.post("/api/compras/checkout", payload || {}, {
-      headers: authHeaders(),
-    });
+    return api.post("/api/compras/checkout", payload || {}, { headers: authHeaders() });
   },
 
   listReservas() {
@@ -92,5 +84,15 @@ export const comprasApi = {
       headers: authHeaders(),
       responseType: "blob",
     });
+  },
+
+  adminListReservas(params) {
+    return api.get("/api/admin/reservas", { headers: authHeaders(), params });
+  },
+  adminGetReserva(id) {
+    return api.get(`/api/admin/reservas/${id}`, { headers: authHeaders() });
+  },
+  adminListEstados() {
+    return api.get("/api/admin/reservas/estados", { headers: authHeaders() });
   },
 };

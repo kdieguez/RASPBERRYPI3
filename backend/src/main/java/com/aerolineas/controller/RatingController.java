@@ -6,6 +6,7 @@ import com.aerolineas.middleware.Auth;
 import com.aerolineas.util.JwtUtil;
 import io.javalin.Javalin;
 
+import java.util.HashMap;
 import java.util.Map;
 
 public class RatingController {
@@ -27,19 +28,19 @@ public class RatingController {
   }
 
   public void routes(Javalin app) {
-
-
     app.get("/api/public/vuelos/{id}/ratings/resumen", ctx -> {
       long idV = ctx.pathParamAsClass("id", Long.class).get();
-      Long idU = tryUserId(ctx);             
-      var r = dao.resumen(idV, idU);
-      ctx.json(Map.of(
-          "promedio", r.promedio(),
-          "total", r.total(),
-          "miRating", r.miRating()
-      ));
-    });
+      Long idU = tryUserId(ctx);
 
+      var r = dao.resumen(idV, idU);
+
+      Map<String, Object> payload = new HashMap<>();
+      payload.put("promedio", r.promedio());  
+      payload.put("total",    r.total());     
+      payload.put("miRating", r.miRating());  
+
+      ctx.json(payload);
+    });
 
     app.post("/api/v1/vuelos/{id}/ratings", ctx -> {
       Auth.jwt().handle(ctx);                

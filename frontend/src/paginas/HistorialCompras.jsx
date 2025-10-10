@@ -6,7 +6,7 @@ import "../styles/historial.css";
 
 const money = (n) => Number(n || 0).toLocaleString("es-GT", { style: "currency", currency: "GTQ" });
 const dt = (s) => s ? new Date(s).toLocaleString("es-GT", { dateStyle: "medium", timeStyle: "short" }) : "—";
-const estadoName = (id) => ({ 1:"Confirmada", 2:"Pagada", 3:"Reembolsada", 4:"Expirada" }[Number(id)] || `Estado ${id}`);
+const estadoName = (id) => ({ 1:"Pagada", 2:"Cancelada"}[Number(id)] || `Estado ${id}`);
 
 export default function HistorialCompras() {
   const nav = useNavigate();

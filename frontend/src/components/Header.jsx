@@ -170,7 +170,7 @@ export default function Header(){
                 <Link to="/admin/ciudades" className="hdr__drop-item" role="menuitem" onClick={closeMenus}>Ciudades</Link>
                 <Link to="/admin/rutas" className="hdr__drop-item" role="menuitem" onClick={closeMenus}>Rutas</Link>
                 <Link to="/admin/config" className="hdr__drop-item" role="menuitem" onClick={closeMenus}> Header & Footer </Link>
-
+                <Link to="/admin/reservas" className="hdr__drop-item" role="menuitem" onClick={closeMenus}> Historial de reservas</Link>
               </div>
             </div>
           )}

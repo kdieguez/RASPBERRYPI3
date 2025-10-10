@@ -5,6 +5,9 @@ import { isLoggedIn, getUser } from "../lib/auth";
 import { comprasApi } from "../api/compras";
 import "../styles/vuelosCatalogo.css";
 
+/* =========================
+ * Utils
+ * ========================= */
 const toDate = (val) => {
   if (val === null || val === undefined) return null;
   if (Array.isArray(val)) {
@@ -24,8 +27,8 @@ const toDate = (val) => {
       /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:?\d{2})?$/i
     );
     if (m) {
-      const [, Y, Mo, D, h, mi, se] = m;
-      d = new Date(+Y, +Mo - 1, +D, +h, +mi, se ? +se : 0);
+      const [, Y, Mo, D, hh, mi, se] = m;
+      d = new Date(+Y, +Mo - 1, +D, +hh, +mi, se ? +se : 0);
       if (!Number.isNaN(d.getTime())) return d;
     }
     const mm = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})$/);
@@ -37,12 +40,13 @@ const toDate = (val) => {
   return null;
 };
 
-const fmtDt = (val) => {
-  const d = toDate(val);
-  return d
-    ? d.toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })
+const fmtDt = (val) =>
+  toDate(val)
+    ? toDate(val).toLocaleString("es-MX", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
     : "—";
-};
 
 const fmtMoney = (n) =>
   Number(n).toLocaleString("es-GT", {
@@ -77,6 +81,9 @@ const precioDeClase = (vuelo, idClase) => {
   return c ? Number(c.precio) : null;
 };
 
+/* =========================
+ * Componente
+ * ========================= */
 export default function VuelosCatalogo() {
   const [vuelos, setVuelos] = useState([]);
   const [clases, setClases] = useState([]);
@@ -113,7 +120,27 @@ export default function VuelosCatalogo() {
           (await clasesApi.list()).data,
         ]);
 
-        const folded = foldPairsFromList(Array.isArray(vuelosRes) ? vuelosRes : []);
+        const src = Array.isArray(vuelosRes) ? vuelosRes : [];
+        const now = new Date();
+
+        // Solo activos y con fecha de salida >= ahora (vigentes)
+        const onlyActiveAndFuture = src
+          .filter(
+            (v) =>
+              v.activo !== false &&
+              !String(v.estado || "").toLowerCase().includes("cancel")
+          )
+          .filter((v) => {
+            const fs = toDate(v.fechaSalida);
+            return fs && fs >= now;
+            // Si prefieres desde el inicio del día:
+            // const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+            // return fs && fs >= startToday;
+          });
+
+        // Plegar regreso dentro del ida SOLO si ambos son vigentes
+        const folded = foldPairsFromList(onlyActiveAndFuture);
+
         setVuelos(
           folded.map((v) => ({
             ...v,
@@ -130,19 +157,31 @@ export default function VuelosCatalogo() {
     })();
   }, [isAdmin]);
 
+  // Pliega regreso dentro del ida si ambos están presentes en la lista filtrada
   const foldPairsFromList = (list) => {
     const byId = new Map(list.map((v) => [v.idVuelo, { ...v }]));
     const hidden = new Set();
 
     for (const v of list) {
-      if (!v.idVueloPareja || hidden.has(v.idVuelo) || hidden.has(v.idVueloPareja)) continue;
-      const pair = byId.get(v.idVueloPareja);
-      if (!pair) continue;
+      if (hidden.has(v.idVuelo)) continue;
+
+      const pairId = v.idVueloPareja;
+      if (!pairId) continue;
+
+      const pair = byId.get(pairId);
+      if (!pair) continue; // su pareja no es vigente o no vino
 
       const fs1 = toDate(v.fechaSalida);
       const fs2 = toDate(pair.fechaSalida);
-      const ida = fs1 && fs2 && fs1 <= fs2 ? v : pair;
-      const regreso = ida === v ? pair : v;
+
+      let ida = v;
+      let regreso = pair;
+      if (fs1 && fs2 && fs1 > fs2) {
+        ida = pair;
+        regreso = v;
+      }
+
+      if (hidden.has(regreso.idVuelo)) continue;
 
       const host = byId.get(ida.idVuelo);
       if (host) {
@@ -153,12 +192,12 @@ export default function VuelosCatalogo() {
           destino: regreso.destino,
           fechaSalida: regreso.fechaSalida,
           fechaLlegada: regreso.fechaLlegada,
-          clases: regreso.clases || [],
-          escalas: regreso.escalas || [],
+          clases: Array.isArray(regreso.clases) ? regreso.clases : [],
+          escalas: Array.isArray(regreso.escalas) ? regreso.escalas : [],
         };
         byId.set(ida.idVuelo, host);
+        hidden.add(regreso.idVuelo);
       }
-      hidden.add(regreso.idVuelo);
     }
 
     return Array.from(byId.values()).filter((v) => !hidden.has(v.idVuelo));
@@ -248,20 +287,35 @@ export default function VuelosCatalogo() {
         return false;
 
       const precioBase = claseSel ? precioDeClase(v, claseSel) : minPrecio(v);
-      if (Number.isFinite(pmin) && !Number.isNaN(pmin) && pmin > 0 && precioBase !== null && precioBase < pmin)
+      if (
+        Number.isFinite(pmin) &&
+        !Number.isNaN(pmin) &&
+        pmin > 0 &&
+        precioBase !== null &&
+        precioBase < pmin
+      )
         return false;
-      if (Number.isFinite(pmax) && !Number.isNaN(pmax) && pmax > 0 && precioBase !== null && precioBase > pmax)
+      if (
+        Number.isFinite(pmax) &&
+        !Number.isNaN(pmax) &&
+        pmax > 0 &&
+        precioBase !== null &&
+        precioBase > pmax
+      )
         return false;
 
-      if (directOnly && Array.isArray(v.escalas) && v.escalas.length > 0) return false;
+      if (directOnly && Array.isArray(v.escalas) && v.escalas.length > 0)
+        return false;
 
       return true;
     });
   }, [vuelos, sp]);
-  
+
   const onChangeClase = (idVuelo, idClase) => {
     setVuelos((prev) =>
-      prev.map((v) => (v.idVuelo === idVuelo ? { ...v, _idClaseSel: Number(idClase) } : v))
+      prev.map((v) =>
+        v.idVuelo === idVuelo ? { ...v, _idClaseSel: Number(idClase) } : v
+      )
     );
   };
   const onChangeCant = (idVuelo, cant) => {
@@ -270,33 +324,47 @@ export default function VuelosCatalogo() {
       prev.map((v) => (v.idVuelo === idVuelo ? { ...v, _cant: n } : v))
     );
   };
+
   const comprar = async (vuelo) => {
     const u = getUser();
-    if (!u) { nav("/login"); return; }
+    if (!u) {
+      nav("/login");
+      return;
+    }
     const s = (vuelo.estado || "").toLowerCase();
     if (s.includes("cancel") || vuelo.activo === false) {
       alert("Este vuelo no está disponible para compra.");
       return;
     }
     const idClase = vuelo._idClaseSel ?? vuelo?.clases?.[0]?.idClase;
-    if (!idClase) { alert("Selecciona una clase."); return; }
+    if (!idClase) {
+      alert("Selecciona una clase.");
+      return;
+    }
     try {
-      await comprasApi.addItem({
-        idVuelo: Number(vuelo.idVuelo),
-        idClase: Number(idClase),
-        cantidad: Number(vuelo._cant || 1),
-      });
+      await comprasApi.addItem(
+        {
+          idVuelo: Number(vuelo.idVuelo),
+          idClase: Number(idClase),
+          cantidad: Number(vuelo._cant || 1),
+        },
+        { pair: !!vuelo.pareja } // si tiene regreso, se agrega como par
+      );
       nav(`/compras/carrito`);
     } catch (e) {
       alert(e?.response?.data?.error || e?.message || "No se pudo agregar al carrito");
     }
   };
 
+  /* =========================
+   * Render
+   * ========================= */
   return (
     <div className="container pag-vuelos-list">
       <div className="vlist__head">
         <h1>
-          Vuelos {isAdmin && <span className="pill" style={{ marginLeft: 8 }}>Admin: todos</span>}
+          Vuelos{" "}
+          {isAdmin && <span className="pill" style={{ marginLeft: 8 }}>Admin</span>}
         </h1>
       </div>
 
@@ -307,7 +375,11 @@ export default function VuelosCatalogo() {
               {f.k}: <strong>{f.v}</strong>
             </span>
           ))}
-          <button className="btn btn-small" onClick={clearFilters} style={{ marginLeft: 8 }}>
+          <button
+            className="btn btn-small"
+            onClick={clearFilters}
+            style={{ marginLeft: 8 }}
+          >
             Quitar filtros
           </button>
         </div>
@@ -394,6 +466,22 @@ export default function VuelosCatalogo() {
                           {fmtDt(v.pareja.fechaSalida)} → {fmtDt(v.pareja.fechaLlegada)}
                         </span>
                       </div>
+                    </div>
+                  )}
+
+                  {v.pareja?.clases?.length > 0 && (
+                    <div className="vitem__classes" style={{ marginTop: 6 }}>
+                      {v.pareja.clases.map((c, i) => (
+                        <div key={i} className="cl">
+                          <div className="cl__name">{claseName(c.idClase)}</div>
+                          <div className="cl__meta">
+                            <span className="label">Cupo</span>
+                            <span>{c.cupoTotal}</span>
+                            <span className="label">Precio</span>
+                            <span>{fmtMoney(c.precio)}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>

@@ -11,9 +11,14 @@ const money = (n) =>
 const dt = (s) =>
   s ? new Date(s).toLocaleString("es-GT", { dateStyle: "medium", timeStyle: "short" }) : "—";
 
+
 const estadoName = (id) =>
-  ({ 1: "Confirmada", 2: "Pagada", 3: "Reembolsada", 4: "Expirada" }[Number(id)] ||
-    `Estado ${id}`);
+  ({
+    1: "Pagada",
+    2: "Cancelada",
+    3: "Reembolsada",
+    4: "Expirada",
+  }[Number(id)] || `Estado ${id}`);
 
 const route = (ciudad, pais) => {
   const c = (ciudad || "").trim();
@@ -33,24 +38,25 @@ export default function ReservaDetalle() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [downloading, setDownloading] = useState(false);
+  const [canceling, setCanceling] = useState(false);
+
+  const fetchDet = async () => {
+    try {
+      setLoading(true);
+      setErr("");
+      const { data } = await comprasApi.getReserva(id);
+      setDet(data);
+    } catch (e) {
+      setErr(e?.response?.data?.error || e.message || "No se pudo cargar la reserva");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!u) {
-      nav("/login");
-      return;
-    }
-    (async () => {
-      try {
-        setLoading(true);
-        setErr("");
-        const { data } = await comprasApi.getReserva(id);
-        setDet(data);
-      } catch (e) {
-        setErr(e?.response?.data?.error || e.message || "No se pudo cargar la reserva");
-      } finally {
-        setLoading(false);
-      }
-    })();
+    if (!u) { nav("/login"); return; }
+    fetchDet();
+    
   }, [id]);
 
   const onDownload = async () => {
@@ -74,7 +80,27 @@ export default function ReservaDetalle() {
     }
   };
 
+  const onCancel = async () => {
+    if (!det || Number(det.idEstado) !== 1) return;
+    const ok = window.confirm("¿Seguro que deseas cancelar esta reserva?");
+    if (!ok) return;
+
+    try {
+      setCanceling(true);
+      await comprasApi.cancelReserva(det.idReserva || id);
+      await fetchDet(); 
+      alert("Reserva cancelada.");
+    } catch (e) {
+      alert(e?.response?.data?.error || e.message || "No se pudo cancelar la reserva");
+    } finally {
+      setCanceling(false);
+    }
+  };
+
   if (!u) return null;
+
+  
+  const codigoSet = new Set((det?.items || []).map(i => String(i.codigoVuelo || "")));
 
   return (
     <div className="container historial">
@@ -83,6 +109,16 @@ export default function ReservaDetalle() {
           Reserva {det?.codigo ? det.codigo : `#${id}`}
         </h1>
         <div style={{ display: "flex", gap: 8 }}>
+          {Number(det?.idEstado) === 1 && (
+            <button
+              className="btn btn-danger"
+              onClick={onCancel}
+              disabled={canceling || loading}
+              title="Cancelar y liberar los boletos de esta reserva"
+            >
+              {canceling ? "Cancelando..." : "Cancelar reserva"}
+            </button>
+          )}
           <button className="btn btn-primary" onClick={onDownload} disabled={downloading || loading}>
             {downloading ? "Generando PDF..." : "Descargar reserva"}
           </button>
@@ -119,64 +155,68 @@ export default function ReservaDetalle() {
             </div>
 
             <ul className="rd-list">
-              {det.items?.map((it) => (
-                <li key={it.idItem} className="rd-item">
-                  <div className="rd-main">
-                    <div className="rd-code">
-                      <span className="badge">{it.codigoVuelo}</span>
-                      <span className="pill">{it.clase}</span>
+              {det.items?.map((it) => {
+                const regresoCodigo = String(it.regresoCodigo || "");
+                const showInlineReturn = !!regresoCodigo && !codigoSet.has(regresoCodigo); 
+                return (
+                  <li key={it.idItem} className="rd-item">
+                    <div className="rd-main">
+                      <div className="rd-code">
+                        <span className="badge">{it.codigoVuelo}</span>
+                        <span className="pill">{it.clase}</span>
+                      </div>
+
+                      <RouteLine item={it} />
+
+                      <div className="rd-times">
+                        <div>
+                          <span className="label">Salida</span> {dt(it.fechaSalida)}
+                        </div>
+                        <div>
+                          <span className="label">Llegada</span> {dt(it.fechaLlegada)}
+                        </div>
+                      </div>
+
+                      {(it.escalaCiudad || it.escalaPais || it.escalaLlegada || it.escalaSalida) && (
+                        <div className="rd-extra">
+                          <div className="label" style={{ marginBottom: 4 }}>Escala</div>
+                          <div className="text-muted">
+                            {route(it.escalaCiudad, it.escalaPais)} — {dt(it.escalaLlegada)} → {dt(it.escalaSalida)}
+                          </div>
+                        </div>
+                      )}
+
+                      {showInlineReturn && (
+                        <div className="rd-extra">
+                          <div className="label" style={{ marginBottom: 4 }}>Regreso</div>
+                          <div className="rd-code" style={{ marginBottom: 6 }}>
+                            <span className="badge">{it.regresoCodigo}</span>
+                          </div>
+                          <div className="text-muted">
+                            {route(it.regresoCiudadOrigen, it.regresoPaisOrigen)} → {route(it.regresoCiudadDestino, it.regresoPaisDestino)}
+                          </div>
+                          <div className="text-muted">
+                            {dt(it.regresoFechaSalida)} → {dt(it.regresoFechaLlegada)}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    <RouteLine item={it} />
-
-                    <div className="rd-times">
+                    <div className="rd-money">
                       <div>
-                        <span className="label">Salida</span> {dt(it.fechaSalida)}
+                        <span className="label">Cantidad</span> {it.cantidad}
                       </div>
                       <div>
-                        <span className="label">Llegada</span> {dt(it.fechaLlegada)}
+                        <span className="label">P. unitario</span> {money(it.precioUnitario)}
+                      </div>
+                      <div>
+                        <span className="label">Subtotal</span>{" "}
+                        <strong>{money(it.subtotal)}</strong>
                       </div>
                     </div>
-
-                    {(it.escalaCiudad || it.escalaPais || it.escalaLlegada || it.escalaSalida) && (
-                      <div className="rd-extra">
-                        <div className="label" style={{ marginBottom: 4 }}>Escala</div>
-                        <div className="text-muted">
-                          {route(it.escalaCiudad, it.escalaPais)} — {dt(it.escalaLlegada)} → {dt(it.escalaSalida)}
-                        </div>
-                      </div>
-                    )}
-
-                    {it.regresoCodigo && (
-                      <div className="rd-extra">
-                        <div className="label" style={{ marginBottom: 4 }}>Regreso</div>
-                        <div className="rd-code" style={{ marginBottom: 6 }}>
-                          <span className="badge">{it.regresoCodigo}</span>
-                        </div>
-                        <div className="text-muted">
-                          {route(it.regresoCiudadOrigen, it.regresoPaisOrigen)} → {route(it.regresoCiudadDestino, it.regresoPaisDestino)}
-                        </div>
-                        <div className="text-muted">
-                          {dt(it.regresoFechaSalida)} → {dt(it.regresoFechaLlegada)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="rd-money">
-                    <div>
-                      <span className="label">Cantidad</span> {it.cantidad}
-                    </div>
-                    <div>
-                      <span className="label">P. unitario</span> {money(it.precioUnitario)}
-                    </div>
-                    <div>
-                      <span className="label">Subtotal</span>{" "}
-                      <strong>{money(it.subtotal)}</strong>
-                    </div>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
 
             <div className="sum-total" style={{ marginTop: 10 }}>

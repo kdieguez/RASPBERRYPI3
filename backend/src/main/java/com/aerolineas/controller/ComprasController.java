@@ -42,10 +42,12 @@ public class ComprasController {
   }
 
   private static final Locale LOCALE_GT = Locale.forLanguageTag("es-GT");
+
   private static String money(BigDecimal n) {
     if (n == null) n = BigDecimal.ZERO;
     return NumberFormat.getCurrencyInstance(LOCALE_GT).format(n);
   }
+
   private static String dt(String s) {
     try {
       Instant ins = Instant.parse(s);
@@ -55,6 +57,7 @@ public class ComprasController {
       return s != null ? s : "—";
     }
   }
+
   private static String getOpt(Object bean, String field) {
     if (bean == null) return "";
     try {
@@ -66,7 +69,7 @@ public class ComprasController {
   }
 
   public void register(Javalin app) {
-
+    
     app.get("/api/dev/test-mail", ctx -> {
       String to = ctx.queryParam("to");
       if (to == null || to.isBlank()) to = ctx.header("X-User-Email");
@@ -77,7 +80,7 @@ public class ComprasController {
       Mailer.send(to, "Prueba SMTP", "<p>Esto es una prueba desde el backend.</p>");
       ctx.result("OK enviado a " + to);
     });
-
+    
     app.get("/api/compras/carrito", ctx -> {
       try {
         long userId = getUserId(ctx);
@@ -93,36 +96,63 @@ public class ComprasController {
         long userId = getUserId(ctx);
         AddItemReq req = ctx.bodyAsClass(AddItemReq.class);
         if (req == null) throw new IllegalArgumentException("Solicitud inválida");
-        dao.addOrIncrementItem(userId, req.idVuelo, req.idClase, req.cantidad <= 0 ? 1 : req.cantidad);
+        int qty = req.cantidad <= 0 ? 1 : req.cantidad;
+        boolean incluirPareja = false;
+        String qpPair = ctx.queryParam("pair");
+        if (qpPair != null) incluirPareja = Boolean.parseBoolean(qpPair);
+        try {
+          dao.addOrIncrementItem(userId, req.idVuelo, req.idClase, qty, incluirPareja);
+        } catch (NoSuchMethodError | UnsupportedOperationException ex) {
+          
+          dao.addOrIncrementItem(userId, req.idVuelo, req.idClase, qty);
+        }
         ctx.status(201);
       } catch (Exception e) {
         ctx.status(400).json(Map.of("error", e.getMessage()));
       }
     });
-
+    
     app.put("/api/compras/items/{idItem}", ctx -> {
       try {
         long userId = getUserId(ctx);
         long idItem = Long.parseLong(ctx.pathParam("idItem"));
         UpdateQtyReq req = ctx.bodyAsClass(UpdateQtyReq.class);
-        dao.updateQuantity(userId, idItem, req.cantidad);
+        boolean sync = false;
+        String qpSync = ctx.queryParam("syncPareja");
+        if (qpSync != null) sync = Boolean.parseBoolean(qpSync);
+
+        try {
+          dao.updateQuantity(userId, idItem, req.cantidad, sync);
+        } catch (NoSuchMethodError | UnsupportedOperationException ex) {
+          dao.updateQuantity(userId, idItem, req.cantidad);
+        }
         ctx.status(204);
       } catch (Exception e) {
         ctx.status(400).json(Map.of("error", e.getMessage()));
       }
     });
-
+    
     app.delete("/api/compras/items/{idItem}", ctx -> {
       try {
         long userId = getUserId(ctx);
         long idItem = Long.parseLong(ctx.pathParam("idItem"));
-        dao.removeItem(userId, idItem);
+
+        boolean sync = false;
+        String qpSync = ctx.queryParam("syncPareja");
+        if (qpSync != null) sync = Boolean.parseBoolean(qpSync);
+
+        try {
+          dao.removeItem(userId, idItem, sync);
+        } catch (NoSuchMethodError | UnsupportedOperationException ex) {
+          dao.removeItem(userId, idItem);
+        }
+
         ctx.status(204);
       } catch (Exception e) {
         ctx.status(400).json(Map.of("error", e.getMessage()));
       }
     });
-
+    
     app.post("/api/compras/checkout", ctx -> {
       try {
         long userId = getUserId(ctx);
@@ -139,7 +169,7 @@ public class ComprasController {
         if (resumen.items == null || resumen.items.isEmpty())
           throw new IllegalArgumentException("El carrito está vacío.");
 
-        long idReserva = dao.checkout(userId);
+        long idReserva = dao.checkout(userId); 
         ctx.json(new CheckoutResp(idReserva));
 
         try { sendEmail(ctx, resumen, idReserva); } catch (Exception ignore) {}
@@ -147,7 +177,7 @@ public class ComprasController {
         ctx.status(400).json(Map.of("error", e.getMessage()));
       }
     });
-
+   
     app.get("/api/compras/reservas", ctx -> {
       try {
         long userId = getUserId(ctx);
@@ -164,6 +194,30 @@ public class ComprasController {
         long id = Long.parseLong(ctx.pathParam("id"));
         var det = dao.getReservaDetalle(userId, id);
         ctx.json(det);
+      } catch (Exception e) {
+        ctx.status(400).json(Map.of("error", e.getMessage()));
+      }
+    });
+   
+    app.post("/api/compras/reservas/{id}/cancelar", ctx -> {
+      try {
+        long userId = getUserId(ctx);
+        long id = Long.parseLong(ctx.pathParam("id"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> claims = ctx.attribute("claims");
+        boolean admin = false;
+        if (claims != null) {
+          Object rol = claims.get("rol");
+          try { admin = Integer.parseInt(String.valueOf(rol)) == 1; } catch (Exception ignore) {}
+        }
+
+        boolean ok = dao.cancelarReserva(userId, id, admin); 
+        if (!ok) {
+          ctx.status(409).json(Map.of("error", "La reserva no está en estado cancelable."));
+          return;
+        }
+        ctx.json(Map.of("status", "ok"));
       } catch (Exception e) {
         ctx.status(400).json(Map.of("error", e.getMessage()));
       }
@@ -218,6 +272,15 @@ public class ComprasController {
         if (email == null || email.isBlank()) email  = ctx.header("X-User-Email");
         if (nombre == null || nombre.isBlank()) nombre = ctx.header("X-User-Name");
 
+        if (nombre == null || nombre.isBlank()) {
+          String fromDet = getOpt(det, "compradorNombre");
+          if (!fromDet.isBlank()) nombre = fromDet;
+        }
+        if (email == null || email.isBlank()) {
+          String fromDet = getOpt(det, "compradorEmail");
+          if (!fromDet.isBlank()) email = fromDet;
+        }
+
         if ((nombre == null || nombre.isBlank()) && email != null && email.contains("@")) {
           nombre = email.substring(0, email.indexOf('@'));
         }
@@ -231,10 +294,64 @@ public class ComprasController {
         ctx.header("Cache-Control", "no-store");
         ctx.result(pdf);
       } catch (Exception e) {
-    e.printStackTrace();
-    ctx.status(400).json(Map.of("error", e.getClass().getSimpleName() + ": " + (e.getMessage()==null? "Error generando PDF" : e.getMessage())));
-  }
+        e.printStackTrace();
+        ctx.status(400).json(Map.of("error", e.getClass().getSimpleName() + ": " +
+            (e.getMessage() == null ? "Error generando PDF" : e.getMessage())));
+      }
     });
+
+    
+
+    app.get("/api/admin/reservas", ctx -> {
+      com.aerolineas.middleware.Auth.jwt().handle(ctx);
+      if (ctx.attribute("claims") == null || !isAdmin(ctx)) {
+        ctx.status(403).json(Map.of("error", "solo administradores")); return;
+      }
+
+      String q       = ctx.queryParam("q");
+      String usuario = ctx.queryParam("usuario");
+      String codigo  = ctx.queryParam("codigo");
+      String vuelo   = ctx.queryParam("vuelo");
+      String fDesde  = ctx.queryParam("desde");
+      String fHasta  = ctx.queryParam("hasta");
+      Integer estado = null;
+      try { estado = ctx.queryParam("estado") == null ? null : Integer.parseInt(ctx.queryParam("estado")); }
+      catch (Exception ignore) {}
+
+      java.sql.Timestamp tsDesde = null, tsHasta = null;
+      try { if (fDesde != null && !fDesde.isBlank()) tsDesde = java.sql.Timestamp.valueOf(fDesde + " 00:00:00"); } catch (Exception ignore) {}
+      try { if (fHasta != null && !fHasta.isBlank()) tsHasta = java.sql.Timestamp.valueOf(fHasta + " 23:59:59"); } catch (Exception ignore) {}
+
+      var list = dao.listReservasAdmin(q, usuario, codigo, vuelo, tsDesde, tsHasta, estado);
+      ctx.json(list);
+    });
+
+    app.get("/api/admin/reservas/estados", ctx -> {
+      com.aerolineas.middleware.Auth.jwt().handle(ctx);
+      if (ctx.attribute("claims") == null || !isAdmin(ctx)) {
+        ctx.status(403).json(Map.of("error", "solo administradores")); return;
+      }
+      ctx.json(dao.listEstadosReserva());
+    });
+
+    app.get("/api/admin/reservas/{id}", ctx -> {
+      com.aerolineas.middleware.Auth.jwt().handle(ctx);
+      if (ctx.attribute("claims") == null || !isAdmin(ctx)) {
+        ctx.status(403).json(Map.of("error", "solo administradores")); return;
+      }
+      long id = Long.parseLong(ctx.pathParam("id"));
+      var det = dao.getReservaDetalleAdmin(id);
+      ctx.json(det);
+    });
+  }
+
+  private static boolean isAdmin(Context ctx) {
+    @SuppressWarnings("unchecked")
+    Map<String, Object> claims = ctx.attribute("claims");
+    if (claims == null) return false;
+    Object rol = claims.get("rol");
+    try { return Integer.parseInt(String.valueOf(rol)) == 1; }
+    catch (Exception e) { return false; }
   }
 
   private void sendEmail(Context ctx, CarritoResp resumen, long idReserva) {

@@ -35,12 +35,12 @@ export default function Carrito() {
   }, []);
 
   const onQty = async (idItem, qty) => {
-    await comprasApi.updateItem(idItem, Math.max(1, Number(qty) || 1));
+    await comprasApi.updateItem(idItem, Math.max(1, Number(qty) || 1), { syncPareja: true });
     await load();
   };
 
   const onRemove = async (idItem) => {
-    await comprasApi.removeItem(idItem);
+    await comprasApi.removeItem(idItem, { syncPareja: true });
     await load();
   };
 

@@ -22,6 +22,8 @@ import Checkout from "./paginas/CheckOut";
 import HistorialCompras from "./paginas/HistorialCompras";
 import ReservaDetalle from "./paginas/ReservaDetalle";
 import ConfigSitio from "./paginas/admin/ConfigSitio";
+import HistorialReservas from "./paginas/admin/HistorialReservas";
+import AdminReservaDetalle from "./paginas/admin/AdminReservaDetalle";
 
 
 function Home() {
@@ -63,6 +65,9 @@ export default function App() {
             <Route path="/admin/vuelos" element={<AdminVuelosList />} />
             <Route path="/admin/vuelos/:id" element={<VueloEdit />} />
             <Route path="/admin/config" element={<ConfigSitio/>}/>
+            <Route path="/admin/reservas" element={<HistorialReservas />} />
+            <Route path="/admin/reservas/:id" element={<AdminReservaDetalle />} />
+
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

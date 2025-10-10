@@ -68,7 +68,6 @@ export default function CheckoutAgradecimiento() {
           <button className="btn btn-primary" onClick={onDownload} disabled={downloading || loading || !!err}>
             {downloading ? "Generando PDF..." : "Descargar PDF"}
           </button>
-          <Link className="btn" to={`/compras/reserva/${id}`}>Ver detalle</Link>
           <Link className="btn btn-primary" to="/vuelos">Seguir comprando</Link>
           <Link className="btn" to="/">Ir al inicio</Link>
         </div>
