@@ -119,7 +119,7 @@ public class VueloController {
       try {
         long idIda     = dao.crearVueloReturnId(req.ida());
         long idRegreso = dao.crearVueloReturnId(req.regreso());
-        dao.vincularPareja(idIda, idRegreso);
+        dao.vincularPareja(idIda, idRegreso); 
         ctx.status(201).json(Map.of("idIda", idIda, "idRegreso", idRegreso));
       } catch (SQLException e) {
         String msg = e.getMessage() == null ? "" : e.getMessage();
@@ -137,11 +137,24 @@ public class VueloController {
         return;
       }
       try {
-        dao.vincularPareja(req.idIda(), req.idRegreso());
+        dao.vincularPareja(req.idIda(), req.idRegreso()); 
         ctx.status(204);
       } catch (SQLException e) {
         String msg = e.getMessage() == null ? "" : e.getMessage();
         ctx.status(400).json(Map.of("error", msg.isBlank() ? "No se pudo vincular vuelos" : msg));
+      }
+    });
+
+    
+    app.put("/api/v1/vuelos/{id}/unlink", ctx -> {
+      Auth.adminOrEmpleado().handle(ctx);
+      long idVuelo = ctx.pathParamAsClass("id", Long.class).get();
+      try {
+        dao.desvincularPareja(idVuelo);
+        ctx.status(204);
+      } catch (SQLException e) {
+        String msg = e.getMessage() == null ? "" : e.getMessage();
+        ctx.status(400).json(Map.of("error", msg.isBlank() ? "No se pudo desvincular el vuelo" : msg));
       }
     });
 

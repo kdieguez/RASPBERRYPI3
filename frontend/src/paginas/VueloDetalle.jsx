@@ -209,10 +209,17 @@ export default function VueloDetalle() {
     }
   };
 
+  //
   const publicar = async () => {
     const u = getUser();
     if (!u) { nav("/login"); return; }
     if (!v?.idVuelo) return;
+
+    const cancel = ((v?.estado || "").toLowerCase().includes("cancel"));
+    if (cancel) {
+      alert("Este vuelo está cancelado; no se pueden agregar calificaciones ni comentarios.");
+      return;
+    }
 
     try {
       setPublishing(true);
@@ -220,7 +227,7 @@ export default function VueloDetalle() {
       if (sel > 0 && myRating == null) {
         try {
           await ratingsApi.create(v.idVuelo, { calificacion: sel });
-          await loadRating(v.idVuelo); 
+          await loadRating(v.idVuelo);
         } catch (e) {
           if (e?.response?.status === 409) {
             alert("Ya calificaste este vuelo");
@@ -244,33 +251,32 @@ export default function VueloDetalle() {
     }
   };
 
-const CommentItem = ({ item, depth = 0 }) => (
-  <div className="cmt__item" style={{ marginLeft: depth * 16 }}>
-    <div className="cmt__meta" style={{ gap: 8 }}>
-      <strong>{item.autor || `Usuario #${item.idUsuario}`}</strong>
-      <span className="cmt__date">{fmtDateTime(item.creadaEn)}</span>
-      {depth === 0 && item.ratingAutor != null && (
-        <span style={{ marginLeft: 6 }}>
-          <StarsBar value={item.ratingAutor} size="md" />
-        </span>
+  const CommentItem = ({ item, depth = 0 }) => (
+    <div className="cmt__item" style={{ marginLeft: depth * 16 }}>
+      <div className="cmt__meta" style={{ gap: 8 }}>
+        <strong>{item.autor || `Usuario #${item.idUsuario}`}</strong>
+        <span className="cmt__date">{fmtDateTime(item.creadaEn)}</span>
+        {depth === 0 && item.ratingAutor != null && (
+          <span style={{ marginLeft: 6 }}>
+            <StarsBar value={item.ratingAutor} size="md" />
+          </span>
+        )}
+      </div>
+      <div className="cmt__body">{item.comentario}</div>
+      {logged && !((v?.estado || "").toLowerCase().includes("cancel")) && (
+        <button
+          className="link"
+          onClick={() => setReplyTo(replyTo === item.idComentario ? null : item.idComentario)}
+        >
+          {replyTo === item.idComentario ? "Cancelar respuesta" : "Responder"}
+        </button>
       )}
+      {Array.isArray(item.respuestas) &&
+        item.respuestas.map((h) => (
+          <CommentItem key={h.idComentario} item={h} depth={depth + 1} />
+        ))}
     </div>
-    <div className="cmt__body">{item.comentario}</div>
-    {logged && (
-      <button
-        className="link"
-        onClick={() => setReplyTo(replyTo === item.idComentario ? null : item.idComentario)}
-      >
-        {replyTo === item.idComentario ? "Cancelar respuesta" : "Responder"}
-      </button>
-    )}
-    {Array.isArray(item.respuestas) &&
-      item.respuestas.map((h) => (
-        <CommentItem key={h.idComentario} item={h} depth={depth + 1} />
-      ))}
-  </div>
-);
-
+  );
 
   const claseName = (idClase) =>
     clasesCat.find((c) => Number(c.idClase) === Number(idClase))?.nombre ||
@@ -327,7 +333,9 @@ const CommentItem = ({ item, depth = 0 }) => (
         idVuelo: Number(v.idVuelo),
         idClase: Number(idClase),
         cantidad: Number(cant || 1),
-      });
+      },
+      { pair: !!regreso && !!regreso.idVuelo } 
+ );
       nav(`/compras/carrito`);
     } catch (e) {
       alert(e?.response?.data?.error || e?.message || "No se pudo agregar al carrito");
@@ -422,12 +430,22 @@ const CommentItem = ({ item, depth = 0 }) => (
                   <div style={{ marginTop: 6, display: "flex", gap: 12, flexWrap: "wrap" }}>
                     <span className="label">Origen:</span> <strong>{regreso.origen || "—"}</strong>
                     <span className="label">Destino:</span> <strong>{regreso.destino || "—"}</strong>
-                    {Array.isArray(regreso.clases) && regreso.clases.length > 0 && (
-                      <span className="label">
-                        Clases: {regreso.clases.map(c => c.idClase).join(", ")}
-                      </span>
-                    )}
                   </div>
+                  {Array.isArray(regreso.clases) && regreso.clases.length > 0 ? (
+      <div className="vd__classgrid" style={{ marginTop: 10 }}>
+        {regreso.clases.map((c, i) => (
+          <div className="vd__classcard" key={i}>
+            <div className="vd__classname">{claseName(c.idClase)}</div>
+            <div className="vd__classmeta">
+              <span className="label">Cupo {c.cupoTotal}</span>
+             <span className="label">Precio: {fmtMoney(c.precio)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p className="hint" style={{ marginTop: 8 }}>No hay clases configuradas para el regreso.</p>
+    )}
                 </div>
               </section>
             )}
@@ -537,6 +555,10 @@ const CommentItem = ({ item, depth = 0 }) => (
             {!logged ? (
               <div className="hint">
                 <button className="link" onClick={() => nav("/login")}>Inicia sesión</button> para calificar y comentar.
+              </div>
+            ) : ((v?.estado || "").toLowerCase().includes("cancel")) ? (
+              <div className="hint">
+                Este vuelo está cancelado. Las calificaciones y comentarios están deshabilitados.
               </div>
             ) : (
               <>

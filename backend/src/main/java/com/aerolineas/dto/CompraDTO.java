@@ -9,7 +9,10 @@ public class CompraDTO {
     public long idVuelo;
     public int idClase;
     public int cantidad;
+    
+    public Boolean incluirPareja; 
   }
+
   public static class UpdateQtyReq {
     public int cantidad;
   }
@@ -69,7 +72,7 @@ public class CompraDTO {
     public int idEstado;
     public BigDecimal total;
     public String creadaEn;
-    public String codigo;        
+    public String codigo;
   }
 
   public static class ReservaDetalle {
@@ -78,8 +81,11 @@ public class CompraDTO {
     public int idEstado;
     public BigDecimal total;
     public String creadaEn;
-    public String codigo;         
+    public String codigo;
     public List<ReservaItem> items;
+
+    public String compradorNombre;
+    public String compradorEmail;
   }
 
   public static class ReservaItem {
@@ -99,14 +105,19 @@ public class CompraDTO {
     public String paisDestino;
     public String escalaCiudad;
     public String escalaPais;
-    public String escalaLlegada;   // ISO-8601
-    public String escalaSalida;    // ISO-8601
+    public String escalaLlegada;
+    public String escalaSalida;
     public String regresoCodigo;
-    public String regresoFechaSalida;   // ISO-8601
-    public String regresoFechaLlegada;  // ISO-8601
+    public String regresoFechaSalida;
+    public String regresoFechaLlegada;
     public String regresoCiudadOrigen;
     public String regresoPaisOrigen;
     public String regresoCiudadDestino;
     public String regresoPaisDestino;
+  }
+
+  public static class EstadoReserva {
+    public int idEstado;
+    public String nombre;
   }
 }
