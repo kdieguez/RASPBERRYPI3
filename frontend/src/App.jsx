@@ -24,16 +24,7 @@ import ReservaDetalle from "./paginas/ReservaDetalle";
 import ConfigSitio from "./paginas/admin/ConfigSitio";
 import HistorialReservas from "./paginas/admin/HistorialReservas";
 import AdminReservaDetalle from "./paginas/admin/AdminReservaDetalle";
-
-
-function Home() {
-  return (
-    <div className="container home">
-      <h1>Bienvenida a Aerolíneas ✈</h1>
-      <p>Esta es una vista de prueba. Luego conectamos con el backend.</p>
-    </div>
-  );
-}
+import Home from "./paginas/Home";
 
 export default function App() {
   return (

@@ -5,9 +5,6 @@ import { isLoggedIn, getUser } from "../lib/auth";
 import { comprasApi } from "../api/compras";
 import "../styles/vuelosCatalogo.css";
 
-/* =========================
- * Utils
- * ========================= */
 const toDate = (val) => {
   if (val === null || val === undefined) return null;
   if (Array.isArray(val)) {
@@ -81,9 +78,6 @@ const precioDeClase = (vuelo, idClase) => {
   return c ? Number(c.precio) : null;
 };
 
-/* =========================
- * Componente
- * ========================= */
 export default function VuelosCatalogo() {
   const [vuelos, setVuelos] = useState([]);
   const [clases, setClases] = useState([]);
@@ -92,6 +86,8 @@ export default function VuelosCatalogo() {
 
   const user = getUser();
   const isAdmin = !!user && Number(user.idRol) === 1;
+
+  const [pairIds, setPairIds] = useState(new Set());
 
   const [logged, setLogged] = useState(isLoggedIn());
   useEffect(() => {
@@ -108,7 +104,6 @@ export default function VuelosCatalogo() {
       try {
         setLoading(true);
         setErr("");
-
         const [vuelosRes, clasesRes] = await Promise.all([
           (async () => {
             try {
@@ -122,8 +117,15 @@ export default function VuelosCatalogo() {
 
         const src = Array.isArray(vuelosRes) ? vuelosRes : [];
         const now = new Date();
-
-        // Solo activos y con fecha de salida >= ahora (vigentes)
+      
+        const pids = new Set();
+        for (const v of src) {
+          const a = Number(v.idVuelo);
+          const b = v.idVueloPareja ? Number(v.idVueloPareja) : null;
+          if (b) { pids.add(a); pids.add(b); }
+        }
+        setPairIds(pids);
+      
         const onlyActiveAndFuture = src
           .filter(
             (v) =>
@@ -133,16 +135,14 @@ export default function VuelosCatalogo() {
           .filter((v) => {
             const fs = toDate(v.fechaSalida);
             return fs && fs >= now;
-            // Si prefieres desde el inicio del día:
-            // const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-            // return fs && fs >= startToday;
           });
-
-        // Plegar regreso dentro del ida SOLO si ambos son vigentes
-        const folded = foldPairsFromList(onlyActiveAndFuture);
+      
+        const baseList = isAdmin ? src : onlyActiveAndFuture;
+      
+        const finalList = foldPairsFromList(baseList);
 
         setVuelos(
-          folded.map((v) => ({
+          finalList.map((v) => ({
             ...v,
             _idClaseSel: v?.clases?.[0]?.idClase ?? null,
             _cant: 1,
@@ -157,7 +157,6 @@ export default function VuelosCatalogo() {
     })();
   }, [isAdmin]);
 
-  // Pliega regreso dentro del ida si ambos están presentes en la lista filtrada
   const foldPairsFromList = (list) => {
     const byId = new Map(list.map((v) => [v.idVuelo, { ...v }]));
     const hidden = new Set();
@@ -169,7 +168,7 @@ export default function VuelosCatalogo() {
       if (!pairId) continue;
 
       const pair = byId.get(pairId);
-      if (!pair) continue; // su pareja no es vigente o no vino
+      if (!pair) continue;
 
       const fs1 = toDate(v.fechaSalida);
       const fs2 = toDate(pair.fechaSalida);
@@ -223,6 +222,8 @@ export default function VuelosCatalogo() {
     if (get("pmin") || get("pmax"))
       af.push({ k: "precio", v: `${get("pmin") || "0"} - ${get("pmax") || "∞"}` });
     if (get("direct") === "1") af.push({ k: "directo", v: "Solo directos" });
+    if (get("trip") === "round") af.push({ k: "tipo", v: "Ida y vuelta" });
+    if (get("trip") === "one") af.push({ k: "tipo", v: "Solo ida" });
     return af;
   }, [sp, clases]);
 
@@ -231,6 +232,7 @@ export default function VuelosCatalogo() {
   const filtered = useMemo(() => {
     const spGet = (k) => (sp.get(k) || "").trim().toLowerCase();
 
+    const trip = sp.get("trip");
     const f_origen = spGet("origen");
     const f_dest = spGet("destino");
     const fsd = sp.get("fsd");
@@ -255,6 +257,17 @@ export default function VuelosCatalogo() {
     const str = (x) => (x || "").toLowerCase();
 
     return (vuelos || []).filter((v) => {
+    
+      if (trip === "round") {
+        if (!v.pareja) return false;
+      } else if (trip === "one") {
+      
+        const idv = Number(v.idVuelo);
+        if (v.pareja) return false;
+        if (v.idVueloPareja) return false;
+        if (pairIds.has(idv)) return false;
+      }
+
       const escalaPaises = Array.isArray(v.escalas)
         ? v.escalas.map((e) => str(e.pais)).join(" ")
         : "";
@@ -309,7 +322,7 @@ export default function VuelosCatalogo() {
 
       return true;
     });
-  }, [vuelos, sp]);
+  }, [vuelos, sp, pairIds]);
 
   const onChangeClase = (idVuelo, idClase) => {
     setVuelos((prev) =>
@@ -348,7 +361,7 @@ export default function VuelosCatalogo() {
           idClase: Number(idClase),
           cantidad: Number(vuelo._cant || 1),
         },
-        { pair: !!vuelo.pareja } // si tiene regreso, se agrega como par
+        { pair: !!vuelo.pareja }
       );
       nav(`/compras/carrito`);
     } catch (e) {
@@ -356,9 +369,6 @@ export default function VuelosCatalogo() {
     }
   };
 
-  /* =========================
-   * Render
-   * ========================= */
   return (
     <div className="container pag-vuelos-list">
       <div className="vlist__head">
