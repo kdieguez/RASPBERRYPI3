@@ -15,7 +15,6 @@ from app.routers.auth import router as auth_router
 from app.routers.vuelos import router as vuelos_router
 from app.routers.portal import router as portal_router
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_to_mongo()
@@ -23,30 +22,25 @@ async def lifespan(app: FastAPI):
     yield
     await close_mongo_connection()
 
-
 app = FastAPI(title=APP_NAME, version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS or [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
-    allow_credentials=False,    
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],         
+    allow_headers=["*"],
     max_age=600,
 )
-
 
 @app.get("/health")
 async def health():
     await get_db()["usuarios"].count_documents({})
     return {"status": "ok"}
 
-
 @app.get("/health/full")
 async def health_full():
+
     users_count = await get_db()["usuarios"].count_documents({})
 
     url = f"{AEROLINEAS_API_URL}/api/public/vuelos"
@@ -65,7 +59,6 @@ async def health_full():
         "mongo": {"usuarios_count": users_count},
         "aerolineas": {"reachable": aerolineas_ok, "url": url},
     }
-
 
 # Routers
 app.include_router(auth_router)

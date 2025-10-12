@@ -40,7 +40,7 @@ ALLOWED_ORIGINS = getenv_list(
 )
 
 CAPTCHA_SECRET   = os.getenv("CAPTCHA_SECRET", "")
-CAPTCHA_DISABLED = getenv_bool("CAPTCHA_DISABLED", True)
+CAPTCHA_DISABLED = getenv_bool("CAPTCHA_DISABLED", False)
 
 APP_NAME = os.getenv("APP_NAME", "Agencia API")
 

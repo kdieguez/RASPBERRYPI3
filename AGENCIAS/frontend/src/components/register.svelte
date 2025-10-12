@@ -1,6 +1,7 @@
 <script>
-  import { onMount } from 'svelte';
-  import { AuthAPI } from "../lib/api.js";
+  import { onMount } from "svelte";
+  import { AuthAPI } from "@/lib/api";
+  import { navigate } from "@/lib/router";
 
   let form = {
     email:"", password:"",
@@ -79,11 +80,8 @@
         numero_pasaporte: form.numero_pasaporte.trim(),
         captcha_token: form.captcha_token
       };
-      const res = await AuthAPI.register(payload);
-      ok = `Usuario creado: ${res?.email ?? "creado"}`;
-      form.password = "";
-      if (widgetId !== null && window.grecaptcha) window.grecaptcha.reset(widgetId);
-      form.captcha_token = "";
+      await AuthAPI.register(payload);
+      navigate("/login?next=/admin/portal");
     } catch (e) {
       err = e?.message || "Ocurrió un error";
     } finally {

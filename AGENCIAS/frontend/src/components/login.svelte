@@ -1,45 +1,51 @@
 <script>
-  import { onMount } from 'svelte';
-  import { AuthAPI } from '../lib/api';
-  import { setAuth, isLoggedIn } from '../lib/auth';
-  import { navigate, path } from '../lib/router';
+  import { onMount } from "svelte";
+  import { AuthAPI } from "@/lib/api";
+  import { setAuth, isLoggedIn } from "@/lib/auth";
+  import { navigate } from "@/lib/router";
 
-  let email = '';
-  let password = '';
+  let email = "";
+  let password = "";
   let loading = false;
-  let error = '';
+  let error = "";
   let showPwd = false;
 
   function nextFromLocation() {
-    let q = '';
-    if (location.hash.includes('?')) {
-      q = location.hash.split('?')[1];
-    } else if (location.search && location.pathname.endsWith('/login')) {
-      q = location.search.slice(1);
-    }
-    const params = new URLSearchParams(q);
-    const n = params.get('next');
-    return n && n.startsWith('/') ? n : '/';
+    const params = new URLSearchParams(location.search || "");
+    const n = params.get("next");
+    return n && n.startsWith("/") ? n : "/admin/portal";
   }
 
   onMount(() => {
-    if ($isLoggedIn) navigate('/');
+    if ($isLoggedIn) navigate(nextFromLocation(), { replace: true });
   });
-
-  $: if ($isLoggedIn && $path === '/login') {
-    navigate('/');
-  }
 
   async function submit(e) {
     e.preventDefault();
-    error = '';
+    error = "";
     loading = true;
     try {
-      const res = await AuthAPI.login({ email: email.trim().toLowerCase(), password });
-      setAuth({ token: res.access_token, user: res.user });
+      const res = await AuthAPI.login({
+        email: email.trim().toLowerCase(),
+        password
+      });
+
+      // ✅ Acepta distintos nombres de token
+      const token =
+        res?.access_token || res?.accessToken || res?.token || null;
+      let user = res?.user || null;
+
+      if (!token) throw new Error("La API no devolvió token de acceso.");
+
+      // ✅ Si no vino el usuario, intenta con /auth/me
+      if (!user) {
+        try { user = await AuthAPI.me(); } catch {}
+      }
+
+      setAuth({ token, user });
       navigate(nextFromLocation());
     } catch (e) {
-      error = e?.message || 'Error al iniciar sesión';
+      error = e?.message || "Error al iniciar sesión";
     } finally {
       loading = false;
     }
@@ -53,37 +59,15 @@
 
     <div style="margin-top:12px;">
       <label class="label" for="email">Correo</label>
-      <input
-        id="email"
-        class="input"
-        type="email"
-        bind:value={email}
-        placeholder="tucorreo@dominio.com"
-        required
-        autocomplete="email"
-      />
+      <input id="email" class="input" type="email" bind:value={email} placeholder="tucorreo@dominio.com" required autocomplete="email" />
     </div>
 
     <div style="margin-top:12px;">
       <label class="label" for="password">Contraseña</label>
       <div style="display:flex;gap:8px;align-items:center;">
-        <input
-          id="password"
-          class="input"
-          type={showPwd ? 'text' : 'password'}
-          bind:value={password}
-          placeholder="••••••••"
-          required
-          autocomplete="current-password"
-        />
-        <button
-          type="button"
-          class="btn"
-          on:click={() => (showPwd = !showPwd)}
-          aria-pressed={showPwd}
-          aria-label={showPwd ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-        >
-          {showPwd ? 'Ocultar' : 'Ver'}
+        <input id="password" class="input" type={showPwd ? "text" : "password"} bind:value={password} placeholder="••••••••" required autocomplete="current-password" />
+        <button type="button" class="btn" on:click={() => (showPwd = !showPwd)} aria-pressed={showPwd} aria-label={showPwd ? "Ocultar contraseña" : "Mostrar contraseña"}>
+          {showPwd ? "Ocultar" : "Ver"}
         </button>
       </div>
     </div>
@@ -94,7 +78,7 @@
 
     <div style="margin-top:16px; display:flex; gap:10px;">
       <button class="btn primary" type="submit" disabled={loading || !email || !password}>
-        {loading ? 'Entrando…' : 'Entrar'}
+        {loading ? "Entrando…" : "Entrar"}
       </button>
       <button class="btn" type="reset" on:click={() => { email=''; password=''; error=''; }}>
         Limpiar

@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
-  import { VuelosAPI } from "../../lib/api";
+  import { VuelosAPI } from "@/lib/api";          // ← usa alias @
+  import { link } from "@/lib/router";            // ← para navegación SPA en <a>
 
   let origin = "";
   let destination = "";
@@ -14,25 +15,35 @@
   let error = "";
 
   onMount(async () => {
-    try { origins = await VuelosAPI.origins(); }
-    catch (e) { error = e.message || "No se pudieron cargar los orígenes"; }
+    try {
+      origins = await VuelosAPI.origins();
+    } catch (e) {
+      error = e?.message || "No se pudieron cargar los orígenes";
+    }
   });
 
   async function onOriginChange() {
     destination = "";
     destinations = [];
     if (!origin) return;
-    try { destinations = await VuelosAPI.destinations(origin); }
-    catch (e) { error = e.message || "No se pudieron cargar los destinos"; }
+    try {
+      destinations = await VuelosAPI.destinations(origin);
+    } catch (e) {
+      error = e?.message || "No se pudieron cargar los destinos";
+    }
   }
 
   async function search() {
-    loading = true; error = "";
+    loading = true;
+    error = "";
     try {
       items = await VuelosAPI.search({ origin, destination, date, pax });
-      items.sort((a,b) => (a.precioDesde ?? 9e15) - (b.precioDesde ?? 9e15));
-    } catch (e) { error = e.message || "Error al buscar vuelos"; }
-    finally { loading = false; }
+      items.sort((a, b) => (a.precioDesde ?? 9e15) - (b.precioDesde ?? 9e15));
+    } catch (e) {
+      error = e?.message || "Error al buscar vuelos";
+    } finally {
+      loading = false;
+    }
   }
 
   const idOrigin = "fld-origin";
@@ -83,7 +94,9 @@
 
   <div class="grid">
     {#each items as v}
-      <a class="item" href={`#/vuelos/${v.idVuelo}?pax=${pax}`}>
+      <a class="item"
+         href={`/vuelos/${v.idVuelo}?pax=${pax}`}
+         use:link>                     <!-- ← navegación SPA garantizada -->
         <div class="price">Desde {v.precioDesde?.toLocaleString?.() ?? v.precioDesde}</div>
         <div class="route">{v.origen} → {v.destino}</div>
         <div class="meta">
