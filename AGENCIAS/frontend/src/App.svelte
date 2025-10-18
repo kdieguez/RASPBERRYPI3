@@ -8,13 +8,14 @@
   import AdminPortal from "@/components/admin/portal.svelte";
   import Catalog from "@/components/vuelos/catalog.svelte";
   import Detail from "@/components/vuelos/detail.svelte";
+
+  import Cart from "@/components/compras/cart.svelte";
+  import Checkout from "@/components/compras/checkout.svelte";
+  import Reservas from "@/components/compras/reservas.svelte";
+  import ReservaDetail from "@/components/compras/reserva_detail.svelte";
+
   import { isLoggedIn } from "@/lib/auth";
   import { path, navigate, match, link } from "@/lib/router";
-
-  let current = "/";
-  const unsub = path.subscribe((p) => (current = p));
-
-  $: if ($isLoggedIn && current === "/login") navigate("/", { replace: true });
 
   function headerCurrent(p) {
     if (p === "/") return "home";
@@ -23,11 +24,24 @@
     if (p === "/admin/users") return "users";
     if (p === "/admin/portal") return "portal";
     if (match("/vuelos", p).ok || match("/vuelos/:id", p).ok) return "vuelos";
+    if (match("/carrito", p).ok) return "carrito";
+    if (match("/reservas", p).ok || match("/reservas/:id", p).ok) return "reservas";
     return "";
   }
 
+  $: current = $path;
+
   $: isVuelosCatalog = match("/vuelos", current).ok;
   $: isVuelosDetail  = match("/vuelos/:id", current).ok;
+
+  $: isCart          = match("/carrito", current).ok;
+  $: isCheckout      = match("/checkout", current).ok;
+  $: isReservas      = match("/reservas", current).ok;
+  $: isReservaDetail = match("/reservas/:id", current).ok;
+
+  $: if ($isLoggedIn && current === "/login") {
+    navigate("/", { replace: true });
+  }
 </script>
 
 <Header current={headerCurrent(current)} />
@@ -38,6 +52,16 @@
   <Catalog />
 {:else if isVuelosDetail}
   <Detail />
+
+{:else if isCart}
+  <Cart />
+{:else if isCheckout}
+  <Checkout />
+{:else if isReservas}
+  <Reservas />
+{:else if isReservaDetail}
+  <ReservaDetail />
+
 {:else if current === '/admin/users'}
   <AdminUsers />
 {:else if current === '/admin/portal'}

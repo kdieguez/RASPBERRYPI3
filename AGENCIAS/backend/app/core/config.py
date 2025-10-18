@@ -63,3 +63,14 @@ __all__ = [
     "ESTADO_CANCELADO_TXT",
     "AEROLINEAS_TIMEOUT",
 ]
+
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+SMTP_FROM = os.getenv("SMTP_FROM", os.getenv("SMTP_USER", ""))
+SMTP_USE_TLS = getenv_bool("SMTP_USE_TLS", True)
+
+__all__ += [
+    "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM", "SMTP_USE_TLS",
+]

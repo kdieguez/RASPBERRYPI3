@@ -1,7 +1,5 @@
-// src/lib/router.js — Router con History API (sin hashes)
 import { writable } from "svelte/store";
 
-/* Utils */
 function normalize(p) {
   p = (p || "/").toString().trim();
   if (p.startsWith("#")) p = p.slice(1);
@@ -18,16 +16,13 @@ function currentPathOnly() {
   return normalize(location.pathname || "/");
 }
 
-/* Migración automática #/ruta → /ruta */
 if ((location.hash || "").startsWith("#/")) {
   history.replaceState({}, "", normalize(location.hash.slice(1)));
 }
 
-/* Store de ruta */
 export const path = writable(currentPathOnly());
 function apply() { path.set(currentPathOnly()); }
 
-/* Navegación */
 export function navigate(to, opts = {}) {
   const next = normalize(to);
   const curr = currentPathOnly();
@@ -35,12 +30,11 @@ export function navigate(to, opts = {}) {
     const fn = opts.replace ? "replaceState" : "pushState";
     history[fn]({}, "", next);
   } else {
-    path.set(next); // fuerza reacción si es la misma ruta
+    path.set(next);
   }
   queueMicrotask(apply);
 }
 
-/* Listeners */
 window.addEventListener("popstate", apply);
 window.addEventListener("load", apply);
 window.addEventListener("hashchange", () => {
@@ -51,7 +45,6 @@ window.addEventListener("hashchange", () => {
 });
 queueMicrotask(apply);
 
-/* Helpers compatibles */
 const EMPTY_PARAMS = {};
 export function match(pattern, current) {
   const [pa] = splitPathAndQuery(normalize(pattern));
@@ -81,14 +74,11 @@ export function onNavigate(cb) {
   return () => unsub();
 }
 
-/* === Svelte action: use:link ===
-   Convierte cualquier <a href="/interna"> en navegación SPA estable. */
 export function link(node) {
   function onClick(e) {
     if (e.defaultPrevented || e.button !== 0) return;
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
 
-    // si el click vino de un hijo, sube al <a>
     const a = e.target.closest("a");
     if (!a || a !== node) return;
 
@@ -96,8 +86,8 @@ export function link(node) {
     if (!href) return;
     if (a.target === "_blank") return;
     if (href.startsWith("mailto:") || href.startsWith("tel:")) return;
-    if (/^https?:\/\//i.test(href)) return; // externo
-    if (href.startsWith("#")) return;       // ancla
+    if (/^https?:\/\//i.test(href)) return;
+    if (href.startsWith("#")) return;    
 
     e.preventDefault();
     navigate(href);
