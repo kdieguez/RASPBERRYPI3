@@ -1,15 +1,38 @@
 from __future__ import annotations
+
 from typing import List, Optional
 from decimal import Decimal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+def _normalize_dt(value):
+    """
+    Acepta:
+      - str: se regresa igual
+      - list/tuple: [YYYY, M, D, HH?, mm?, ss?] → 'YYYY-MM-DDTHH:mm:ss'
+      - None: None
+      - otro: str(value)
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (list, tuple)) and len(value) >= 3:
+        y, m, d, *rest = value
+        hh = rest[0] if len(rest) > 0 else 0
+        mm = rest[1] if len(rest) > 1 else 0
+        ss = rest[2] if len(rest) > 2 else 0
+        return f"{int(y):04d}-{int(m):02d}-{int(d):02d}T{int(hh):02d}:{int(mm):02d}:{int(ss):02d}"
+    return str(value)
 
 class AddItemReq(BaseModel):
     idVuelo: int = Field(..., ge=1)
     idClase: int = Field(..., ge=1)
     cantidad: int = Field(1, ge=1)
 
+
 class UpdateQtyReq(BaseModel):
     cantidad: int = Field(..., ge=1)
+
 
 class PaymentReq(BaseModel):
     class Tarjeta(BaseModel):
@@ -27,6 +50,7 @@ class PaymentReq(BaseModel):
 
     tarjeta: Tarjeta
     facturacion: Facturacion
+
 
 class CheckoutResp(BaseModel):
     idReserva: str
@@ -50,12 +74,19 @@ class CarritoItem(BaseModel):
     paisDestino: Optional[str] = None
     parejaDe: Optional[int] = None
 
+    @field_validator("fechaSalida", "fechaLlegada", mode="before")
+    @classmethod
+    def _norm_dates(cls, v):
+        return _normalize_dt(v)
+
+
 class CarritoResp(BaseModel):
     idCarrito: str | int
     idUsuario: str | int
     fechaCreacion: Optional[str] = None
     total: Decimal = Decimal("0.00")
     items: List[CarritoItem] = []
+
 
 class ReservaItem(BaseModel):
     idItem: str
@@ -81,6 +112,18 @@ class ReservaItem(BaseModel):
     regresoCiudadDestino: Optional[str] = None
     regresoPaisDestino: Optional[str] = None
 
+    @field_validator(
+        "fechaSalida",
+        "fechaLlegada",
+        "regresoFechaSalida",
+        "regresoFechaLlegada",
+        mode="before",
+    )
+    @classmethod
+    def _norm_reserva_dates(cls, v):
+        return _normalize_dt(v)
+
+
 class ReservaListItem(BaseModel):
     idReserva: str
     idUsuario: str | int
@@ -88,6 +131,7 @@ class ReservaListItem(BaseModel):
     total: Decimal
     creadaEn: Optional[str] = None
     codigo: Optional[str] = None
+
 
 class ReservaDetalle(BaseModel):
     idReserva: str
