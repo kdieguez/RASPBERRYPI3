@@ -24,6 +24,55 @@ public class VueloController {
     app.get("/api/public/vuelos", ctx -> ctx.json(dao.listarVuelosPublic()));
     app.get("/api/v1/vuelos",     ctx -> ctx.json(dao.listarVuelosPublic()));
 
+    // Endpoints públicos para vuelos con escala
+    app.get("/api/public/vuelos/con-escala", ctx -> {
+      try {
+        ctx.json(dao.listarVuelosConEscalaPublic());
+      } catch (Exception e) {
+        String msg = e.getMessage() == null ? "" : e.getMessage();
+        ctx.status(500).json(Map.of("error", msg.isBlank() ? "Error al listar vuelos con escala" : msg));
+      }
+    });
+
+    app.get("/api/v1/vuelos/con-escala", ctx -> {
+      try {
+        ctx.json(dao.listarVuelosConEscalaPublic());
+      } catch (Exception e) {
+        String msg = e.getMessage() == null ? "" : e.getMessage();
+        ctx.status(500).json(Map.of("error", msg.isBlank() ? "Error al listar vuelos con escala" : msg));
+      }
+    });
+
+    app.get("/api/public/vuelos/con-escala/{id}", ctx -> {
+      long id = ctx.pathParamAsClass("id", Long.class).get();
+      try {
+        var vuelo = dao.obtenerVueloConEscalaPublic(id);
+        if (vuelo == null) {
+          ctx.status(404).json(Map.of("error", "Vuelo con escala no encontrado"));
+          return;
+        }
+        ctx.json(vuelo);
+      } catch (Exception e) {
+        String msg = e.getMessage() == null ? "" : e.getMessage();
+        ctx.status(500).json(Map.of("error", msg.isBlank() ? "Error al obtener vuelo con escala" : msg));
+      }
+    });
+
+    app.get("/api/v1/vuelos/con-escala/{id}", ctx -> {
+      long id = ctx.pathParamAsClass("id", Long.class).get();
+      try {
+        var vuelo = dao.obtenerVueloConEscalaPublic(id);
+        if (vuelo == null) {
+          ctx.status(404).json(Map.of("error", "Vuelo con escala no encontrado"));
+          return;
+        }
+        ctx.json(vuelo);
+      } catch (Exception e) {
+        String msg = e.getMessage() == null ? "" : e.getMessage();
+        ctx.status(500).json(Map.of("error", msg.isBlank() ? "Error al obtener vuelo con escala" : msg));
+      }
+    });
+
     app.get("/api/v1/vuelos/{id}", ctx -> {
       long id = ctx.pathParamAsClass("id", Long.class).get();
       var v = dao.obtenerVueloPublic(id);
@@ -192,6 +241,45 @@ public class VueloController {
         } else {
           ctx.status(400).json(Map.of("error", msg));
         }
+      }
+    });
+
+    // Endpoints para vuelos con escala
+    app.post("/api/v1/admin/vuelos/con-escala", ctx -> {
+      Auth.adminOrEmpleado().handle(ctx);
+      VueloDTO.VueloConEscalaCreate dto = ctx.bodyAsClass(VueloDTO.VueloConEscalaCreate.class);
+      try {
+        long id = dao.crearVueloConEscala(dto);
+        ctx.status(201).json(Map.of("idVueloConEscala", id));
+      } catch (Exception e) {
+        String msg = e.getMessage() == null ? "" : e.getMessage();
+        ctx.status(400).json(Map.of("error", msg.isBlank() ? "No se pudo crear el vuelo con escala" : msg));
+      }
+    });
+
+    app.get("/api/v1/admin/vuelos/con-escala", ctx -> {
+      Auth.adminOrEmpleado().handle(ctx);
+      try {
+        ctx.json(dao.listarVuelosConEscala());
+      } catch (Exception e) {
+        String msg = e.getMessage() == null ? "" : e.getMessage();
+        ctx.status(500).json(Map.of("error", msg.isBlank() ? "Error al listar vuelos con escala" : msg));
+      }
+    });
+
+    app.get("/api/v1/admin/vuelos/con-escala/{id}", ctx -> {
+      Auth.adminOrEmpleado().handle(ctx);
+      long id = ctx.pathParamAsClass("id", Long.class).get();
+      try {
+        var vuelo = dao.obtenerVueloConEscala(id);
+        if (vuelo == null) {
+          ctx.status(404).json(Map.of("error", "Vuelo con escala no encontrado"));
+          return;
+        }
+        ctx.json(vuelo);
+      } catch (Exception e) {
+        String msg = e.getMessage() == null ? "" : e.getMessage();
+        ctx.status(500).json(Map.of("error", msg.isBlank() ? "Error al obtener vuelo con escala" : msg));
       }
     });
 

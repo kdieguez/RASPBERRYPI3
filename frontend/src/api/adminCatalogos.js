@@ -37,3 +37,11 @@ export const vuelosApi = {
   updateEstado: (id, idEstado, motivo) =>
     axios.put(`/api/v1/vuelos/${id}/estado`, { idEstado, motivo }),
 };
+
+export const vuelosConEscalaApi = {
+  listPublic: () => axios.get("/api/public/vuelos/con-escala"),
+  listAdmin: () => axios.get("/api/v1/admin/vuelos/con-escala"),
+  getPublic: (id) => axios.get(`/api/public/vuelos/con-escala/${id}`),
+  getAdmin: (id) => axios.get(`/api/v1/admin/vuelos/con-escala/${id}`),
+  createAdmin: (dto) => axios.post("/api/v1/admin/vuelos/con-escala", dto),
+};
