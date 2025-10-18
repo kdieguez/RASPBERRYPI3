@@ -8,14 +8,18 @@
   import AdminPortal from "@/components/admin/portal.svelte";
   import Catalog from "@/components/vuelos/catalog.svelte";
   import Detail from "@/components/vuelos/detail.svelte";
+  import { isLoggedIn } from "@/lib/auth";
+  import { path, navigate, match, link } from "@/lib/router";
 
   import Cart from "@/components/compras/cart.svelte";
   import Checkout from "@/components/compras/checkout.svelte";
   import Reservas from "@/components/compras/reservas.svelte";
   import ReservaDetail from "@/components/compras/reserva_detail.svelte";
 
-  import { isLoggedIn } from "@/lib/auth";
-  import { path, navigate, match, link } from "@/lib/router";
+  let current = "/";
+  const unsub = path.subscribe((p) => (current = p));
+
+  $: if ($isLoggedIn && current === "/login") navigate("/", { replace: true });
 
   function headerCurrent(p) {
     if (p === "/") return "home";
@@ -29,8 +33,6 @@
     return "";
   }
 
-  $: current = $path;
-
   $: isVuelosCatalog = match("/vuelos", current).ok;
   $: isVuelosDetail  = match("/vuelos/:id", current).ok;
 
@@ -38,51 +40,49 @@
   $: isCheckout      = match("/checkout", current).ok;
   $: isReservas      = match("/reservas", current).ok;
   $: isReservaDetail = match("/reservas/:id", current).ok;
-
-  $: if ($isLoggedIn && current === "/login") {
-    navigate("/", { replace: true });
-  }
 </script>
 
 <Header current={headerCurrent(current)} />
 
-{#if current === '/'}
-  <Home />
-{:else if isVuelosCatalog}
-  <Catalog />
-{:else if isVuelosDetail}
-  <Detail />
+{#key current}
+  {#if current === '/'}
+    <Home />
+  {:else if isVuelosCatalog}
+    <Catalog />
+  {:else if isVuelosDetail}
+    <Detail />
 
-{:else if isCart}
-  <Cart />
-{:else if isCheckout}
-  <Checkout />
-{:else if isReservas}
-  <Reservas />
-{:else if isReservaDetail}
-  <ReservaDetail />
+  {:else if isCart}
+    <Cart />
+  {:else if isCheckout}
+    <Checkout />
+  {:else if isReservas}
+    <Reservas />
+  {:else if isReservaDetail}
+    <ReservaDetail />
 
-{:else if current === '/admin/users'}
-  <AdminUsers />
-{:else if current === '/admin/portal'}
-  <AdminPortal />
-{:else if current === '/register'}
-  <Register />
-{:else if current === '/login'}
-  {#if $isLoggedIn}
-    <section class="container">
-      <div class="card">Ya has iniciado sesión. Redirigiendo…</div>
-    </section>
+  {:else if current === '/admin/users'}
+    <AdminUsers />
+  {:else if current === '/admin/portal'}
+    <AdminPortal />
+  {:else if current === '/register'}
+    <Register />
+  {:else if current === '/login'}
+    {#if $isLoggedIn}
+      <section class="container">
+        <div class="card">Ya has iniciado sesión. Redirigiendo…</div>
+      </section>
+    {:else}
+      <Login />
+    {/if}
   {:else}
-    <Login />
+    <section class="container">
+      <div class="card">
+        <h2>Página no encontrada</h2>
+        <a class="btn" href="/" use:link>Ir al inicio</a>
+      </div>
+    </section>
   {/if}
-{:else}
-  <section class="container">
-    <div class="card">
-      <h2>Página no encontrada</h2>
-      <a class="btn" href="/" use:link>Ir al inicio</a>
-    </div>
-  </section>
-{/if}
+{/key}
 
 <Footer />

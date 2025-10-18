@@ -1,5 +1,6 @@
-import App from './App.svelte'
-import './app.css'
+import { mount } from 'svelte';
+import App from './App.svelte';
+import './app.css';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
 window.addEventListener('error', (e) => {
@@ -11,4 +12,6 @@ window.addEventListener('unhandledrejection', (e) => {
 
 console.log('[BOOT] main.js cargado, montando Svelte…');
 
-new App({ target: document.getElementById('app') })
+export const app = mount(App, {
+  target: document.getElementById('app'),
+});

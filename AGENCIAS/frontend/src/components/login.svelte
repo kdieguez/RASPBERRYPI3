@@ -17,40 +17,35 @@
   }
 
   onMount(() => {
-    console.log('[LOGIN] onMount');
-    if ($isLoggedIn) {
-      console.log('[LOGIN] ya logueado, redirigiendo…');
-      navigate(nextFromLocation(), { replace: true });
-    }
-    window.__testLogin = submit;
+    if ($isLoggedIn) navigate(nextFromLocation(), { replace: true });
   });
 
-  async function submit(e) {
-    e?.preventDefault?.();
-    console.log('[LOGIN] submit()', { email, hasPwd: !!password });
+  async function submit() {
     error = "";
     loading = true;
+    console.log("[LOGIN] submit →", { email });
+
     try {
       const res = await AuthAPI.login({
         email: email.trim().toLowerCase(),
         password
       });
-      console.log('[LOGIN] respuesta de /login', res);
 
-      const token = res?.access_token || res?.accessToken || res?.token || null;
+      const token =
+        res?.access_token || res?.accessToken || res?.token || null;
       let user = res?.user || null;
+
       if (!token) throw new Error("La API no devolvió token de acceso.");
 
       if (!user) {
-        try { user = await AuthAPI.me(); console.log('[LOGIN] /me OK', user); }
-        catch (e) { console.warn('[LOGIN] /me falló', e); }
+        try { user = await AuthAPI.me(); } catch {}
       }
 
       setAuth({ token, user });
-      console.log('[LOGIN] setAuth OK; navegando a', nextFromLocation());
+      console.log("[LOGIN] ok → navegando a", nextFromLocation());
       navigate(nextFromLocation());
     } catch (e) {
-      console.error('[LOGIN] error en submit', e);
+      console.error("[LOGIN] error:", e);
       error = e?.message || "Error al iniciar sesión";
     } finally {
       loading = false;
@@ -59,20 +54,47 @@
 </script>
 
 <div class="container" style="display:grid;place-items:center;min-height:calc(100vh - 64px);">
-  <form class="card" style="width: 420px;" on:submit|preventDefault={submit} autocomplete="on">
+  <form
+    class="card"
+    style="width: 420px;"
+    autocomplete="on"
+    on:submit={(e) => { e.preventDefault(); if (!loading) submit(); }}
+  >
     <h2 style="margin:0 0 10px 0;">Inicia sesión</h2>
     <p style="margin:0;color:#9ca3af">Usa tu correo y contraseña registrados.</p>
 
     <div style="margin-top:12px;">
       <label class="label" for="email">Correo</label>
-      <input id="email" class="input" type="email" bind:value={email} placeholder="tucorreo@dominio.com" required autocomplete="email" />
+      <input
+        id="email"
+        class="input"
+        type="email"
+        bind:value={email}
+        placeholder="tucorreo@dominio.com"
+        required
+        autocomplete="email"
+      />
     </div>
 
     <div style="margin-top:12px;">
       <label class="label" for="password">Contraseña</label>
       <div style="display:flex;gap:8px;align-items:center;">
-        <input id="password" class="input" type={showPwd ? "text" : "password"} bind:value={password} placeholder="••••••••" required autocomplete="current-password" />
-        <button type="button" class="btn" on:click={() => (showPwd = !showPwd)} aria-pressed={showPwd} aria-label={showPwd ? "Ocultar contraseña" : "Mostrar contraseña"}>
+        <input
+          id="password"
+          class="input"
+          type={showPwd ? "text" : "password"}
+          bind:value={password}
+          placeholder="••••••••"
+          required
+          autocomplete="current-password"
+        />
+        <button
+          type="button"
+          class="btn"
+          on:click={() => (showPwd = !showPwd)}
+          aria-pressed={showPwd}
+          aria-label={showPwd ? "Ocultar contraseña" : "Mostrar contraseña"}
+        >
           {showPwd ? "Ocultar" : "Ver"}
         </button>
       </div>
@@ -83,11 +105,15 @@
     {/if}
 
     <div style="margin-top:16px; display:flex; gap:10px;">
-      <button class="btn primary" type="submit" disabled={loading || !email || !password}
-              on:click|preventDefault={submit}>
+      <button class="btn primary" type="submit" disabled={loading || !email || !password}>
         {loading ? "Entrando…" : "Entrar"}
       </button>
-      <button class="btn" type="reset" on:click={() => { email=''; password=''; error=''; }}>
+      <button
+        class="btn"
+        type="button"
+        on:click={() => { email=''; password=''; error=''; }}
+        disabled={loading}
+      >
         Limpiar
       </button>
     </div>

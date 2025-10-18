@@ -3,8 +3,6 @@
   import { VuelosAPI, ComprasAPI } from "@/lib/api";
   import { link } from "@/lib/router";
 
-  console.log('[CAT] MONTANDO Catalog.svelte __build=2');
-
   let origin = "";
   let destination = "";
   let date = "";
@@ -12,36 +10,42 @@
 
   let origins = [];
   let destinations = [];
-  let items = [];            // ← ÚNICA fuente de verdad
+  let items = [];
   let loading = false;
   let error = "";
-  let showDebug = false;
 
   onMount(async () => {
-    try { origins = await VuelosAPI.origins(); } catch (e) { error = e?.message || "No se pudieron cargar los orígenes"; }
+    try {
+      const list = await VuelosAPI.origins();
+      origins = Array.isArray(list) ? [...list] : [];
+    } catch (e) {
+      error = e?.message || "No se pudieron cargar los orígenes";
+    }
   });
 
   async function onOriginChange() {
     destination = "";
     destinations = [];
     if (!origin) return;
-    try { destinations = await VuelosAPI.destinations(origin); }
-    catch (e) { error = e?.message || "No se pudieron cargar los destinos"; }
+    try {
+      const list = await VuelosAPI.destinations(origin);
+      destinations = Array.isArray(list) ? [...list] : [];
+    } catch (e) {
+      error = e?.message || "No se pudieron cargar los destinos";
+    }
   }
 
   async function search() {
-    loading = true; error = "";
+    loading = true;
+    error = "";
     try {
       const res = await VuelosAPI.search({ origin, destination, date, pax });
-      console.log('[CAT] resultados len:', Array.isArray(res) ? res.length : 'N/A', res);
-      // fuerza nueva referencia para reactividad
-      items = (Array.isArray(res) ? res : []).map(x => ({ ...x }));
-      // ordena de manera segura
-      items.sort((a,b) =>
-        (a?.precioDesde ?? Number.MAX_SAFE_INTEGER) - (b?.precioDesde ?? Number.MAX_SAFE_INTEGER)
+      const sorted = (Array.isArray(res) ? res : []).slice().sort(
+        (a, b) => ((a?.precioDesde ?? Number.POSITIVE_INFINITY) - (b?.precioDesde ?? Number.POSITIVE_INFINITY))
       );
+      items = sorted;
+      console.log("[CATALOG] items:", items);
     } catch (e) {
-      console.error('[CAT] error search', e);
       error = e?.message || "Error al buscar vuelos";
       items = [];
     } finally {
@@ -51,7 +55,9 @@
 
   async function addToCart(v) {
     try {
-      await ComprasAPI.addItem({ idVuelo: v.idVuelo, idClase: 1, cantidad: 1, pair: false });
+      const idVuelo = v.idVuelo;
+      const idClase = 1;
+      await ComprasAPI.addItem({ idVuelo, idClase, cantidad: 1, pair: false });
       alert("Agregado al carrito");
     } catch (e) {
       alert(e?.message || "Error agregando al carrito");
@@ -67,7 +73,7 @@
 <div class="wrap">
   <h1>Vuelos</h1>
 
-  <form class="card" on:submit|preventDefault={search}>
+  <form class="card" on:submit={(e)=>{ e.preventDefault(); search(); }}>
     <div class="row">
       <div>
         <label for={idOrigin}>Origen</label>
@@ -104,32 +110,29 @@
   {#if error}<p class="error">{error}</p>{/if}
   {#if loading}<p>Cargando...</p>{/if}
 
-  <p class="muted">Vuelos encontrados: {items.length}</p>
-
-  <details class="muted" bind:open={showDebug} style="margin:.5rem 0">
-    <summary>Ver datos crudos (debug)</summary>
-    <pre style="white-space:pre-wrap;overflow:auto;max-height:240px;">{JSON.stringify(items, null, 2)}</pre>
-  </details>
+  {#if !loading && (!items || items.length === 0)}
+    <div class="card" style="margin-top:12px;">No hay vuelos para esos filtros.</div>
+  {/if}
 
   <div class="grid">
-    {#each items as v (v.idVuelo ?? v.codigo ?? v)}
+    {#each items as v (v.idVuelo)}
       <div class="item">
         <a
           href={`/vuelos/${v.idVuelo}?pax=${pax}`}
           use:link
           style="text-decoration:none; color:inherit;"
         >
-          <div class="price">Desde {v.precioDesde?.toLocaleString?.() ?? v.precioDesde ?? '—'}</div>
+          <div class="price">Desde {v.precioDesde?.toLocaleString?.() ?? v.precioDesde}</div>
           <div class="route">{v.origen} → {v.destino}</div>
           <div class="meta">
-            <span>{v.fechaSalida ? new Date(v.fechaSalida).toLocaleString() : '—'}</span>
-            <span>Proveedor: {v.proveedor ?? '—'}</span>
+            <span>{new Date(v.fechaSalida).toLocaleString()}</span>
+            <span>Proveedor: {v.proveedor}</span>
             {#if v.tieneEscala}<span class="escala">Con escala</span>{/if}
           </div>
         </a>
 
         <div class="item-actions">
-          <button class="btn" on:click={() => addToCart(v)}>Agregar al carrito</button>
+          <button class="btn" type="button" on:click={() => addToCart(v)}>Agregar al carrito</button>
           <a class="btn ghost" href="/carrito" use:link>Ver carrito</a>
         </div>
       </div>
@@ -140,7 +143,6 @@
 <style>
   .wrap { max-width: 1000px; margin: 0 auto; padding: 1rem; }
   h1 { color: #E62727; }
-  .muted { opacity:.75 }
   .card { background:#fff; border:1px solid #eee; border-left:4px solid #1E93AB; padding:1rem; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,.04);}
   .row { display:grid; grid-template-columns: repeat(5, 1fr); gap:.75rem; align-items:end; }
   label { font-size:.85rem; color:#555; }
