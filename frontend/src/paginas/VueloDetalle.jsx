@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { vuelosApi, clasesApi } from "../api/adminCatalogos";
+import { vuelosApi, clasesApi, vuelosConEscalaApi } from "../api/adminCatalogos";
 import { isLoggedIn, getUser } from "../lib/auth";
 import { comprasApi } from "../api/compras";
 import "../styles/vueloDetalle.css";
@@ -101,6 +101,7 @@ export default function VueloDetalle() {
   const [v, setV] = useState(null);
   const [clasesCat, setClasesCat] = useState([]);
   const [regreso, setRegreso] = useState(null);
+  const [esVueloConEscala, setEsVueloConEscala] = useState(false);
 
   const [idClaseSel, setIdClaseSel] = useState(null);
   const [cant, setCant] = useState(1);
@@ -163,25 +164,49 @@ export default function VueloDetalle() {
       try {
         setLoading(true);
         setErr("");
-        const [{ data: vuelo }, { data: catClases }] = await Promise.all([
-          fetchVueloSmart(id),
+        
+        // Intentar cargar como vuelo con escala primero
+        let vueloConEscala = null;
+        try {
+          const { data } = await vuelosConEscalaApi.getAdmin(id);
+          vueloConEscala = data;
+        } catch {
+          // No es un vuelo con escala, continuar con vuelo normal
+        }
+
+        if (vueloConEscala) {
+          // Es un vuelo con escala
+          setEsVueloConEscala(true);
+          setV(vueloConEscala);
+          setRegreso(null);
+        } else {
+          // Es un vuelo normal
+          setEsVueloConEscala(false);
+          const [{ data: vuelo }, { data: catClases }] = await Promise.all([
+            fetchVueloSmart(id),
+            clasesApi.list(),
+          ]);
+
+          setV(vuelo);
+          setClasesCat(Array.isArray(catClases) ? catClases : []);
+
+          if (vuelo?.idVueloPareja && Number(vuelo.idVueloPareja) !== Number(id)) {
+            try {
+              const { data: vp } = await fetchVueloSmart(vuelo.idVueloPareja);
+              setRegreso(vp);
+            } catch {
+              setRegreso({ idVuelo: vuelo.idVueloPareja });
+            }
+          } else {
+            setRegreso(null);
+          }
+        }
+
+        const [{ data: catClases }] = await Promise.all([
           clasesApi.list(),
         ]);
-
-        setV(vuelo);
         setClasesCat(Array.isArray(catClases) ? catClases : []);
-        setIdClaseSel(vuelo?.clases?.[0]?.idClase ?? null);
-
-        if (vuelo?.idVueloPareja && Number(vuelo.idVueloPareja) !== Number(id)) {
-          try {
-            const { data: vp } = await fetchVueloSmart(vuelo.idVueloPareja);
-            setRegreso(vp);
-          } catch {
-            setRegreso({ idVuelo: vuelo.idVueloPareja });
-          }
-        } else {
-          setRegreso(null);
-        }
+        setIdClaseSel(vueloConEscala?.clases?.[0]?.idClase ?? v?.clases?.[0]?.idClase ?? null);
       } catch (e) {
         setErr(e?.response?.data?.error || "No se pudo cargar el vuelo");
       } finally {
@@ -329,13 +354,25 @@ export default function VueloDetalle() {
     const idClase = idClaseSel ?? v?.clases?.[0]?.idClase;
     if (!idClase) { alert("Selecciona una clase."); return; }
     try {
-      await comprasApi.addItem({
-        idVuelo: Number(v.idVuelo),
-        idClase: Number(idClase),
-        cantidad: Number(cant || 1),
-      },
-      { pair: !!regreso && !!regreso.idVuelo } 
- );
+      if (esVueloConEscala) {
+        await comprasApi.addItem({
+          idVuelo: Number(v.primerTramo.idVuelo),
+          idClase: Number(idClase),
+          cantidad: Number(cant || 1),
+        }, { pair: true });
+        
+        await comprasApi.addItem({
+          idVuelo: Number(v.segundoTramo.idVuelo),
+          idClase: Number(idClase),
+          cantidad: Number(cant || 1),
+        }, { pair: true });
+      } else {
+        await comprasApi.addItem({
+          idVuelo: Number(v.idVuelo),
+          idClase: Number(idClase),
+          cantidad: Number(cant || 1),
+        }, { pair: !!regreso && !!regreso.idVuelo });
+      }
       nav(`/compras/carrito`);
     } catch (e) {
       alert(e?.response?.data?.error || e?.message || "No se pudo agregar al carrito");
@@ -356,7 +393,7 @@ export default function VueloDetalle() {
           </div>
           <div className="vd__header__text">
             <h2>
-              Vuelo <span className="vd__code">{v.codigo || `#${id}`}</span>
+              {esVueloConEscala ? "Vuelo con Escala" : "Vuelo"} <span className="vd__code">{v.codigo || `#${id}`}</span>
             </h2>
             <p className="subtitle">
               <Link to="/vuelos">← Volver a la lista</Link>
@@ -365,6 +402,9 @@ export default function VueloDetalle() {
               <span className={`pill ${esCancelado ? "pill--bad" : "pill--ok"}`}>
                 {esCancelado ? "Cancelado" : v.estado || "Programado"}
               </span>
+              {esVueloConEscala && (
+                <span className="pill pill--escala">Con Escala</span>
+              )}
               {v.activo === false ? (
                 <span className="pill">Inactivo</span>
               ) : (
@@ -377,17 +417,90 @@ export default function VueloDetalle() {
         <div className="vd__grid">
           <section>
             <h3 className="block-title">Ruta</h3>
-            <div className="vd__route">
-              <div>
-                <div className="label">Origen</div>
-                <div className="vd__big">{v.origen || "—"}</div>
+            {esVueloConEscala ? (
+              <div className="vd__route-escala">
+                <div className="vd__tramo">
+                  <h4 className="tramo-title">🛫 Primer Tramo</h4>
+                  <div className="vd__route">
+                    <div>
+                      <div className="label">Origen</div>
+                      <div className="vd__big">{v.primerTramo?.origen || "—"}</div>
+                    </div>
+                    <div className="vd__arrow">→</div>
+                    <div>
+                      <div className="label">Escala</div>
+                      <div className="vd__big">{v.primerTramo?.destino || "—"}</div>
+                    </div>
+                  </div>
+                  <div className="tramo-times">
+                    <div className="vd__titem">
+                      <div className="vd__dot" />
+                      <div>
+                        <div className="label">Salida</div>
+                        <div className="vd__big">{fmtDateTime(v.primerTramo?.fechaSalida)}</div>
+                      </div>
+                    </div>
+                    <div className="vd__titem">
+                      <div className="vd__dot" />
+                      <div>
+                        <div className="label">Llegada</div>
+                        <div className="vd__big">{fmtDateTime(v.primerTramo?.fechaLlegada)}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="escala-info">
+                  <div className="escala-badge">
+                    <span className="escala-icon">✈️</span>
+                    <span>Escala en {v.primerTramo?.destino}</span>
+                  </div>
+                </div>
+                
+                <div className="vd__tramo">
+                  <h4 className="tramo-title">🛫 Segundo Tramo</h4>
+                  <div className="vd__route">
+                    <div>
+                      <div className="label">Escala</div>
+                      <div className="vd__big">{v.segundoTramo?.origen || "—"}</div>
+                    </div>
+                    <div className="vd__arrow">→</div>
+                    <div>
+                      <div className="label">Destino</div>
+                      <div className="vd__big">{v.segundoTramo?.destino || "—"}</div>
+                    </div>
+                  </div>
+                  <div className="tramo-times">
+                    <div className="vd__titem">
+                      <div className="vd__dot" />
+                      <div>
+                        <div className="label">Salida</div>
+                        <div className="vd__big">{fmtDateTime(v.segundoTramo?.fechaSalida)}</div>
+                      </div>
+                    </div>
+                    <div className="vd__titem">
+                      <div className="vd__dot" />
+                      <div>
+                        <div className="label">Llegada</div>
+                        <div className="vd__big">{fmtDateTime(v.segundoTramo?.fechaLlegada)}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="vd__arrow">→</div>
-              <div>
-                <div className="label">Destino</div>
-                <div className="vd__big">{v.destino || "—"}</div>
+            ) : (
+              <div className="vd__route">
+                <div>
+                  <div className="label">Origen</div>
+                  <div className="vd__big">{v.origen || "—"}</div>
+                </div>
+                <div className="vd__arrow">→</div>
+                <div>
+                  <div className="label">Destino</div>
+                  <div className="vd__big">{v.destino || "—"}</div>
+                </div>
               </div>
-            </div>
+            )}
 
             <h3 className="block-title" style={{ marginTop: 16 }}>Fechas</h3>
             <div className="vd__timeline">

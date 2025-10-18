@@ -56,11 +56,13 @@ com\aerolineas\controller\ComprasController.class
 com\aerolineas\controller\ComentarioController.class
 com\aerolineas\dao\CiudadDAO.class
 com\aerolineas\dto\PaisDTOs$Create.class
+com\aerolineas\dto\VueloDTO$VueloConEscalaView.class
 com\aerolineas\dto\CompraDTO$CarritoItem.class
 com\aerolineas\dto\CompraDTO$ReservaItem.class
 com\aerolineas\dto\PaisDTOs.class
 com\aerolineas\model\Usuario.class
 com\aerolineas\dto\VueloDTO$CreatedPair.class
+com\aerolineas\dto\VueloDTO$VueloConEscalaCreate.class
 com\aerolineas\dto\VueloDTO$View.class
 com\aerolineas\controller\ClaseController.class
 com\aerolineas\dto\CompraDTO$PaymentReq$Tarjeta.class

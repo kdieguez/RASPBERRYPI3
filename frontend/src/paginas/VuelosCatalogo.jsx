@@ -116,6 +116,7 @@ export default function VuelosCatalogo() {
         ]);
 
         const src = Array.isArray(vuelosRes) ? vuelosRes : [];
+        console.log("Vuelos cargados:", src.length);
         const now = new Date();
       
         const pids = new Set();
@@ -138,11 +139,23 @@ export default function VuelosCatalogo() {
           });
       
         const baseList = isAdmin ? src : onlyActiveAndFuture;
-      
+        console.log("Vuelos activos y futuros:", baseList.length);
         const finalList = foldPairsFromList(baseList);
+        console.log("Vuelos después de foldPairs:", finalList.length);
+
+        let vuelosConEscalaLogicos = [];
+        try {
+          vuelosConEscalaLogicos = crearVuelosConEscalaLogicos(finalList, sp);
+        } catch (error) {
+          console.error("Error creando vuelos con escala:", error);
+          vuelosConEscalaLogicos = [];
+        }
+        console.log("Vuelos con escala creados:", vuelosConEscalaLogicos.length);
+        const allVuelos = [...finalList, ...vuelosConEscalaLogicos];
+        console.log("Total de vuelos a mostrar:", allVuelos.length);
 
         setVuelos(
-          finalList.map((v) => ({
+          allVuelos.map((v) => ({
             ...v,
             _idClaseSel: v?.clases?.[0]?.idClase ?? null,
             _cant: 1,
@@ -155,7 +168,114 @@ export default function VuelosCatalogo() {
         setLoading(false);
       }
     })();
-  }, [isAdmin]);
+  }, [isAdmin, sp]);
+
+  // Función para crear vuelos con escala lógicos basados en vuelos individuales
+  const crearVuelosConEscalaLogicos = (vuelos, searchParams) => {
+    try {
+      const f_origen = (searchParams.get("origen") || "").trim().toLowerCase();
+      const f_dest = (searchParams.get("destino") || "").trim().toLowerCase();
+      
+      if (!f_origen && !f_dest) {
+        return [];
+      }
+      
+      if (!vuelos || vuelos.length === 0) {
+        return [];
+      }
+      
+      const str = (x) => (x || "").toLowerCase();
+      const vuelosConEscala = [];
+      const procesados = new Set();
+      
+      // Buscar combinaciones de vuelos que puedan formar escalas
+      for (let i = 0; i < vuelos.length; i++) {
+        const vuelo1 = vuelos[i];
+        if (!vuelo1 || procesados.has(vuelo1.idVuelo)) continue;
+        
+        // Verificar si el primer vuelo coincide con el origen buscado
+        const origenMatch = !f_origen || 
+          str(vuelo1.origen).includes(f_origen) ||
+          str(vuelo1.origenPais).includes(f_origen);
+        
+        if (!origenMatch) continue;
+        
+        // Buscar un segundo vuelo que salga del destino del primero
+        for (let j = 0; j < vuelos.length; j++) {
+          const vuelo2 = vuelos[j];
+          if (!vuelo2 || i === j || procesados.has(vuelo2.idVuelo)) continue;
+          
+          // Verificar si el segundo vuelo va al destino buscado
+          const destinoMatch = !f_dest ||
+            str(vuelo2.destino).includes(f_dest) ||
+            str(vuelo2.destinoPais).includes(f_dest);
+          
+          if (!destinoMatch) continue;
+          
+          // Verificar que el destino del primer vuelo sea el origen del segundo
+          const destino1 = str(vuelo1.destino);
+          const origen2 = str(vuelo2.origen);
+          
+          if (destino1 !== origen2) continue;
+          
+          // Verificar que la llegada del primer vuelo sea antes o igual a la salida del segundo
+          const llegada1 = toDate(vuelo1.fechaLlegada);
+          const salida2 = toDate(vuelo2.fechaSalida);
+          
+          if (!llegada1 || !salida2 || llegada1 > salida2) continue;
+          
+          // Crear vuelo con escala lógico
+          const vueloConEscala = {
+            idVuelo: `escala_${vuelo1.idVuelo}_${vuelo2.idVuelo}`,
+            codigo: `${vuelo1.codigo} + ${vuelo2.codigo}`,
+            idRuta: vuelo1.idRuta,
+            origen: vuelo1.origen,
+            destino: vuelo2.destino,
+            origenPais: vuelo1.origenPais,
+            destinoPais: vuelo2.destinoPais,
+            fechaSalida: vuelo1.fechaSalida,
+            fechaLlegada: vuelo2.fechaLlegada,
+            activo: vuelo1.activo && vuelo2.activo,
+            estado: "ACTIVO",
+            clases: vuelo1.clases || [],
+            escalas: [
+              {
+                ciudad: vuelo1.destino,
+                pais: vuelo1.destinoPais,
+                llegada: vuelo1.fechaLlegada,
+                salida: vuelo2.fechaSalida
+              }
+            ],
+            // Información especial para vuelos con escala
+            _esVueloConEscala: true,
+            _primerTramo: vuelo1,
+            _segundoTramo: vuelo2,
+            // Crear una "pareja" virtual para el segundo tramo
+            pareja: {
+              idVuelo: vuelo2.idVuelo,
+              codigo: vuelo2.codigo,
+              origen: vuelo2.origen,
+              destino: vuelo2.destino,
+              fechaSalida: vuelo2.fechaSalida,
+              fechaLlegada: vuelo2.fechaLlegada,
+              clases: vuelo2.clases || [],
+              escalas: []
+            }
+          };
+          
+          vuelosConEscala.push(vueloConEscala);
+          procesados.add(vuelo1.idVuelo);
+          procesados.add(vuelo2.idVuelo);
+          break; // Solo una combinación por vuelo
+        }
+      }
+      
+      return vuelosConEscala;
+    } catch (error) {
+      console.error("Error en crearVuelosConEscalaLogicos:", error);
+      return [];
+    }
+  };
 
   const foldPairsFromList = (list) => {
     const byId = new Map(list.map((v) => [v.idVuelo, { ...v }]));
@@ -355,14 +475,35 @@ export default function VuelosCatalogo() {
       return;
     }
     try {
-      await comprasApi.addItem(
-        {
-          idVuelo: Number(vuelo.idVuelo),
-          idClase: Number(idClase),
-          cantidad: Number(vuelo._cant || 1),
-        },
-        { pair: !!vuelo.pareja }
-      );
+      if (vuelo._esVueloConEscala) {
+        // Para vuelos con escala lógicos, agregar ambos tramos al carrito
+        await comprasApi.addItem(
+          {
+            idVuelo: Number(vuelo._primerTramo.idVuelo),
+            idClase: Number(idClase),
+            cantidad: Number(vuelo._cant || 1),
+          },
+          { pair: false } // Agregar individualmente
+        );
+        await comprasApi.addItem(
+          {
+            idVuelo: Number(vuelo._segundoTramo.idVuelo),
+            idClase: Number(idClase),
+            cantidad: Number(vuelo._cant || 1),
+          },
+          { pair: false } // Agregar individualmente
+        );
+      } else {
+        // Para vuelos normales, solo agregar el vuelo seleccionado
+        await comprasApi.addItem(
+          {
+            idVuelo: Number(vuelo.idVuelo),
+            idClase: Number(idClase),
+            cantidad: Number(vuelo._cant || 1),
+          },
+          { pair: !!vuelo.pareja } // Usar pareja solo si existe
+        );
+      }
       nav(`/compras/carrito`);
     } catch (e) {
       alert(e?.response?.data?.error || e?.message || "No se pudo agregar al carrito");
@@ -415,6 +556,9 @@ export default function VuelosCatalogo() {
                     <div className="vitem__code">
                       <span className="badge">{v.codigo}</span>
                       <EstadoPill estado={v.estado} />
+                      {v._esVueloConEscala && (
+                        <span className="pill pill--escala">Con Escala</span>
+                      )}
                       {isAdmin &&
                         (v.activo === false ? (
                           <span className="pill">Inactivo</span>
@@ -452,7 +596,9 @@ export default function VuelosCatalogo() {
                     <div className="vitem__escalas">
                       {v.escalas.map((e, i) => (
                         <div key={i} className="esc">
-                          <span className="label">Escala</span>
+                          <span className="label">
+                            {v._esVueloConEscala ? "Escala en" : "Escala"}
+                          </span>
                           <span>
                             {e.ciudad} ({e.pais}) — {fmtDt(e.llegada)} → {fmtDt(e.salida)}
                           </span>
@@ -464,7 +610,9 @@ export default function VuelosCatalogo() {
                   {v.pareja && (
                     <div className="vitem__escalas">
                       <div className="esc">
-                        <span className="label">Regreso</span>
+                        <span className="label">
+                          {v._esVueloConEscala ? "Segundo tramo" : "Regreso"}
+                        </span>
                         <span>
                           <strong>
                             <Link to={`/vuelos/${v.pareja.idVuelo}`}>{v.pareja.codigo}</Link>
@@ -553,6 +701,37 @@ export default function VuelosCatalogo() {
                       >
                         Añadir a carrito
                       </button>
+
+                      {v.pareja && !v._esVueloConEscala && (
+                        <button
+                          className="btn btn-primary"
+                          style={{ marginLeft: 8 }}
+                          onClick={async () => {
+                            try {
+                              // Agregar ambos vuelos (ida y regreso)
+                              await comprasApi.addItem(
+                                {
+                                  idVuelo: Number(v.idVuelo),
+                                  idClase: Number(v._idClaseSel || v.clases[0].idClase),
+                                  cantidad: Number(v._cant || 1),
+                                },
+                                { pair: true }
+                              );
+                              nav(`/compras/carrito`);
+                            } catch (e) {
+                              alert(e?.response?.data?.error || e?.message || "No se pudo agregar al carrito");
+                            }
+                          }}
+                          disabled={
+                            !v.clases ||
+                            v.clases.length === 0 ||
+                            (v.estado || "").toLowerCase().includes("cancel") ||
+                            v.activo === false
+                          }
+                        >
+                          Ida y vuelta
+                        </button>
+                      )}
                     </>
                   ) : (
                     <button

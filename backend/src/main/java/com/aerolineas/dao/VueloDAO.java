@@ -4,6 +4,7 @@ import com.aerolineas.config.DB;
 import com.aerolineas.dto.VueloDTO;
 
 import java.sql.*;
+import java.time.LocalDateTime;
 import java.util.*;
 
 import static com.aerolineas.util.EstadosVuelo.*;
@@ -920,5 +921,570 @@ public class VueloDAO {
         return idVuelo;
       }
     }
+  }
+
+  // Métodos para vuelos con escala
+  public long crearVueloConEscala(VueloDTO.VueloConEscalaCreate dto) throws Exception {
+    try (Connection conn = DB.getConnection()) {
+      conn.setAutoCommit(false);
+      try {
+        // Validar que ambos vuelos existan y sean compatibles
+        validarCompatibilidadEscala(conn, dto.idVueloPrimerTramo(), dto.idVueloSegundoTramo());
+        
+        // Crear el registro de vuelo con escala
+        String sql = "INSERT INTO VUELO_CON_ESCALA (CODIGO, ID_VUELO_PRIMER_TRAMO, ID_VUELO_SEGUNDO_TRAMO, ACTIVO) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement ps = conn.prepareStatement(sql, new String[]{"ID_VUELO_CON_ESCALA"})) {
+          ps.setString(1, dto.codigo());
+          ps.setLong(2, dto.idVueloPrimerTramo());
+          ps.setLong(3, dto.idVueloSegundoTramo());
+          ps.setInt(4, dto.activo() != null && dto.activo() ? 1 : 0);
+          ps.executeUpdate();
+          
+          try (ResultSet rs = ps.getGeneratedKeys()) {
+            if (!rs.next()) throw new SQLException("No se generó ID_VUELO_CON_ESCALA");
+            long idVueloConEscala = rs.getLong(1);
+            
+            // Insertar las clases
+            if (dto.clases() != null && !dto.clases().isEmpty()) {
+              String sqlClases = "INSERT INTO VUELO_CON_ESCALA_CLASE (ID_VUELO_CON_ESCALA, ID_CLASE, CUPO_TOTAL, PRECIO) VALUES (?, ?, ?, ?)";
+              try (PreparedStatement psClases = conn.prepareStatement(sqlClases)) {
+                for (VueloDTO.ClaseConfig clase : dto.clases()) {
+                  psClases.setLong(1, idVueloConEscala);
+                  psClases.setInt(2, clase.idClase());
+                  psClases.setInt(3, clase.cupoTotal());
+                  psClases.setDouble(4, clase.precio());
+                  psClases.addBatch();
+                }
+                psClases.executeBatch();
+              }
+            }
+            
+            conn.commit();
+            return idVueloConEscala;
+          }
+        }
+      } catch (Exception e) {
+        conn.rollback();
+        throw e;
+      } finally {
+        conn.setAutoCommit(true);
+      }
+    }
+  }
+
+  public void validarCompatibilidadEscala(Connection conn, long idVuelo1, long idVuelo2) throws SQLException {
+    if (idVuelo1 <= 0 || idVuelo2 <= 0) {
+      throw new SQLException("IDs de vuelo inválidos");
+    }
+    if (idVuelo1 == idVuelo2) {
+      throw new SQLException("Un vuelo no puede ser escala de sí mismo");
+    }
+
+    String sql = """
+        SELECT v1.ID_VUELO, v1.FECHA_LLEGADA, v2.FECHA_SALIDA,
+               co1.NOMBRE AS ORIGEN1, cd1.NOMBRE AS DESTINO1,
+               co2.NOMBRE AS ORIGEN2, cd2.NOMBRE AS DESTINO2,
+               v1.ACTIVO AS ACTIVO1, v2.ACTIVO AS ACTIVO2,
+               e1.Estado AS ESTADO1, e2.Estado AS ESTADO2
+        FROM VUELO v1
+        JOIN RUTA r1 ON r1.ID_RUTA = v1.ID_RUTA
+        JOIN CIUDAD co1 ON co1.ID_CIUDAD = r1.ID_CIUDAD_ORIGEN
+        JOIN CIUDAD cd1 ON cd1.ID_CIUDAD = r1.ID_CIUDAD_DESTINO
+        JOIN ESTADOS e1 ON e1.ID_ESTADO = v1.ID_ESTADO
+        CROSS JOIN VUELO v2
+        JOIN RUTA r2 ON r2.ID_RUTA = v2.ID_RUTA
+        JOIN CIUDAD co2 ON co2.ID_CIUDAD = r2.ID_CIUDAD_ORIGEN
+        JOIN CIUDAD cd2 ON cd2.ID_CIUDAD = r2.ID_CIUDAD_DESTINO
+        JOIN ESTADOS e2 ON e2.ID_ESTADO = v2.ID_ESTADO
+        WHERE v1.ID_VUELO = ? AND v2.ID_VUELO = ?
+        """;
+
+    try (PreparedStatement ps = conn.prepareStatement(sql)) {
+      ps.setLong(1, idVuelo1);
+      ps.setLong(2, idVuelo2);
+      try (ResultSet rs = ps.executeQuery()) {
+        if (!rs.next()) {
+          throw new SQLException("Uno o ambos vuelos no existen");
+        }
+
+        // Verificar que ambos vuelos estén activos
+        if (rs.getInt("ACTIVO1") != 1 || rs.getInt("ACTIVO2") != 1) {
+          throw new SQLException("Ambos vuelos deben estar activos");
+        }
+
+        // Verificar que no estén cancelados
+        String estado1 = rs.getString("ESTADO1").toLowerCase();
+        String estado2 = rs.getString("ESTADO2").toLowerCase();
+        if (estado1.contains("cancelado") || estado2.contains("cancelado")) {
+          throw new SQLException("Los vuelos no pueden estar cancelados");
+        }
+
+        // Verificar que el destino del primer vuelo sea el origen del segundo
+        String destino1 = rs.getString("DESTINO1");
+        String origen2 = rs.getString("ORIGEN2");
+        if (!destino1.equals(origen2)) {
+          throw new SQLException("El destino del primer vuelo debe ser el origen del segundo vuelo");
+        }
+
+        // Verificar que la llegada del primer vuelo sea antes o igual a la salida del segundo
+        LocalDateTime llegada1 = rs.getTimestamp("FECHA_LLEGADA").toLocalDateTime();
+        LocalDateTime salida2 = rs.getTimestamp("FECHA_SALIDA").toLocalDateTime();
+        if (llegada1.isAfter(salida2)) {
+          throw new SQLException("La llegada del primer vuelo debe ser antes o igual a la salida del segundo vuelo");
+        }
+      }
+    }
+  }
+
+  public VueloDTO.VueloConEscalaView obtenerVueloConEscala(long id) throws Exception {
+    String sql = """
+        SELECT vce.ID_VUELO_CON_ESCALA, vce.CODIGO, vce.ACTIVO,
+               v1.ID_VUELO AS ID_VUELO1, v1.CODIGO AS CODIGO1, v1.FECHA_SALIDA AS FECHA_SALIDA1, v1.FECHA_LLEGADA AS FECHA_LLEGADA1,
+               v2.ID_VUELO AS ID_VUELO2, v2.CODIGO AS CODIGO2, v2.FECHA_SALIDA AS FECHA_SALIDA2, v2.FECHA_LLEGADA AS FECHA_LLEGADA2,
+               co1.NOMBRE AS ORIGEN1, cd1.NOMBRE AS DESTINO1, po1.NOMBRE AS ORIGEN_PAIS1, pd1.NOMBRE AS DESTINO_PAIS1,
+               co2.NOMBRE AS ORIGEN2, cd2.NOMBRE AS DESTINO2, po2.NOMBRE AS ORIGEN_PAIS2, pd2.NOMBRE AS DESTINO_PAIS2,
+               e1.Estado AS ESTADO1, e2.Estado AS ESTADO2,
+               vcec.ID_CLASE, vcec.CUPO_TOTAL, vcec.PRECIO
+        FROM VUELO_CON_ESCALA vce
+        JOIN VUELO v1 ON v1.ID_VUELO = vce.ID_VUELO_PRIMER_TRAMO
+        JOIN VUELO v2 ON v2.ID_VUELO = vce.ID_VUELO_SEGUNDO_TRAMO
+        JOIN RUTA r1 ON r1.ID_RUTA = v1.ID_RUTA
+        JOIN RUTA r2 ON r2.ID_RUTA = v2.ID_RUTA
+        JOIN CIUDAD co1 ON co1.ID_CIUDAD = r1.ID_CIUDAD_ORIGEN
+        JOIN CIUDAD cd1 ON cd1.ID_CIUDAD = r1.ID_CIUDAD_DESTINO
+        JOIN CIUDAD co2 ON co2.ID_CIUDAD = r2.ID_CIUDAD_ORIGEN
+        JOIN CIUDAD cd2 ON cd2.ID_CIUDAD = r2.ID_CIUDAD_DESTINO
+        JOIN PAIS po1 ON po1.ID_PAIS = co1.ID_PAIS
+        JOIN PAIS pd1 ON pd1.ID_PAIS = cd1.ID_PAIS
+        JOIN PAIS po2 ON po2.ID_PAIS = co2.ID_PAIS
+        JOIN PAIS pd2 ON pd2.ID_PAIS = cd2.ID_PAIS
+        JOIN ESTADOS e1 ON e1.ID_ESTADO = v1.ID_ESTADO
+        JOIN ESTADOS e2 ON e2.ID_ESTADO = v2.ID_ESTADO
+        LEFT JOIN VUELO_CON_ESCALA_CLASE vcec ON vcec.ID_VUELO_CON_ESCALA = vce.ID_VUELO_CON_ESCALA
+        WHERE vce.ID_VUELO_CON_ESCALA = ?
+        """;
+
+    VueloDTO.VueloConEscalaView view = null;
+    List<VueloDTO.ClaseConfig> clases = new ArrayList<>();
+
+    try (Connection cn = DB.getConnection();
+         PreparedStatement ps = cn.prepareStatement(sql)) {
+      ps.setLong(1, id);
+      try (ResultSet rs = ps.executeQuery()) {
+        while (rs.next()) {
+          if (view == null) {
+            // Crear los objetos de vuelo para cada tramo
+            VueloDTO.View primerTramo = new VueloDTO.View(
+                rs.getLong("ID_VUELO1"),
+                rs.getString("CODIGO1"),
+                rs.getLong("ID_VUELO1"),
+                rs.getString("ORIGEN1"),
+                rs.getString("DESTINO1"),
+                rs.getTimestamp("FECHA_SALIDA1").toLocalDateTime(),
+                rs.getTimestamp("FECHA_LLEGADA1").toLocalDateTime(),
+                true,
+                null,
+                rs.getString("ESTADO1"),
+                new ArrayList<>(),
+                new ArrayList<>(),
+                null,
+                rs.getString("ORIGEN_PAIS1"),
+                rs.getString("DESTINO_PAIS1")
+            );
+
+            VueloDTO.View segundoTramo = new VueloDTO.View(
+                rs.getLong("ID_VUELO2"),
+                rs.getString("CODIGO2"),
+                rs.getLong("ID_VUELO2"),
+                rs.getString("ORIGEN2"),
+                rs.getString("DESTINO2"),
+                rs.getTimestamp("FECHA_SALIDA2").toLocalDateTime(),
+                rs.getTimestamp("FECHA_LLEGADA2").toLocalDateTime(),
+                true,
+                null,
+                rs.getString("ESTADO2"),
+                new ArrayList<>(),
+                new ArrayList<>(),
+                null,
+                rs.getString("ORIGEN_PAIS2"),
+                rs.getString("DESTINO_PAIS2")
+            );
+
+            view = new VueloDTO.VueloConEscalaView(
+                rs.getLong("ID_VUELO_CON_ESCALA"),
+                rs.getString("CODIGO"),
+                primerTramo,
+                segundoTramo,
+                rs.getString("ORIGEN1"),
+                rs.getString("DESTINO2"),
+                rs.getString("ORIGEN_PAIS1"),
+                rs.getString("DESTINO_PAIS2"),
+                rs.getTimestamp("FECHA_SALIDA1").toLocalDateTime(),
+                rs.getTimestamp("FECHA_LLEGADA2").toLocalDateTime(),
+                rs.getInt("ACTIVO") == 1,
+                null,
+                "ACTIVO",
+                clases,
+                null
+            );
+          }
+
+          // Agregar clases
+          int idClase = rs.getInt("ID_CLASE");
+          if (!rs.wasNull()) {
+            clases.add(new VueloDTO.ClaseConfig(
+                idClase,
+                rs.getInt("CUPO_TOTAL"),
+                rs.getDouble("PRECIO")
+            ));
+          }
+        }
+      }
+    }
+
+    return view;
+  }
+
+  public List<VueloDTO.VueloConEscalaView> listarVuelosConEscala() throws SQLException {
+    String sql = """
+        SELECT vce.ID_VUELO_CON_ESCALA, vce.CODIGO, vce.ACTIVO,
+               v1.ID_VUELO AS ID_VUELO1, v1.CODIGO AS CODIGO1, v1.FECHA_SALIDA AS FECHA_SALIDA1, v1.FECHA_LLEGADA AS FECHA_LLEGADA1,
+               v2.ID_VUELO AS ID_VUELO2, v2.CODIGO AS CODIGO2, v2.FECHA_SALIDA AS FECHA_SALIDA2, v2.FECHA_LLEGADA AS FECHA_LLEGADA2,
+               co1.NOMBRE AS ORIGEN1, cd1.NOMBRE AS DESTINO1, po1.NOMBRE AS ORIGEN_PAIS1, pd1.NOMBRE AS DESTINO_PAIS1,
+               co2.NOMBRE AS ORIGEN2, cd2.NOMBRE AS DESTINO2, po2.NOMBRE AS ORIGEN_PAIS2, pd2.NOMBRE AS DESTINO_PAIS2,
+               e1.Estado AS ESTADO1, e2.Estado AS ESTADO2,
+               vcec.ID_CLASE, vcec.CUPO_TOTAL, vcec.PRECIO
+        FROM VUELO_CON_ESCALA vce
+        JOIN VUELO v1 ON v1.ID_VUELO = vce.ID_VUELO_PRIMER_TRAMO
+        JOIN VUELO v2 ON v2.ID_VUELO = vce.ID_VUELO_SEGUNDO_TRAMO
+        JOIN RUTA r1 ON r1.ID_RUTA = v1.ID_RUTA
+        JOIN RUTA r2 ON r2.ID_RUTA = v2.ID_RUTA
+        JOIN CIUDAD co1 ON co1.ID_CIUDAD = r1.ID_CIUDAD_ORIGEN
+        JOIN CIUDAD cd1 ON cd1.ID_CIUDAD = r1.ID_CIUDAD_DESTINO
+        JOIN CIUDAD co2 ON co2.ID_CIUDAD = r2.ID_CIUDAD_ORIGEN
+        JOIN CIUDAD cd2 ON cd2.ID_CIUDAD = r2.ID_CIUDAD_DESTINO
+        JOIN PAIS po1 ON po1.ID_PAIS = co1.ID_PAIS
+        JOIN PAIS pd1 ON pd1.ID_PAIS = cd1.ID_PAIS
+        JOIN PAIS po2 ON po2.ID_PAIS = co2.ID_PAIS
+        JOIN PAIS pd2 ON pd2.ID_PAIS = cd2.ID_PAIS
+        JOIN ESTADOS e1 ON e1.ID_ESTADO = v1.ID_ESTADO
+        JOIN ESTADOS e2 ON e2.ID_ESTADO = v2.ID_ESTADO
+        LEFT JOIN VUELO_CON_ESCALA_CLASE vcec ON vcec.ID_VUELO_CON_ESCALA = vce.ID_VUELO_CON_ESCALA
+        WHERE vce.ACTIVO = 1
+        ORDER BY vce.ID_VUELO_CON_ESCALA
+        """;
+
+    Map<Long, VueloDTO.VueloConEscalaView> vuelos = new LinkedHashMap<>();
+
+    try (Connection conn = DB.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql);
+         ResultSet rs = ps.executeQuery()) {
+
+      while (rs.next()) {
+        long idVueloConEscala = rs.getLong("ID_VUELO_CON_ESCALA");
+        VueloDTO.VueloConEscalaView view = vuelos.get(idVueloConEscala);
+
+        if (view == null) {
+          // Crear los objetos de vuelo para cada tramo
+          VueloDTO.View primerTramo = new VueloDTO.View(
+              rs.getLong("ID_VUELO1"),
+              rs.getString("CODIGO1"),
+              rs.getLong("ID_VUELO1"),
+              rs.getString("ORIGEN1"),
+              rs.getString("DESTINO1"),
+              rs.getTimestamp("FECHA_SALIDA1").toLocalDateTime(),
+              rs.getTimestamp("FECHA_LLEGADA1").toLocalDateTime(),
+              true,
+              null,
+              rs.getString("ESTADO1"),
+              new ArrayList<>(),
+              new ArrayList<>(),
+              null,
+              rs.getString("ORIGEN_PAIS1"),
+              rs.getString("DESTINO_PAIS1")
+          );
+
+          VueloDTO.View segundoTramo = new VueloDTO.View(
+              rs.getLong("ID_VUELO2"),
+              rs.getString("CODIGO2"),
+              rs.getLong("ID_VUELO2"),
+              rs.getString("ORIGEN2"),
+              rs.getString("DESTINO2"),
+              rs.getTimestamp("FECHA_SALIDA2").toLocalDateTime(),
+              rs.getTimestamp("FECHA_LLEGADA2").toLocalDateTime(),
+              true,
+              null,
+              rs.getString("ESTADO2"),
+              new ArrayList<>(),
+              new ArrayList<>(),
+              null,
+              rs.getString("ORIGEN_PAIS2"),
+              rs.getString("DESTINO_PAIS2")
+          );
+
+          view = new VueloDTO.VueloConEscalaView(
+              idVueloConEscala,
+              rs.getString("CODIGO"),
+              primerTramo,
+              segundoTramo,
+              rs.getString("ORIGEN1"),
+              rs.getString("DESTINO2"),
+              rs.getString("ORIGEN_PAIS1"),
+              rs.getString("DESTINO_PAIS2"),
+              rs.getTimestamp("FECHA_SALIDA1").toLocalDateTime(),
+              rs.getTimestamp("FECHA_LLEGADA2").toLocalDateTime(),
+              rs.getInt("ACTIVO") == 1,
+              null,
+              "ACTIVO",
+              new ArrayList<>(),
+              null
+          );
+          vuelos.put(idVueloConEscala, view);
+        }
+
+        // Agregar clases
+        int idClase = rs.getInt("ID_CLASE");
+        if (!rs.wasNull()) {
+          view.clases().add(new VueloDTO.ClaseConfig(
+              idClase,
+              rs.getInt("CUPO_TOTAL"),
+              rs.getDouble("PRECIO")
+          ));
+        }
+      }
+    }
+
+    return new ArrayList<>(vuelos.values());
+  }
+
+  // Métodos públicos para vuelos con escala (sin restricciones de admin)
+  public List<VueloDTO.VueloConEscalaView> listarVuelosConEscalaPublic() throws SQLException {
+    String sql = """
+        SELECT vce.ID_VUELO_CON_ESCALA, vce.CODIGO, vce.ACTIVO,
+               v1.ID_VUELO AS ID_VUELO1, v1.CODIGO AS CODIGO1, v1.FECHA_SALIDA AS FECHA_SALIDA1, v1.FECHA_LLEGADA AS FECHA_LLEGADA1,
+               v2.ID_VUELO AS ID_VUELO2, v2.CODIGO AS CODIGO2, v2.FECHA_SALIDA AS FECHA_SALIDA2, v2.FECHA_LLEGADA AS FECHA_LLEGADA2,
+               co1.NOMBRE AS ORIGEN1, cd1.NOMBRE AS DESTINO1, po1.NOMBRE AS ORIGEN_PAIS1, pd1.NOMBRE AS DESTINO_PAIS1,
+               co2.NOMBRE AS ORIGEN2, cd2.NOMBRE AS DESTINO2, po2.NOMBRE AS ORIGEN_PAIS2, pd2.NOMBRE AS DESTINO_PAIS2,
+               e1.Estado AS ESTADO1, e2.Estado AS ESTADO2,
+               vcec.ID_CLASE, vcec.CUPO_TOTAL, vcec.PRECIO
+        FROM VUELO_CON_ESCALA vce
+        JOIN VUELO v1 ON v1.ID_VUELO = vce.ID_VUELO_PRIMER_TRAMO
+        JOIN VUELO v2 ON v2.ID_VUELO = vce.ID_VUELO_SEGUNDO_TRAMO
+        JOIN RUTA r1 ON r1.ID_RUTA = v1.ID_RUTA
+        JOIN RUTA r2 ON r2.ID_RUTA = v2.ID_RUTA
+        JOIN CIUDAD co1 ON co1.ID_CIUDAD = r1.ID_CIUDAD_ORIGEN
+        JOIN CIUDAD cd1 ON cd1.ID_CIUDAD = r1.ID_CIUDAD_DESTINO
+        JOIN CIUDAD co2 ON co2.ID_CIUDAD = r2.ID_CIUDAD_ORIGEN
+        JOIN CIUDAD cd2 ON cd2.ID_CIUDAD = r2.ID_CIUDAD_DESTINO
+        JOIN PAIS po1 ON po1.ID_PAIS = co1.ID_PAIS
+        JOIN PAIS pd1 ON pd1.ID_PAIS = cd1.ID_PAIS
+        JOIN PAIS po2 ON po2.ID_PAIS = co2.ID_PAIS
+        JOIN PAIS pd2 ON pd2.ID_PAIS = cd2.ID_PAIS
+        JOIN ESTADOS e1 ON e1.ID_ESTADO = v1.ID_ESTADO
+        JOIN ESTADOS e2 ON e2.ID_ESTADO = v2.ID_ESTADO
+        LEFT JOIN VUELO_CON_ESCALA_CLASE vcec ON vcec.ID_VUELO_CON_ESCALA = vce.ID_VUELO_CON_ESCALA
+        WHERE vce.ACTIVO = 1
+          AND NVL(v1.ACTIVO,1) = 1
+          AND NVL(v2.ACTIVO,1) = 1
+          AND UPPER(e1.Estado) <> 'CANCELADO'
+          AND UPPER(e2.Estado) <> 'CANCELADO'
+        ORDER BY vce.ID_VUELO_CON_ESCALA
+        """;
+
+    Map<Long, VueloDTO.VueloConEscalaView> vuelos = new LinkedHashMap<>();
+
+    try (Connection conn = DB.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql);
+         ResultSet rs = ps.executeQuery()) {
+
+      while (rs.next()) {
+        long idVueloConEscala = rs.getLong("ID_VUELO_CON_ESCALA");
+        VueloDTO.VueloConEscalaView view = vuelos.get(idVueloConEscala);
+
+        if (view == null) {
+          // Crear los objetos de vuelo para cada tramo
+          VueloDTO.View primerTramo = new VueloDTO.View(
+              rs.getLong("ID_VUELO1"),
+              rs.getString("CODIGO1"),
+              rs.getLong("ID_VUELO1"),
+              rs.getString("ORIGEN1"),
+              rs.getString("DESTINO1"),
+              rs.getTimestamp("FECHA_SALIDA1").toLocalDateTime(),
+              rs.getTimestamp("FECHA_LLEGADA1").toLocalDateTime(),
+              true,
+              null,
+              rs.getString("ESTADO1"),
+              new ArrayList<>(),
+              new ArrayList<>(),
+              null,
+              rs.getString("ORIGEN_PAIS1"),
+              rs.getString("DESTINO_PAIS1")
+          );
+
+          VueloDTO.View segundoTramo = new VueloDTO.View(
+              rs.getLong("ID_VUELO2"),
+              rs.getString("CODIGO2"),
+              rs.getLong("ID_VUELO2"),
+              rs.getString("ORIGEN2"),
+              rs.getString("DESTINO2"),
+              rs.getTimestamp("FECHA_SALIDA2").toLocalDateTime(),
+              rs.getTimestamp("FECHA_LLEGADA2").toLocalDateTime(),
+              true,
+              null,
+              rs.getString("ESTADO2"),
+              new ArrayList<>(),
+              new ArrayList<>(),
+              null,
+              rs.getString("ORIGEN_PAIS2"),
+              rs.getString("DESTINO_PAIS2")
+          );
+
+          view = new VueloDTO.VueloConEscalaView(
+              idVueloConEscala,
+              rs.getString("CODIGO"),
+              primerTramo,
+              segundoTramo,
+              rs.getString("ORIGEN1"),
+              rs.getString("DESTINO2"),
+              rs.getString("ORIGEN_PAIS1"),
+              rs.getString("DESTINO_PAIS2"),
+              rs.getTimestamp("FECHA_SALIDA1").toLocalDateTime(),
+              rs.getTimestamp("FECHA_LLEGADA2").toLocalDateTime(),
+              rs.getInt("ACTIVO") == 1,
+              null,
+              "ACTIVO",
+              new ArrayList<>(),
+              null
+          );
+          vuelos.put(idVueloConEscala, view);
+        }
+
+        // Agregar clases
+        int idClase = rs.getInt("ID_CLASE");
+        if (!rs.wasNull()) {
+          view.clases().add(new VueloDTO.ClaseConfig(
+              idClase,
+              rs.getInt("CUPO_TOTAL"),
+              rs.getDouble("PRECIO")
+          ));
+        }
+      }
+    }
+
+    return new ArrayList<>(vuelos.values());
+  }
+
+  public VueloDTO.VueloConEscalaView obtenerVueloConEscalaPublic(long id) throws Exception {
+    String sql = """
+        SELECT vce.ID_VUELO_CON_ESCALA, vce.CODIGO, vce.ACTIVO,
+               v1.ID_VUELO AS ID_VUELO1, v1.CODIGO AS CODIGO1, v1.FECHA_SALIDA AS FECHA_SALIDA1, v1.FECHA_LLEGADA AS FECHA_LLEGADA1,
+               v2.ID_VUELO AS ID_VUELO2, v2.CODIGO AS CODIGO2, v2.FECHA_SALIDA AS FECHA_SALIDA2, v2.FECHA_LLEGADA AS FECHA_LLEGADA2,
+               co1.NOMBRE AS ORIGEN1, cd1.NOMBRE AS DESTINO1, po1.NOMBRE AS ORIGEN_PAIS1, pd1.NOMBRE AS DESTINO_PAIS1,
+               co2.NOMBRE AS ORIGEN2, cd2.NOMBRE AS DESTINO2, po2.NOMBRE AS ORIGEN_PAIS2, pd2.NOMBRE AS DESTINO_PAIS2,
+               e1.Estado AS ESTADO1, e2.Estado AS ESTADO2,
+               vcec.ID_CLASE, vcec.CUPO_TOTAL, vcec.PRECIO
+        FROM VUELO_CON_ESCALA vce
+        JOIN VUELO v1 ON v1.ID_VUELO = vce.ID_VUELO_PRIMER_TRAMO
+        JOIN VUELO v2 ON v2.ID_VUELO = vce.ID_VUELO_SEGUNDO_TRAMO
+        JOIN RUTA r1 ON r1.ID_RUTA = v1.ID_RUTA
+        JOIN RUTA r2 ON r2.ID_RUTA = v2.ID_RUTA
+        JOIN CIUDAD co1 ON co1.ID_CIUDAD = r1.ID_CIUDAD_ORIGEN
+        JOIN CIUDAD cd1 ON cd1.ID_CIUDAD = r1.ID_CIUDAD_DESTINO
+        JOIN CIUDAD co2 ON co2.ID_CIUDAD = r2.ID_CIUDAD_ORIGEN
+        JOIN CIUDAD cd2 ON cd2.ID_CIUDAD = r2.ID_CIUDAD_DESTINO
+        JOIN PAIS po1 ON po1.ID_PAIS = co1.ID_PAIS
+        JOIN PAIS pd1 ON pd1.ID_PAIS = cd1.ID_PAIS
+        JOIN PAIS po2 ON po2.ID_PAIS = co2.ID_PAIS
+        JOIN PAIS pd2 ON pd2.ID_PAIS = cd2.ID_PAIS
+        JOIN ESTADOS e1 ON e1.ID_ESTADO = v1.ID_ESTADO
+        JOIN ESTADOS e2 ON e2.ID_ESTADO = v2.ID_ESTADO
+        LEFT JOIN VUELO_CON_ESCALA_CLASE vcec ON vcec.ID_VUELO_CON_ESCALA = vce.ID_VUELO_CON_ESCALA
+        WHERE vce.ID_VUELO_CON_ESCALA = ?
+          AND vce.ACTIVO = 1
+          AND NVL(v1.ACTIVO,1) = 1
+          AND NVL(v2.ACTIVO,1) = 1
+          AND UPPER(e1.Estado) <> 'CANCELADO'
+          AND UPPER(e2.Estado) <> 'CANCELADO'
+        """;
+
+    VueloDTO.VueloConEscalaView view = null;
+    List<VueloDTO.ClaseConfig> clases = new ArrayList<>();
+
+    try (Connection cn = DB.getConnection();
+         PreparedStatement ps = cn.prepareStatement(sql)) {
+      ps.setLong(1, id);
+      try (ResultSet rs = ps.executeQuery()) {
+        while (rs.next()) {
+          if (view == null) {
+            // Crear los objetos de vuelo para cada tramo
+            VueloDTO.View primerTramo = new VueloDTO.View(
+                rs.getLong("ID_VUELO1"),
+                rs.getString("CODIGO1"),
+                rs.getLong("ID_VUELO1"),
+                rs.getString("ORIGEN1"),
+                rs.getString("DESTINO1"),
+                rs.getTimestamp("FECHA_SALIDA1").toLocalDateTime(),
+                rs.getTimestamp("FECHA_LLEGADA1").toLocalDateTime(),
+                true,
+                null,
+                rs.getString("ESTADO1"),
+                new ArrayList<>(),
+                new ArrayList<>(),
+                null,
+                rs.getString("ORIGEN_PAIS1"),
+                rs.getString("DESTINO_PAIS1")
+            );
+
+            VueloDTO.View segundoTramo = new VueloDTO.View(
+                rs.getLong("ID_VUELO2"),
+                rs.getString("CODIGO2"),
+                rs.getLong("ID_VUELO2"),
+                rs.getString("ORIGEN2"),
+                rs.getString("DESTINO2"),
+                rs.getTimestamp("FECHA_SALIDA2").toLocalDateTime(),
+                rs.getTimestamp("FECHA_LLEGADA2").toLocalDateTime(),
+                true,
+                null,
+                rs.getString("ESTADO2"),
+                new ArrayList<>(),
+                new ArrayList<>(),
+                null,
+                rs.getString("ORIGEN_PAIS2"),
+                rs.getString("DESTINO_PAIS2")
+            );
+
+            view = new VueloDTO.VueloConEscalaView(
+                rs.getLong("ID_VUELO_CON_ESCALA"),
+                rs.getString("CODIGO"),
+                primerTramo,
+                segundoTramo,
+                rs.getString("ORIGEN1"),
+                rs.getString("DESTINO2"),
+                rs.getString("ORIGEN_PAIS1"),
+                rs.getString("DESTINO_PAIS2"),
+                rs.getTimestamp("FECHA_SALIDA1").toLocalDateTime(),
+                rs.getTimestamp("FECHA_LLEGADA2").toLocalDateTime(),
+                rs.getInt("ACTIVO") == 1,
+                null,
+                "ACTIVO",
+                clases,
+                null
+            );
+          }
+
+          // Agregar clases
+          int idClase = rs.getInt("ID_CLASE");
+          if (!rs.wasNull()) {
+            clases.add(new VueloDTO.ClaseConfig(
+                idClase,
+                rs.getInt("CUPO_TOTAL"),
+                rs.getDouble("PRECIO")
+            ));
+          }
+        }
+      }
+    }
+
+    return view;
   }
 }

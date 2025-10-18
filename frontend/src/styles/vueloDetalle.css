@@ -376,3 +376,61 @@ a, .link {
 
 .starsmini .star { font-size: 14px; opacity: .9; }
 .starsmini .star.star--on { color: #f59e0b; opacity: 1; }
+
+.pill--escala {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+
+.vd__route-escala {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.vd__tramo {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.tramo-title {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tramo-times {
+  margin-top: 12px;
+  display: flex;
+  gap: 20px;
+}
+
+.escala-info {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0;
+}
+
+.escala-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  border: 1px solid #3b82f6;
+}
+
+.escala-icon {
+  font-size: 16px;
+}

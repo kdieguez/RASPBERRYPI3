@@ -36,4 +36,31 @@ public class VueloDTO {
     public record CreatedPair(Long idIda, Long idRegreso) {}
 
     public record UpdateAdmin( String codigo, long idRuta, LocalDateTime fechaSalida, LocalDateTime fechaLlegada, Boolean activo, List<ClaseConfig> clases, List<EscalaCreate> escalas, String motivoCambio ) {}
+
+    // DTOs para vuelos con escala
+    public record VueloConEscalaCreate(
+        String codigo,
+        long idVueloPrimerTramo,
+        long idVueloSegundoTramo,
+        List<ClaseConfig> clases,
+        Boolean activo
+    ) {}
+
+    public record VueloConEscalaView(
+        long idVueloConEscala,
+        String codigo,
+        View primerTramo,
+        View segundoTramo,
+        String origen,
+        String destino,
+        String origenPais,
+        String destinoPais,
+        LocalDateTime fechaSalida,
+        LocalDateTime fechaLlegada,
+        boolean activo,
+        Integer idEstado,
+        String estado,
+        List<ClaseConfig> clases,
+        List<EscalaView> escalas
+    ) {}
 }

@@ -33,6 +33,7 @@
 }
 .pill{ padding:2px 8px; border-radius:999px; background:#e5e7eb; color:#475569; font-weight:600; font-size:.85rem; }
 .pill--ok{ background:#dcfce7; color:#166534; }
+.pill--escala{ background:#fef3c7; color:#92400e; border:1px solid #f59e0b; }
 
 .vitem__city{ margin:6px 0 8px; color:var(--ink-2); font-size:1.05rem; }
 .vitem__times{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
@@ -40,6 +41,7 @@
 
 .vitem__escalas{ margin-top:8px; display:flex; flex-direction:column; gap:4px; }
 .esc .label{ color:var(--ink-3); font-size:.85rem; margin-right:6px; }
+.esc{ padding:6px 8px; background:#f8fafc; border-radius:8px; border-left:3px solid var(--secondary); }
 
 .vitem__classes{ display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; align-content:start; }
 @media (max-width: 900px){ .vitem__classes{ grid-template-columns: 1fr; } }
