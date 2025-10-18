@@ -14,6 +14,7 @@ from app.core.database import (
 from app.routers.auth import router as auth_router
 from app.routers.vuelos import router as vuelos_router
 from app.routers.portal import router as portal_router
+from app.routers.compras import router as compras_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -65,3 +66,4 @@ app.include_router(auth_router)
 app.include_router(users_admin.router)
 app.include_router(vuelos_router)
 app.include_router(portal_router)
+app.include_router(compras_router)

@@ -17,17 +17,11 @@
   }
 
   onMount(() => {
-    console.log('[LOGIN] onMount');
-    if ($isLoggedIn) {
-      console.log('[LOGIN] ya logueado, redirigiendo…');
-      navigate(nextFromLocation(), { replace: true });
-    }
-    window.__testLogin = submit;
+    if ($isLoggedIn) navigate(nextFromLocation(), { replace: true });
   });
 
   async function submit(e) {
     e?.preventDefault?.();
-    console.log('[LOGIN] submit()', { email, hasPwd: !!password });
     error = "";
     loading = true;
     try {
@@ -35,22 +29,20 @@
         email: email.trim().toLowerCase(),
         password
       });
-      console.log('[LOGIN] respuesta de /login', res);
 
-      const token = res?.access_token || res?.accessToken || res?.token || null;
+      const token =
+        res?.access_token || res?.accessToken || res?.token || null;
       let user = res?.user || null;
+
       if (!token) throw new Error("La API no devolvió token de acceso.");
 
       if (!user) {
-        try { user = await AuthAPI.me(); console.log('[LOGIN] /me OK', user); }
-        catch (e) { console.warn('[LOGIN] /me falló', e); }
+        try { user = await AuthAPI.me(); } catch {}
       }
 
       setAuth({ token, user });
-      console.log('[LOGIN] setAuth OK; navegando a', nextFromLocation());
       navigate(nextFromLocation());
     } catch (e) {
-      console.error('[LOGIN] error en submit', e);
       error = e?.message || "Error al iniciar sesión";
     } finally {
       loading = false;

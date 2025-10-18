@@ -1,6 +1,6 @@
 import { getToken } from "./auth";
 
-const BASE = import.meta.env.VITE_API_BASE || "http://localhost:8001";
+const BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8001";
 
 async function withAuthFetch(url, opts = {}) {
   const t = getToken();

@@ -62,7 +62,7 @@
   }
 
   async function submit(e) {
-    e?.preventDefault();
+    e?.preventDefault?.();
     ok = ""; err = "";
 
     if (!validate()) { err = "Corrige los campos marcados (*)"; return; }
@@ -131,7 +131,8 @@
     </div>
 
     <div style="display:flex; gap:10px; margin-top:12px">
-      <button class="btn primary" type="submit" disabled={submitting}>
+      <button class="btn primary" type="submit" disabled={submitting}
+              on:click|preventDefault={submit}>
         {submitting ? "Creando..." : "Crear cuenta"}
       </button>
     </div>
