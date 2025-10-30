@@ -14,7 +14,7 @@ def getenv_list(name: str, default=None):
         return default if default is not None else []
     return [x.strip() for x in raw.split(",") if x.strip()]
 
-MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URI = os.getenv("MONGO_URI") or os.getenv("MONGODB_URI")
 
 if not MONGO_URI:
     user = quote_plus(os.getenv("MONGO_USER", ""))
@@ -29,10 +29,11 @@ if not MONGO_URI:
 
 if not MONGO_URI:
     raise RuntimeError(
-        "MONGO_URI no configurada. Define MONGO_URI o (MONGO_USER, MONGO_PASS, MONGO_CLUSTER)."
+        "MONGO_URI no configurada. Define MONGO_URI o MONGODB_URI "
+        "o (MONGO_USER, MONGO_PASS, MONGO_CLUSTER)."
     )
 
-MONGO_DB = os.getenv("MONGO_DB", "agencia_viajes")
+MONGO_DB = os.getenv("MONGO_DB") or os.getenv("MONGODB_DB") or "agencia_viajes"
 
 ALLOWED_ORIGINS = getenv_list(
     "ALLOWED_ORIGINS",

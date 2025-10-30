@@ -34,8 +34,30 @@ public class App {
     next.handle(ctx);
   }
 
+  private static int resolvePort(String[] args) {
+    String envPort = System.getenv("PORT");
+    if (envPort != null && envPort.matches("\\d+")) {
+      return Integer.parseInt(envPort);
+    }
+    String sysPort = System.getProperty("port");
+    if (sysPort != null && sysPort.matches("\\d+")) {
+      return Integer.parseInt(sysPort);
+    }
+    if (args != null) {
+      for (String a : args) {
+        if (a != null && a.startsWith("--port=")) {
+          String v = a.substring("--port=".length());
+          if (v.matches("\\d+")) return Integer.parseInt(v);
+        }
+      }
+    }
+    return 8080;
+  }
+
   public static void main(String[] args) {
-    var app = Javalin.create(cfg -> cfg.http.defaultContentType = "application/json").start(8080);
+    int port = resolvePort(args); 
+
+    var app = Javalin.create(cfg -> cfg.http.defaultContentType = "application/json").start(port);
 
     app.exception(IllegalArgumentException.class, (e, ctx) -> {
       ctx.status(400).json(Map.of("error", e.getMessage()));

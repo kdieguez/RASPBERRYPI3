@@ -9,8 +9,10 @@ async def connect_to_mongo() -> None:
     client = AsyncIOMotorClient(
         MONGO_URI,
         serverSelectionTimeoutMS=8001,
-        uuidRepresentation="standard"
+        uuidRepresentation="standard",
     )
+    # Fuerza handshake/validación de conexión
+    await client.admin.command("ping")
     db = client[MONGO_DB]
 
 async def close_mongo_connection() -> None:
@@ -27,9 +29,5 @@ def get_db() -> AsyncIOMotorDatabase:
 
 async def ensure_indexes() -> None:
     d = get_db()
-
     await d["usuarios"].create_index("email", unique=True, name="uq_email")
-    await d["ui_settings"].create_index(
-        [("type", 1)],
-        name="ix_ui_type"
-    )
+    await d["ui_settings"].create_index([("type", 1)], name="ix_ui_type")
