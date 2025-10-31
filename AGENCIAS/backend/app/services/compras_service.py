@@ -13,7 +13,8 @@ from app.repositories import compras_repository as repo
 from app.services.proveedores import aerolinea_client as aer
 from app.services.mailer import send_email
 from app.services.pdf_service import build_ticket_pdf
-from app.services.vuelos_service import get_flight_detail_filtered
+from app.services.vuelos_service import detail as get_flight_detail_filtered
+
 
 def _dec(v: Any) -> Decimal:
     try:

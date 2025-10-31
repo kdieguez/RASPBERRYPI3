@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
-  import { VuelosAPI, ComprasAPI } from "@/lib/api";
-  import { link } from "@/lib/router";
+
+  const API = "http://127.0.0.1:8001/api/v1/vuelos";
 
   let origin = "";
   let destination = "";
@@ -14,12 +14,26 @@
   let loading = false;
   let error = "";
 
+  async function getJSON(url) {
+    const r = await fetch(url);
+    if (!r.ok) {
+      let msg = "";
+      try {
+        const j = await r.json();
+        msg = j.detail || j.message || j.error || "";
+      } catch {
+        msg = await r.text();
+      }
+      throw new Error(msg || `HTTP ${r.status}`);
+    }
+    return await r.json();
+  }
+
   onMount(async () => {
     try {
-      const list = await VuelosAPI.origins();
-      origins = Array.isArray(list) ? [...list] : [];
+      origins = await getJSON(`${API}/origins`);
     } catch (e) {
-      error = e?.message || "No se pudieron cargar los orígenes";
+      error = e.message || "No se pudieron cargar los orígenes";
     }
   });
 
@@ -28,136 +42,204 @@
     destinations = [];
     if (!origin) return;
     try {
-      const list = await VuelosAPI.destinations(origin);
-      destinations = Array.isArray(list) ? [...list] : [];
+      destinations = await getJSON(`${API}/destinations/${encodeURIComponent(origin)}`);
     } catch (e) {
-      error = e?.message || "No se pudieron cargar los destinos";
+      error = e.message || "No se pudieron cargar los destinos";
     }
   }
 
-  async function search() {
+  async function buscar() {
     loading = true;
     error = "";
     try {
-      const res = await VuelosAPI.search({ origin, destination, date, pax });
-      const sorted = (Array.isArray(res) ? res : []).slice().sort(
-        (a, b) => ((a?.precioDesde ?? Number.POSITIVE_INFINITY) - (b?.precioDesde ?? Number.POSITIVE_INFINITY))
-      );
-      items = sorted;
-      console.log("[CATALOG] items:", items);
+      const q = new URLSearchParams();
+      if (origin) q.set("origin", origin);
+      if (destination) q.set("destination", destination);
+      if (date) q.set("date", date);
+      if (pax) q.set("pax", String(pax));
+      items = await getJSON(`${API}?${q.toString()}`);
     } catch (e) {
-      error = e?.message || "Error al buscar vuelos";
+      error = e.message || "Error al buscar vuelos";
       items = [];
     } finally {
       loading = false;
     }
   }
 
-  async function addToCart(v) {
-    try {
-      const idVuelo = v.idVuelo;
-      const idClase = 1;
-      await ComprasAPI.addItem({ idVuelo, idClase, cantidad: 1, pair: false });
-      alert("Agregado al carrito");
-    } catch (e) {
-      alert(e?.message || "Error agregando al carrito");
-    }
+  function fmtMoney(n) {
+    if (n == null) return "-";
+    return `Q ${Number(n).toLocaleString("es-GT", { maximumFractionDigits: 2 })}`;
   }
 
-  const idOrigin = "fld-origin";
-  const idDestination = "fld-destination";
-  const idDate = "fld-date";
-  const idPax = "fld-pax";
+  function viewDetail(id) {
+    location.hash = `#/vuelos/${id}`;
+  }
 </script>
 
-<div class="wrap">
-  <h1>Vuelos</h1>
+<div class="container">
+  <h2>Catálogo de vuelos</h2>
 
-  <form class="card" on:submit={(e)=>{ e.preventDefault(); search(); }}>
-    <div class="row">
-      <div>
-        <label for={idOrigin}>Origen</label>
-        <select id={idOrigin} bind:value={origin} on:change={onOriginChange}>
-          <option value="">— Selecciona —</option>
-          {#each origins as o}<option value={o}>{o}</option>{/each}
-        </select>
-      </div>
-
-      <div>
-        <label for={idDestination}>Destino</label>
-        <select id={idDestination} bind:value={destination} disabled={!origin}>
-          <option value="">— Selecciona —</option>
-          {#each destinations as d}<option value={d}>{d}</option>{/each}
-        </select>
-      </div>
-
-      <div>
-        <label for={idDate}>Fecha salida</label>
-        <input id={idDate} type="date" bind:value={date} />
-      </div>
-
-      <div>
-        <label for={idPax}>Pasajeros</label>
-        <input id={idPax} type="number" min="1" max="9" bind:value={pax} />
-      </div>
-
-      <div class="actions">
-        <button class="btn" type="submit">Buscar</button>
-      </div>
-    </div>
-  </form>
-
-  {#if error}<p class="error">{error}</p>{/if}
-  {#if loading}<p>Cargando...</p>{/if}
-
-  {#if !loading && (!items || items.length === 0)}
-    <div class="card" style="margin-top:12px;">No hay vuelos para esos filtros.</div>
+  {#if error}
+    <p class="error">{error}</p>
   {/if}
 
-  <div class="grid">
-    {#each items as v (v.idVuelo)}
-      <div class="item">
-        <a
-          href={`/vuelos/${v.idVuelo}?pax=${pax}`}
-          use:link
-          style="text-decoration:none; color:inherit;"
-        >
-          <div class="price">Desde {v.precioDesde?.toLocaleString?.() ?? v.precioDesde}</div>
-          <div class="route">{v.origen} → {v.destino}</div>
-          <div class="meta">
-            <span>{new Date(v.fechaSalida).toLocaleString()}</span>
-            <span>Proveedor: {v.proveedor}</span>
-            {#if v.tieneEscala}<span class="escala">Con escala</span>{/if}
-          </div>
-        </a>
+  <div class="filters">
+    <select bind:value={origin} on:change={onOriginChange}>
+      <option value="">Origen</option>
+      {#each origins as o}
+        <option value={o}>{o}</option>
+      {/each}
+    </select>
 
-        <div class="item-actions">
-          <button class="btn" type="button" on:click={() => addToCart(v)}>Agregar al carrito</button>
-          <a class="btn ghost" href="/carrito" use:link>Ver carrito</a>
+    <select bind:value={destination} disabled={!origin}>
+      <option value="">Destino</option>
+      {#each destinations as d}
+        <option value={d}>{d}</option>
+      {/each}
+    </select>
+
+    <input type="date" bind:value={date} />
+    <input type="number" min="1" max="9" bind:value={pax} />
+
+    <button class="btn" on:click={buscar} disabled={loading}>
+      {loading ? "Buscando..." : "Buscar"}
+    </button>
+  </div>
+
+  <div class="grid">
+    {#each items as it}
+      <div class="card">
+        <div class="price">Desde {fmtMoney(it.precioDesde)}</div>
+        <div class="title">{it.origen} → {it.destino}</div>
+        <div class="meta">
+          <span>Proveedor: {it.proveedor}</span>
+          {#if it.tieneEscala}
+            <span class="pill">Con escala</span>
+          {/if}
+        </div>
+        <div class="actions">
+          <button class="btn primary" on:click={() => viewDetail(it.idVuelo)}>Ver detalle</button>
         </div>
       </div>
     {/each}
   </div>
+
+  {#if !loading && items.length === 0}
+    <p class="hint">Usa los filtros y presiona <b>Buscar</b> para ver resultados.</p>
+  {/if}
 </div>
 
 <style>
-  .wrap { max-width: 1000px; margin: 0 auto; padding: 1rem; }
-  h1 { color: #E62727; }
-  .card { background:#fff; border:1px solid #eee; border-left:4px solid #1E93AB; padding:1rem; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,.04);}
-  .row { display:grid; grid-template-columns: repeat(5, 1fr); gap:.75rem; align-items:end; }
-  label { font-size:.85rem; color:#555; }
-  input, select { width:100%; padding:.55rem .6rem; border:1px solid #ddd; border-radius:10px; }
-  .actions { display:flex; justify-content:flex-end; }
-  .btn { background:#E62727; color:#fff; border:0; padding:.6rem 1rem; border-radius:999px; cursor:pointer; }
-  .btn:hover { opacity:.9; }
-  .btn.ghost { background: transparent; color:#E62727; border:1px solid #E62727; }
-  .error { color:#E62727; margin-top:.5rem; }
-  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap:1rem; margin-top:1rem; }
-  .item { border:1px solid #eee; border-radius:14px; padding:.9rem; transition: transform .12s ease; background:#fff; }
-  .item:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.06); }
-  .price { font-weight:700; color:#1E93AB; }
-  .route { font-size:1.15rem; margin:.25rem 0; }
-  .meta { display:flex; gap:.6rem; flex-wrap:wrap; font-size:.85rem; color:#666; }
-  .escala { background:#1E93AB10; padding:.1rem .4rem; border-radius:6px; color:#1E93AB; }
-  .item-actions { margin-top:.6rem; display:flex; gap:.5rem; }
+  .container {
+    padding: 16px;
+  }
+
+  h2 {
+    font-size: 1.6rem;
+    color: #1a1a1a;
+    margin-bottom: 10px;
+  }
+
+  .filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  select,
+  input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+  }
+
+  .btn {
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid #ddd;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+  }
+
+  .btn:hover {
+    background: #f6f6f6;
+  }
+
+  .btn.primary {
+    background: #e51c23;
+    color: #fff;
+    border-color: #e51c23;
+  }
+
+  .btn.primary:hover {
+    background: #c5131a;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: transform 0.15s ease;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+  }
+
+  .price {
+    color: #0a7;
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+  }
+
+  .title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: #666;
+    font-size: 0.9rem;
+  }
+
+  .pill {
+    background: #e7f5ff;
+    color: #0a5;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.8rem;
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .error {
+    color: #c00;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+
+  .hint {
+    color: #555;
+    margin-top: 20px;
+  }
 </style>

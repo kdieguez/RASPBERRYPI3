@@ -4,7 +4,7 @@ const BASE = import.meta.env.VITE_API_URL;
  * @param {string} path
  * @param {{ method?: 'GET'|'POST'|'PUT'|'PATCH'|'DELETE', body?: any, headers?: Record<string,string>, timeout?: number }} [opts]
  */
-async function request(path, opts = {}) {
+export async function request(path, opts = {}) {
   const { method = 'GET', body, headers, timeout = 10000 } = opts;
 
   let token;
@@ -46,7 +46,7 @@ async function request(path, opts = {}) {
   return json ?? { ok: true, raw: text };
 }
 
-function qs(obj = {}) {
+export function qs(obj = {}) {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(obj)) {
     if (v === undefined || v === null || String(v).trim() === '') continue;
@@ -86,8 +86,6 @@ export const VuelosAPI = {
   destinations: (origin) => request('/vuelos/destinations' + qs({ origin })),
 };
 
-export { request };
-
 export const ComprasAPI = {
   getCart: () => request('/compras/carrito'),
   addItem: ({ idVuelo, idClase, cantidad = 1, pair = false }) =>
@@ -104,21 +102,18 @@ export const ComprasAPI = {
     request(`/compras/items/${idItem}?syncPareja=${syncPareja ? 'true' : 'false'}`, {
       method: 'DELETE',
     }),
-
-  checkout: (payment) =>
-    request('/compras/checkout', { method: 'POST', body: payment }),
-
+  checkout: (payment) => request('/compras/checkout', { method: 'POST', body: payment }),
   list: () => request('/compras/reservas'),
   detail: (id) => request(`/compras/reservas/${id}`),
 
   boletoPdf: async (id) => {
-    const BASE = import.meta.env.VITE_API_URL || '';
+    const BASEURL = import.meta.env.VITE_API_URL || '';
     let token;
     try {
       const raw = localStorage.getItem('auth');
       token = raw ? JSON.parse(raw)?.token : undefined;
     } catch {}
-    const res = await fetch(`${BASE}/compras/reservas/${id}/boleto.pdf`, {
+    const res = await fetch(`${BASEURL}/compras/reservas/${id}/boleto.pdf`, {
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
@@ -130,3 +125,41 @@ export const ComprasAPI = {
     return await res.blob();
   },
 };
+
+export function toDate(v) {
+  if (v == null) return null;
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  if (typeof v === "number") return new Date(v > 1e12 ? v : v * 1000);
+  if (typeof v === "string") {
+    let s = v.trim();
+
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      const d = new Date(s.replace(" ", "T"));
+      if (!isNaN(d)) return d;
+    }
+
+    const m = s.match(/^(\d{2})-([A-Z]{3})-(\d{2,4})\s+(\d{2})\.(\d{2})\.(\d{2})/i);
+    if (m) {
+      const [_, dd, mon, yy, hh, mm, ss] = m;
+      const months = { JAN:0, FEB:1, MAR:2, APR:3, MAY:4, JUN:5, JUL:6, AUG:7, SEP:8, OCT:9, NOV:10, DEC:11 };
+      const year = Number(yy) < 100 ? 2000 + Number(yy) : Number(yy);
+      return new Date(year, months[mon.toUpperCase()] ?? 0, Number(dd), Number(hh), Number(mm), Number(ss));
+    }
+
+    const d = new Date(s);
+    if (!isNaN(d)) return d;
+  }
+  return null;
+}
+
+export function fmtDate(d, opts = {}) {
+  if (!d) return "";
+  return new Intl.DateTimeFormat("es-GT", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    ...opts,
+  }).format(d);
+}
