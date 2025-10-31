@@ -1,5 +1,7 @@
 import datetime as dt
+import re
 from typing import Any, Dict, List, Optional
+
 import httpx
 
 from app.core.config import (
@@ -10,14 +12,28 @@ from app.core.config import (
 
 TIMEOUT = 15.0
 
+_MONTH = {
+    "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
+    "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
+}
+
+_ORACLE_RE = re.compile(
+    r"""^\s*
+        (?P<d>\d{1,2})-(?P<mon>[A-Za-z]{3})-(?P<yy>\d{2})
+        \s+
+        (?P<h>\d{1,2})[.:](?P<m>\d{2})[.:](?P<s>\d{2})
+        (?:\.\d+)?                   
+        (?:\s*(?P<ap>AM|PM))?             
+        \s*$""",
+    re.X,
+)
+
 def _iso(s: Any) -> Optional[str]:
     """
-    Normaliza a ISO-8601 sin microsegundos.
+    Normaliza a ISO8601 (YYYY-MM-DDTHH:MM:SS) sin microsegundos.
     Acepta:
-      - datetime
-      - string ISO o con espacio ("2025-09-15 08:00:00")
-      - arreglo estilo Jackson [yyyy, m, d, H, M, S, (ms)]
-      - dict con year, month, day, (hour, minute, second opcionales)
+      - ISO nativo (con 'T' o con espacio)
+      - Formato Oracle 'DD-MON-YY HH.MM.SS[.fffffffff] [AM|PM]'
     """
     if s is None:
         return None
@@ -25,37 +41,48 @@ def _iso(s: Any) -> Optional[str]:
     if isinstance(s, dt.datetime):
         return s.replace(microsecond=0).isoformat()
 
-    if isinstance(s, (list, tuple)) and len(s) >= 3:
-        y = int(s[0]); m = int(s[1]); d = int(s[2])
-        H = int(s[3]) if len(s) > 3 else 0
-        M = int(s[4]) if len(s) > 4 else 0
-        S = int(s[5]) if len(s) > 5 else 0
-        us = (int(s[6]) * 1000) if len(s) > 6 else 0
-        return dt.datetime(y, m, d, H, M, S, us).replace(microsecond=0).isoformat()
-
-    if isinstance(s, dict) and {"year", "month", "day"} <= set(s.keys()):
-        y = int(s["year"]); m = int(s["month"]); d = int(s["day"])
-        H = int(s.get("hour", 0)); M = int(s.get("minute", 0)); S = int(s.get("second", 0))
-        return dt.datetime(y, m, d, H, M, S).replace(microsecond=0).isoformat()
-
     txt = str(s).strip()
     if not txt:
         return None
-    if " " in txt and "T" not in txt[:11]:
-        txt = txt.replace(" ", "T", 1)
-    if txt.endswith("Z"):
-        txt = txt[:-1] + "+00:00"
-    try:
-        return dt.datetime.fromisoformat(txt).replace(microsecond=0).isoformat()
-    except Exception:
-        return None
 
+    try:
+        fixed = txt.replace(" ", "T", 1) if " " in txt and "T" not in txt[:11] else txt
+        return dt.datetime.fromisoformat(fixed).replace(microsecond=0).isoformat()
+    except Exception:
+        pass
+
+    m = _ORACLE_RE.match(txt)
+    if m:
+        d = int(m.group("d"))
+        mon_abbr = m.group("mon").upper()
+        yy = int(m.group("yy"))
+        h = int(m.group("h"))
+        mi = int(m.group("m"))
+        se = int(m.group("s"))
+        ap = m.group("ap")
+
+        year = 2000 + yy
+        month = _MONTH.get(mon_abbr)
+        if not month:
+            return None
+
+        if ap:
+            h = h % 12
+            if ap.upper() == "PM":
+                h += 12
+
+        try:
+            dt_obj = dt.datetime(year, month, d, h, mi, se)
+            return dt_obj.replace(microsecond=0).isoformat()
+        except Exception:
+            return None
+
+    return None
 
 def _min_price(v: Dict[str, Any]) -> Optional[float]:
     clases = v.get("clases") or []
     prices = [c.get("precio") for c in clases if isinstance(c.get("precio"), (int, float))]
     return min(prices) if prices else None
-
 
 def _is_cancelled(v: Dict[str, Any]) -> bool:
     if v.get("idEstado") is not None and ESTADO_CANCELADO_ID is not None:
@@ -63,8 +90,7 @@ def _is_cancelled(v: Dict[str, Any]) -> bool:
             return True
     estado = (v.get("estado") or "").strip().lower()
     cancel_txt = (ESTADO_CANCELADO_TXT or "").strip().lower()
-    return bool(cancel_txt) and estado == cancel_txt
-
+    return bool(cancel_txt and estado == cancel_txt)
 
 async def _get_json(url: str):
     async with httpx.AsyncClient(timeout=TIMEOUT, headers={"Accept": "application/json"}) as cli:
@@ -98,23 +124,27 @@ def map_catalog_item(v: Dict[str, Any]) -> Dict[str, Any]:
         "proveedor": "AEROLINEAS",
     }
 
-
-def _match(v: Dict[str, Any], origin: Optional[str], dest: Optional[str], date: Optional[str], pax: int) -> bool:
+def _match(v: Dict[str, Any], origin: Optional[str], dest: Optional[str],
+           date: Optional[str], pax: int) -> bool:
     def n(x): return (x or "").strip().lower()
-    if origin and n(v.get("origen")) != n(origin): return False
-    if dest   and n(v.get("destino")) != n(dest):  return False
+    if origin and n(v.get("origen")) != n(origin):
+        return False
+    if dest and n(v.get("destino")) != n(dest):
+        return False
     if date:
         try:
             goal = dt.date.fromisoformat(date)
             fs = _iso(v.get("fechaSalida"))
-            if not fs: return False
-            if dt.datetime.fromisoformat(fs).date() != goal: return False
+            if not fs:
+                return False
+            if dt.datetime.fromisoformat(fs).date() != goal:
+                return False
         except Exception:
             return False
     return pax >= 1
 
-
-async def search(origin: Optional[str], destination: Optional[str], date: Optional[str], pax: int) -> List[Dict[str, Any]]:
+async def search(origin: Optional[str], destination: Optional[str],
+                 date: Optional[str], pax: int) -> List[Dict[str, Any]]:
     vuelos = await fetch_all()
     out: List[Dict[str, Any]] = []
     for v in vuelos:
@@ -130,7 +160,6 @@ async def search(origin: Optional[str], destination: Optional[str], date: Option
     out.sort(key=lambda x: (x["precioDesde"] if x["precioDesde"] is not None else 9e18))
     return out
 
-
 async def detail(id_vuelo: int) -> Optional[Dict[str, Any]]:
     v = await fetch_one(id_vuelo)
     if not v:
@@ -139,14 +168,12 @@ async def detail(id_vuelo: int) -> Optional[Dict[str, Any]]:
     v["fechaLlegada"] = _iso(v.get("fechaLlegada"))
     for e in v.get("escalas") or []:
         e["llegada"] = _iso(e.get("llegada"))
-        e["salida"]  = _iso(e.get("salida"))
+        e["salida"] = _iso(e.get("salida"))
     return v
-
 
 async def list_origins() -> List[str]:
     vuelos = await fetch_all()
     return sorted({(v.get("origen") or "").strip() for v in vuelos if v.get("origen")})
-
 
 async def list_destinations(origin: str) -> List[str]:
     o = (origin or "").strip().lower()
