@@ -95,7 +95,7 @@ async def add_or_increment_item(user: Dict[str, Any], req: AddItemReq, incluir_p
     if item:
         item["cantidad"] = int(item.get("cantidad", 1)) + max(1, req.cantidad)
     else:
-        detalle = await get_flight_detail_filtered(req.idVuelo, pax=max(1, req.cantidad))
+        detalle = await get_flight_detail_filtered(req.idVuelo)
 
         precio_base = None
         clase_txt = None
