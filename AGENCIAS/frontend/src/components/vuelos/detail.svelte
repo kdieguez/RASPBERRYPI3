@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
-  import { VuelosAPI } from "../../lib/api";
-  import { path, match, getQuery, onNavigate } from "../../lib/router";
+  import { VuelosAPI, ComprasAPI } from "../../lib/api";
+  import { path, match, getQuery, onNavigate, navigate } from "../../lib/router";
 
   let flight = null;
   let loading = true;
@@ -16,12 +16,59 @@
     return id;
   }
 
+  function toDate(any) {
+    if (any === null || any === undefined) return null;
+    if (any instanceof Date) return isNaN(any) ? null : any;
+    if (typeof any === "number") {
+      const ms = any > 1e12 ? any : any * 1000;
+      return new Date(ms);
+    }
+    if (typeof any === "string") {
+      const s = any.trim().replace(" ", "T");
+      const d = new Date(s);
+      if (!isNaN(d)) return d;
+    }
+    return null;
+  }
+
+  function fmtDate(d) {
+    if (!d) return "";
+    return new Intl.DateTimeFormat("es-GT", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(d);
+  }
+
   async function load(p) {
     loading = true; error = "";
     const id = parseFromPath(p);
     if (!id) { error = "Ruta inválida"; loading = false; return; }
     try {
-      flight = await VuelosAPI.detail(id, pax);
+      const v = await VuelosAPI.detail(id, pax);
+      const salida = toDate(v.salida ?? v.fechaSalida);
+      const llegada = toDate(v.llegada ?? v.fechaLlegada);
+      flight = {
+        ...v,
+        salida,
+        llegada,
+        salidaTxt: fmtDate(salida),
+        llegadaTxt: fmtDate(llegada),
+        escalas: v.escalas?.map(e => ({
+          ciudad: e.ciudad ?? e.city ?? e.aeropuerto ?? "—",
+          pais: e.pais ?? e.country ?? "",
+          llegadaTxt: fmtDate(toDate(e.llegada ?? e.arrival)),
+          salidaTxt: fmtDate(toDate(e.salida ?? e.departure))
+        })) ?? [],
+        clases: v.clases?.map(c => ({
+          idClase: c.idClase ?? c.id,
+          nombre: c.nombre ?? `Clase #${c.idClase ?? c.id}`,
+          precio: c.precio ?? c.precioBase ?? c.tarifa ?? 0,
+          disponible: c.disponible ?? c.cupo ?? c.asientosDisponibles ?? 0
+        })) ?? []
+      };
     } catch (e) {
       error = e.message || "No se pudo cargar el vuelo";
       flight = null;
@@ -38,50 +85,187 @@
     return () => { off(); unsubPath(); };
   });
 
-  function canReserve(c) {
-    if (typeof c?.disponible === "number") return c.disponible >= pax;
-    return pax <= 1;
+  async function continuar(c) {
+    try {
+      await ComprasAPI.addItem({
+        idVuelo: flight.id,
+        idClase: c.idClase,
+        cantidad: pax,
+        pair: false
+      });
+      navigate("/carrito");
+    } catch (e) {
+      alert(e?.message || "No se pudo agregar al carrito");
+    }
   }
 </script>
 
-{#if loading}<p>Cargando...</p>{/if}
-{#if error}<p class="error">{error}</p>{/if}
+{#if loading}
+  <div class="loading">Cargando vuelo...</div>
+{:else if error}
+  <p class="error">{error}</p>
+{:else if flight}
+  <div class="vuelo-detail">
+    <div class="header">
+      <h1>{flight.origen} → {flight.destino}</h1>
+      <p class="fecha">{flight.salidaTxt} — {flight.llegadaTxt}</p>
+    </div>
 
-{#if flight}
-  <div class="card">
-    <h2>{flight.origen} → {flight.destino}</h2>
-    <p class="when">{new Date(flight.fechaSalida).toLocaleString()} — {new Date(flight.fechaLlegada).toLocaleString()}</p>
+    <div class="section-grid">
+      <div class="info-box">
+        <h3>Ruta</h3>
+        <p><b>Origen:</b> {flight.origen}</p>
+        <p><b>Destino:</b> {flight.destino}</p>
+      </div>
+
+      <div class="info-box">
+        <h3>Fechas</h3>
+        <p><b>Salida:</b> {flight.salidaTxt}</p>
+        <p><b>Llegada:</b> {flight.llegadaTxt}</p>
+      </div>
+    </div>
 
     {#if flight.escalas?.length}
-      <h3>Escalas</h3>
-      <ul class="escalas">
-        {#each flight.escalas as e}
-          <li>{e.ciudad}, {e.pais} · {new Date(e.llegada).toLocaleString()} → {new Date(e.salida).toLocaleString()}</li>
-        {/each}
-      </ul>
+      <div class="section">
+        <h3>Escalas</h3>
+        <ul class="escalas">
+          {#each flight.escalas as e}
+            <li>
+              ✈️ <b>{e.ciudad}</b>{e.pais ? ` (${e.pais})` : ''} —
+              {e.llegadaTxt} → {e.salidaTxt}
+            </li>
+          {/each}
+        </ul>
+      </div>
     {/if}
 
-    <h3>Clases disponibles</h3>
-    <div class="classes">
-      {#each flight.clases as c}
-        <div class="clase {canReserve(c) ? '' : 'disabled'}">
-          <div class="price">{c.precio?.toLocaleString?.() ?? c.precio}</div>
-          <div>Clase #{c.idClase}</div>
-          {#if typeof c.disponible === "number"}<div>Disponibles: {c.disponible}</div>{/if}
-          <button disabled={!canReserve(c)}>Continuar</button>
-        </div>
-      {/each}
+    <div class="section">
+      <h3>Clases y precios</h3>
+      <div class="clases-grid">
+        {#each flight.clases as c}
+          <div class="clase">
+            <div class="precio">Q {c.precio.toLocaleString()}</div>
+            <div class="nombre">{c.nombre}</div>
+            <div class="disp">Disponibles: {c.disponible}</div>
+            <button on:click={() => continuar(c)}>Añadir al carrito</button>
+          </div>
+        {/each}
+      </div>
     </div>
   </div>
 {/if}
 
 <style>
-  .card { background:#fff; border:1px solid #eee; border-left:4px solid #E62727; padding:1rem; border-radius:12px; max-width: 1000px; margin:0 auto; }
-  .error { color:#E62727; }
-  .when { color:#555; margin:.25rem 0 .75rem; }
-  .escalas { margin:.25rem 0 1rem; padding-left:1rem; }
-  .classes { display:grid; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); gap:.75rem; margin-top:.75rem; }
-  .clase { border:1px solid #eee; border-radius:12px; padding:.8rem; }
-  .clase.disabled { opacity:.55; }
-  button { background:#1E93AB; color:#fff; border:0; padding:.5rem .8rem; border-radius:10px; cursor:pointer; }
+  .vuelo-detail {
+    background: #fff;
+    border: 1px solid #eee;
+    border-left: 4px solid #E62727;
+    padding: 1.5rem;
+    border-radius: 16px;
+    max-width: 1100px;
+    margin: 1rem auto 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+  .header h1 {
+    color: #E62727;
+    margin-bottom: 0.25rem;
+  }
+  .fecha {
+    color: #666;
+    font-size: 0.95rem;
+  }
+
+  .section-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(260px,1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .info-box {
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 1rem;
+    background: #fafafa;
+  }
+
+  .section {
+    margin-top: 1.5rem;
+  }
+  .section h3 {
+    border-bottom: 2px solid #1E93AB;
+    padding-bottom: 0.25rem;
+    color: #1E93AB;
+  }
+
+  .escalas {
+    list-style: none;
+    padding: 0.5rem 1rem;
+  }
+  .escalas li {
+    margin: 0.25rem 0;
+    color: #444;
+  }
+
+  .clases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-top: 0.75rem;
+  }
+
+  .clase {
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: center;
+    background: #fff;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .clase:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.07);
+  }
+  .precio {
+    font-weight: 700;
+    font-size: 1.3rem;
+    color: #E62727;
+  }
+  .nombre {
+    margin: 0.2rem 0;
+    color: #333;
+  }
+  .disp {
+    color: #666;
+    font-size: 0.85rem;
+    margin-bottom: 0.4rem;
+  }
+  button {
+    background: #1E93AB;
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  button:hover {
+    background: #157a8b;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .error {
+    color: #E62727;
+    text-align: center;
+    font-weight: 500;
+  }
 </style>

@@ -1,15 +1,32 @@
 from __future__ import annotations
+import os
 import httpx
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from app.core.config import AEROLINEAS_API_URL, AEROLINEAS_TIMEOUT
 
-import os
 WS_TOKEN = os.getenv("AEROLINEAS_WS_TOKEN", "").strip()
+AER_FALLBACK_USER_ID = (os.getenv("AEROLINEAS_FALLBACK_USER_ID") or "").strip()
 
-def _headers_for(user_id: str, email: Optional[str] = None, name: Optional[str] = None) -> Dict[str, str]:
+def _sanitize_user_id(user_id: Optional[str]) -> str:
+    """
+    Aerolíneas requiere X-User-Id numérico (long).
+    Si recibimos un ObjectId de Mongo u otra cosa, usamos el fallback
+    siempre que sea numérico; si no existe, se lanza error claro.
+    """
+    if user_id and user_id.isdigit():
+        return user_id
+    if AER_FALLBACK_USER_ID and AER_FALLBACK_USER_ID.isdigit():
+        return AER_FALLBACK_USER_ID
+    raise ValueError(
+        "Aerolíneas requiere un X-User-Id numérico. "
+        "Define AEROLINEAS_FALLBACK_USER_ID en .env o guarda aeroUserId numérico por usuario."
+    )
+
+def _headers_for(user_id: Optional[str], email: Optional[str] = None, name: Optional[str] = None) -> Dict[str, str]:
+    uid = _sanitize_user_id(user_id)
     h = {
         "Accept": "application/json",
-        "X-User-Id": user_id,
+        "X-User-Id": uid,
     }
     if email:
         h["X-User-Email"] = email
@@ -19,7 +36,7 @@ def _headers_for(user_id: str, email: Optional[str] = None, name: Optional[str] 
         h["Authorization"] = f"Bearer {WS_TOKEN}"
     return h
 
-async def add_item(user_id: str, id_vuelo: int, id_clase: int, cantidad: int, incluir_pareja: bool=False) -> None:
+async def add_item(user_id: str, id_vuelo: int, id_clase: int, cantidad: int, incluir_pareja: bool = False) -> None:
     url = f"{AEROLINEAS_API_URL}/api/compras/items"
     payload = {"idVuelo": id_vuelo, "idClase": id_clase, "cantidad": cantidad}
     qp = "?pair=true" if incluir_pareja else ""
@@ -27,7 +44,7 @@ async def add_item(user_id: str, id_vuelo: int, id_clase: int, cantidad: int, in
         r = await client.post(url + qp, json=payload)
         r.raise_for_status()
 
-async def update_item(user_id: str, id_item: int, cantidad: int, sync_pareja: bool=False) -> None:
+async def update_item(user_id: str, id_item: int, cantidad: int, sync_pareja: bool = False) -> None:
     url = f"{AEROLINEAS_API_URL}/api/compras/items/{id_item}"
     qp = "?syncPareja=true" if sync_pareja else ""
     payload = {"cantidad": cantidad}
@@ -35,7 +52,7 @@ async def update_item(user_id: str, id_item: int, cantidad: int, sync_pareja: bo
         r = await client.put(url + qp, json=payload)
         r.raise_for_status()
 
-async def remove_item(user_id: str, id_item: int, sync_pareja: bool=False) -> None:
+async def remove_item(user_id: str, id_item: int, sync_pareja: bool = False) -> None:
     url = f"{AEROLINEAS_API_URL}/api/compras/items/{id_item}"
     qp = "?syncPareja=true" if sync_pareja else ""
     async with httpx.AsyncClient(timeout=AEROLINEAS_TIMEOUT, headers=_headers_for(user_id)) as client:

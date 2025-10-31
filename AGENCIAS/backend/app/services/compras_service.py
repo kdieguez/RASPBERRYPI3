@@ -15,7 +15,6 @@ from app.services.mailer import send_email
 from app.services.pdf_service import build_ticket_pdf
 from app.services.vuelos_service import get_flight_detail_filtered
 
-
 def _dec(v: Any) -> Decimal:
     try:
         return Decimal(str(v))
@@ -170,11 +169,10 @@ async def remove_item(user: Dict[str, Any], id_item: str, sync_pareja: bool) -> 
     await _recalculate_totals(cart)
     await repo.save_cart(cart)
 
-
 async def checkout(user: Dict[str, Any], payment: PaymentReq) -> CheckoutResp:
     """
     Orquesta el checkout:
-    - Reenvía ítems del carrito local a Aerolíneas (add_item).
+    - Reenvía ítems del carrito local a Aerolíneas.
     - Ejecuta checkout real en Aerolíneas.
     - Trae el detalle de reserva, persiste la compra en Mongo y limpia el carrito.
     - Envía correo con PDF adjunto.
@@ -222,7 +220,7 @@ async def checkout(user: Dict[str, Any], payment: PaymentReq) -> CheckoutResp:
     compra_doc = {
         "idUsuario": user["id"],
         "tipo": "vuelo",
-        "idEstado": 1, 
+        "idEstado": 1,
         "total": float(total),
         "codigo": det.get("codigo"),
         "proveedores": [{
@@ -230,7 +228,7 @@ async def checkout(user: Dict[str, Any], payment: PaymentReq) -> CheckoutResp:
             "idReservaProveedor": aero_id_reserva,
             "codigo": det.get("codigo")
         }],
-        "detalle_vuelo": det, 
+        "detalle_vuelo": det,
     }
     saved = await repo.insert_compra(compra_doc)
 
@@ -259,7 +257,6 @@ async def checkout(user: Dict[str, Any], payment: PaymentReq) -> CheckoutResp:
             pass
 
     return CheckoutResp(idReserva=saved["id"])
-
 
 async def list_compras(user: Dict[str, Any]) -> List[ReservaListItem]:
     rows = await repo.list_compras_by_user(user["id"])
@@ -316,7 +313,6 @@ async def get_compra_detalle(user: Dict[str, Any], compra_id: str) -> ReservaDet
         compradorEmail=None
     )
 
-
 async def cancelar_compra(user: Dict[str, Any], compra_id: str, is_admin: bool) -> bool:
     """
     Marca la compra como cancelada en Agencia (idEstado=2).
@@ -325,7 +321,6 @@ async def cancelar_compra(user: Dict[str, Any], compra_id: str, is_admin: bool) 
     """
     await repo.update_estado_compra(compra_id, 2)
     return True
-
 
 def _safe_filename(s: str) -> str:
     return re.sub(r'[^A-Za-z0-9._-]', '_', s or 'boleto')
