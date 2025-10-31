@@ -19,13 +19,14 @@ function resolveApiBase() {
   } catch {}
 
   if (window.__API_BASE__) return norm(window.__API_BASE__);
+
   const ls = localStorage.getItem("apiBase");
   if (ls) return norm(ls);
 
   const envBase = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL;
   if (envBase) return norm(envBase);
 
-  return norm(window.location.origin); 
+  return norm(window.location.origin);
 }
 
 const API_BASE = resolveApiBase();
@@ -45,11 +46,10 @@ axios.interceptors.response.use(
     const status = err?.response?.status;
     const url = err?.config?.url || "";
 
-    if (status === 401 && url.startsWith("/api/v1/")) {
-      if (!getToken()) {
-        clearAuth();
-        if (!location.pathname.startsWith("/login")) location.assign("/login");
-      }
+
+    if (status === 401 && url.startsWith("/api/")) {
+      clearAuth();
+      if (!location.pathname.startsWith("/login")) location.assign("/login");
     }
 
     return Promise.reject(err);

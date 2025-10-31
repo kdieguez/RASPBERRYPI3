@@ -3,23 +3,14 @@
     "pid": 18512,
     "port": 8080
   },
-  "airlines": {
-    "aircentra": {
-      "pid": 15828,
-      "port": 8081
-    },
-    "guatefly": {
-      "pid": 10208,
-      "port": 8080
-    }
-  },
+  "airlines": {},
   "frontends": {
     "guatefly-ui": {
-      "pid": 15924,
+      "pid": 12552,
       "port": 5174
     },
     "aircentra-ui": {
-      "pid": 5820,
+      "pid": 26236,
       "port": 5175
     }
   }

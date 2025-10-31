@@ -16,8 +16,8 @@ import webbrowser
 SECRET = os.getenv("LAUNCHER_KEY", "supercalifragilisticoespialidoso")
 STATE_FILE = "launcher_state.json"
 
-JAR_DIR_HINT = os.getenv("LAUNCHER_JAR_DIR")      
-JAR_NAME_HINT = os.getenv("LAUNCHER_JAR_NAME")    
+JAR_DIR_HINT = os.getenv("LAUNCHER_JAR_DIR")
+JAR_NAME_HINT = os.getenv("LAUNCHER_JAR_NAME")
 
 def free_port(start=8080, tries=200):
     for p in range(start, start + tries):
@@ -52,7 +52,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-state = load_state()  
+state = load_state()
 state.setdefault("airlines", {})
 state.setdefault("frontends", {})
 
@@ -64,7 +64,7 @@ def _workdir_for_jar(jar_path: Path) -> Path:
 
 def _find_jar_candidates() -> List[Path]:
     candidates: List[Path] = []
-    
+
     if JAR_DIR_HINT and JAR_NAME_HINT:
         p = Path(JAR_DIR_HINT).expanduser().resolve() / JAR_NAME_HINT
         if p.exists():
@@ -74,7 +74,7 @@ def _find_jar_candidates() -> List[Path]:
         d = Path(JAR_DIR_HINT).expanduser().resolve()
         for path in d.glob("*.jar"):
             candidates.append(path)
-    
+
     base = Path(__file__).parent.resolve()
     common = [
         base.parent / "backend" / "target",
@@ -85,13 +85,14 @@ def _find_jar_candidates() -> List[Path]:
         if d.exists():
             for path in d.glob("*.jar"):
                 candidates.append(path)
-    
+
     unique, seen = [], set()
     for c in candidates:
         s = str(c)
         if c.exists() and s not in seen:
             seen.add(s)
             unique.append(c)
+
     prioritized = [p for p in unique if "aerolineas" in p.name.lower()]
     rest = [p for p in unique if p not in prioritized]
     return prioritized + rest
@@ -104,14 +105,14 @@ def _resolve_jar_path(opt_path: Optional[str]) -> Path:
         return p
     candidates = _find_jar_candidates()
     if not candidates:
-        raise HTTPException(400, "No se encontró ningún .jar. Configura LAUNCHER_JAR_DIR/LAUNCHER_JAR_NAME o envía jar_path.")
+        raise HTTPException(400, "No se encontró ningún .jar. Configura LAUNCHER_JAR_DIR/NAME o envía jar_path.")
     return candidates[0]
 
 class AirlineLaunch(BaseModel):
     airline_id: str
     airline_name: str
-    jar_path: Optional[str] = None   
-    central_base: str                
+    jar_path: Optional[str] = None
+    central_base: str
     central_admin_key: str
     oracle_url: Optional[str] = None
     oracle_user: Optional[str] = None
@@ -128,6 +129,7 @@ def list_running(x_launcher_key: str | None = Header(default=None)):
 def spawn_airline(payload: AirlineLaunch, x_launcher_key: str | None = Header(default=None)):
     if x_launcher_key != SECRET:
         raise HTTPException(403, "bad key")
+
     port = payload.port or free_port(8080)
     env = os.environ.copy()
     env["AIRLINE_ID"] = payload.airline_id
@@ -135,19 +137,26 @@ def spawn_airline(payload: AirlineLaunch, x_launcher_key: str | None = Header(de
     env["CENTRAL_BASE"] = payload.central_base.rstrip("/")
     env["CENTRAL_ADMIN_KEY"] = payload.central_admin_key
     env["PORT"] = str(port)
-    if payload.oracle_url:  env["ORACLE_URL"]  = payload.oracle_url
-    if payload.oracle_user: env["ORACLE_USER"] = payload.oracle_user
-    if payload.oracle_pass: env["ORACLE_PASS"] = payload.oracle_pass
+
+    if payload.oracle_url:
+        env["ORACLE_URL"] = payload.oracle_url
+    if payload.oracle_user:
+        env["ORACLE_USER"] = payload.oracle_user
+    if payload.oracle_pass:
+        env["ORACLE_PASS"] = payload.oracle_pass
 
     jar_path = _resolve_jar_path(payload.jar_path)
     workdir = _workdir_for_jar(jar_path)
 
+    cmd = ["java", "-jar", str(jar_path), f"--port={port}"]
+
     proc = subprocess.Popen(
-        ["java", "-jar", str(jar_path)],
+        cmd,
         env=env,
         cwd=str(workdir),
         creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
     )
+
     state["airlines"][payload.airline_id] = {"pid": proc.pid, "port": port}
     save_state(state)
     return {"ok": True, "pid": proc.pid, "port": port, "id": payload.airline_id}
@@ -171,20 +180,14 @@ PkgMgr = Literal["npm", "yarn", "pnpm"]
 class FrontendLaunch(BaseModel):
     app_id: str
     app_name: str
-    project_dir: str              
+    project_dir: str
     package_manager: PkgMgr = "npm"
-    script: str = "dev"           
+    script: str = "dev"
     is_vite: bool = True
     port: Optional[int] = None
     env: Optional[Dict[str, str]] = None
 
 def _pm_executable(pm: str) -> str:
-    """
-    Devuelve el ejecutable correcto para el package manager.
-    En Windows forzamos *.cmd para evitar el problema con npm.ps1.
-    Permite override con variables:
-      LAUNCHER_NPM_CMD, LAUNCHER_YARN_CMD, LAUNCHER_PNPM_CMD
-    """
     is_win = platform.system().lower().startswith("win")
 
     if pm == "npm":
@@ -194,6 +197,7 @@ def _pm_executable(pm: str) -> str:
         if is_win:
             return shutil.which("npm.cmd") or r"C:\Program Files\nodejs\npm.cmd"
         return shutil.which("npm") or "npm"
+
     if pm == "yarn":
         override = os.getenv("LAUNCHER_YARN_CMD")
         if override:
@@ -213,17 +217,12 @@ def _pm_executable(pm: str) -> str:
     raise HTTPException(400, f"package_manager no soportado: {pm}")
 
 def _frontend_cmd(pm_exec: str, script: str, port: int, is_vite: bool) -> List[str]:
-    """
-    Construye el comando listo para Popen.
-    """
     if is_vite:
-        
         if pm_exec.endswith(("npm", "npm.cmd")):
             return [pm_exec, "run", script, "--", "--port", str(port)]
         else:
             return [pm_exec, script, "--port", str(port)]
     else:
-        
         if pm_exec.endswith(("npm", "npm.cmd")):
             return [pm_exec, "run", script]
         else:
@@ -252,7 +251,7 @@ def spawn_frontend(payload: FrontendLaunch, x_launcher_key: str | None = Header(
     if payload.env:
         env.update({k: str(v) for k, v in payload.env.items()})
     if not payload.is_vite:
-        env["PORT"] = str(port)   
+        env["PORT"] = str(port)
 
     cmd = _frontend_cmd(pm_exec, payload.script, port, payload.is_vite)
 
@@ -263,86 +262,9 @@ def spawn_frontend(payload: FrontendLaunch, x_launcher_key: str | None = Header(
             env=env,
             creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
         )
-    except FileNotFoundError as e:
-        raise HTTPException(
-            500,
-            f"No se pudo ejecutar '{pm_exec}'. Asegúrate de que existe o define "
-            f"LAUNCHER_NPM_CMD/LAUNCHER_YARN_CMD/LAUNCHER_PNPM_CMD. Detalle: {e}"
-        ) from e
     except Exception as e:
         raise HTTPException(500, f"Fallo al lanzar el frontend: {e}") from e
 
     state["frontends"][payload.app_id] = {"pid": proc.pid, "port": port}
     save_state(state)
     return {"ok": True, "pid": proc.pid, "port": port, "id": payload.app_id}
-
-@app.post("/stop/frontend/{app_id}")
-def stop_frontend(app_id: str, x_launcher_key: str | None = Header(default=None)):
-    if x_launcher_key != SECRET:
-        raise HTTPException(403, "bad key")
-    info = state["frontends"].get(app_id)
-    if not info:
-        return {"ok": True, "msg": "not running"}
-    try:
-        subprocess.run(["taskkill", "/PID", str(info["pid"]), "/F"], check=False)
-    finally:
-        state["frontends"].pop(app_id, None)
-        save_state(state)
-    return {"ok": True}
-
-@app.post("/spawn/frontend_by_system")
-def spawn_frontend_by_system(payload: dict, x_launcher_key: str | None = Header(default=None)):
-    if x_launcher_key != SECRET:
-        raise HTTPException(403, "bad key")
-
-    system_id = payload.get("system_id")
-    central_base = (payload.get("central_base") or "").rstrip("/")
-    admin_key = payload.get("central_admin_key") or ""
-    if not system_id or not central_base:
-        raise HTTPException(400, "Faltan system_id o central_base")
-
-    url = f"{central_base}/central/systems/{system_id}"
-    headers = {"x-admin-key": admin_key} if admin_key else {}
-    r = requests.get(url, headers=headers, timeout=10)
-    if r.status_code != 200:
-        raise HTTPException(r.status_code, f"No se pudo leer system {system_id} en Central")
-    s = r.json()
-
-    app_id = s["id"]
-    frontend_base = s.get("frontend_base")
-    frontend_port = s.get("frontend_port")
-    frontend_dir = s.get("frontend_dir")
-    frontend_pm = (s.get("frontend_pm") or "npm").lower()
-    frontend_script = s.get("frontend_script") or "dev"
-    extra_env = s.get("frontend_env") or {}
-    is_cra = s.get("is_cra") is True
-    is_vite = not is_cra
-
-    if frontend_dir:
-        proj = Path(frontend_dir).expanduser().resolve()
-        if not (proj / "package.json").exists():
-            raise HTTPException(400, f"package.json no encontrado en {proj}")
-        port = frontend_port or free_port_front()
-        env = os.environ.copy()
-        env.update({k: str(v) for k, v in extra_env.items()})
-        if not is_vite:
-            env["PORT"] = str(port)
-
-        pm_exec = _pm_executable(frontend_pm)
-        cmd = _frontend_cmd(pm_exec, frontend_script, port, is_vite)
-
-        proc = subprocess.Popen(
-            cmd, cwd=str(proj), env=env,
-            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
-        )
-        state["frontends"][app_id] = {"pid": proc.pid, "port": port}
-        save_state(state)
-        if frontend_base:
-            webbrowser.open(str(frontend_base))
-        return {"ok": True, "mode": "devserver", "pid": proc.pid, "port": port, "id": app_id}
-
-    if frontend_base:
-        webbrowser.open(str(frontend_base))
-        return {"ok": True, "mode": "open-url", "url": frontend_base, "id": app_id}
-
-    raise HTTPException(400, "El sistema no tiene frontend_dir ni frontend_base")
