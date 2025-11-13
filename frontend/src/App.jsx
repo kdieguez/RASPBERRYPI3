@@ -1,3 +1,4 @@
+// src/App.jsx
 import { Routes, Route, Navigate } from "react-router-dom";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -26,6 +27,12 @@ import HistorialReservas from "./paginas/admin/HistorialReservas";
 import AdminReservaDetalle from "./paginas/admin/AdminReservaDetalle";
 import Home from "./paginas/Home";
 
+// Página informativa genérica (lee de BD según slug)
+import PaginaInformativa from "./paginas/PaginaInformativa";
+
+// Admin de páginas informativas
+import PaginasInfoAdmin from "./paginas/admin/PaginasInfoAdmin";
+
 export default function App() {
   return (
     <>
@@ -36,16 +43,22 @@ export default function App() {
           <Route path="/registro" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/perfil" element={<Perfil />} />
-          <Route path="/vuelos" element={<VuelosCatalogo/>} />
-          <Route path="/vuelos/:id" element={<VueloDetalle/>}/>
+          <Route path="/vuelos" element={<VuelosCatalogo />} />
+          <Route path="/vuelos/:id" element={<VueloDetalle />} />
           <Route path="/compras/carrito" element={<Carrito />} />
           <Route path="/compras/checkout" element={<Checkout />} />
-          <Route path="/compras/checkout/:id" element={<CheckoutAgradecimiento />} />
-          <Route path="/compras/historial" element={<HistorialCompras/>} />
-          <Route path="/compras/reservas/:id" element={<ReservaDetalle/>}/>
-          
+          <Route
+            path="/compras/checkout/:id"
+            element={<CheckoutAgradecimiento />}
+          />
+          <Route path="/compras/historial" element={<HistorialCompras />} />
+          <Route path="/compras/reservas/:id" element={<ReservaDetalle />} />
 
-          {/* Rutas admin */}
+          {/* Páginas informativas públicas (dinámicas con slug) */}
+          {/* /info/checkin, /info/abordaje, /info/equipaje, etc. */}
+          <Route path="/info/:slug" element={<PaginaInformativa />} />
+
+          {/* Admin */}
           <Route element={<ProtectedRoute allowRoles={[1]} />}>
             <Route path="/admin/vuelos/nuevo" element={<VueloNuevo />} />
             <Route path="/admin/usuarios" element={<UsuariosList />} />
@@ -55,10 +68,14 @@ export default function App() {
             <Route path="/admin/rutas" element={<AdminRutas />} />
             <Route path="/admin/vuelos" element={<AdminVuelosList />} />
             <Route path="/admin/vuelos/:id" element={<VueloEdit />} />
-            <Route path="/admin/config" element={<ConfigSitio/>}/>
+            <Route path="/admin/config" element={<ConfigSitio />} />
             <Route path="/admin/reservas" element={<HistorialReservas />} />
-            <Route path="/admin/reservas/:id" element={<AdminReservaDetalle />} />
-
+            <Route
+              path="/admin/reservas/:id"
+              element={<AdminReservaDetalle />}
+            />
+            {/* Administración de páginas informativas */}
+            <Route path="/admin/info" element={<PaginasInfoAdmin />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

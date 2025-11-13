@@ -1,33 +1,47 @@
+# app/main.py
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers.systems import router as systems_router
-from app.routers.partnerships import router as partnerships_router  
+# Conexión Mongo y utilidades
+from app.db import connect_to_mongo, ensure_indexes, close_mongo_connection
 
-app = FastAPI(title="Central API")
+# Routers
+from app.routers.systems import router as systems_router
+from app.routers.partnerships import router as partnerships_router
+# Si tienes el router de bootstrap, descomenta la siguiente línea:
+# from app.routers.bootstrap import router as bootstrap_router
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 1) Conectar a Mongo
+    await connect_to_mongo()
+    # 2) Crear índices
+    await ensure_indexes()
+    yield
+    # 3) Cerrar conexión
+    await close_mongo_connection()
+
+app = FastAPI(title="Central API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],              
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(systems_router, prefix="/central", tags=["systems"])
-
+# Routers
+app.include_router(systems_router,      prefix="/central", tags=["systems"])
 app.include_router(partnerships_router, prefix="/central", tags=["partnerships"])
+# app.include_router(bootstrap_router,  prefix="/central", tags=["bootstrap"])
 
-from app.db import ensure_indexes
-
-@app.on_event("startup")
-async def _startup():
-    await ensure_indexes()
-
+# Health
 @app.get("/")
 def root():
     return {"ok": True, "msg": "Central API"}
 
-@app.get("/health/db")
-def health_db():
+@app.get("/health")
+async def health():
     return {"ok": True}

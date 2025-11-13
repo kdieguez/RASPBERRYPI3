@@ -55,7 +55,7 @@ public class App {
   }
 
   public static void main(String[] args) {
-    int port = resolvePort(args); 
+    int port = resolvePort(args);
 
     var app = Javalin.create(cfg -> cfg.http.defaultContentType = "application/json").start(port);
 
@@ -115,10 +115,12 @@ public class App {
     app.get("/api/admin/usuarios",            ctx -> requireAdmin(ctx, adminUsr::list));
     app.get("/api/admin/usuarios/{id}",       ctx -> requireAdmin(ctx, adminUsr::get));
     app.put("/api/admin/usuarios/{id}",       ctx -> requireAdmin(ctx, adminUsr::update));
+
     app.get("/api/config",                 configCtrl::getAll);
     app.get("/api/config/{section}",       configCtrl::getBySection);
     app.put("/api/admin/config/{section}", ctx -> requireAdmin(ctx, configCtrl::upsertSection));
 
+    // Controladores de dominio
     new PaisController().routes(app);
     new CiudadController().routes(app);
     new RutaController().routes(app);
@@ -127,5 +129,10 @@ public class App {
     new ComprasController().register(app);
     new ComentarioController().routes(app);
     new RatingController().routes(app);
+
+    // Informativas (usa InfoController con sus propios guards)
+    new PaginasController().routes(app);
+
+    app.exception(Exception.class, JsonErrorHandler.of(500));
   }
 }

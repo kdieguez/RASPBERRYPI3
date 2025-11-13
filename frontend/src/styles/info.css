@@ -1,0 +1,47 @@
+.info-media-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.info-media-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.info-media-item--imagen {
+  flex: 0 1 260px;
+}
+
+.info-media-img {
+  border-radius: 8px;
+  height: auto;
+  object-fit: cover;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.info-media-img--imagen {
+  max-width: 240px;
+  width: 100%;
+}
+
+.info-media-item--infografia {
+  flex: 1 1 100%;
+  align-items: center;
+}
+
+.info-media-img--infografia {
+  max-width: 720px;      
+  width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  border: 2px solid #e3f2fd;
+}
+
+.info-media-caption {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #555;
+}

@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from typing import Optional
-from ..db import systems, partnerships
+
+from ..db import systems as systems_col, partnerships as partnerships_col
 from ..models import SystemIn, SystemOut
 from ..security import require_admin_key
+from app.services.provision_service import provision_oracle_schema
 
 router = APIRouter(prefix="/systems", tags=["systems"])
 
@@ -27,7 +29,7 @@ async def list_systems(
     if frontend_enabled is not None:
         q["frontend_enabled"] = frontend_enabled
 
-    cur = systems.find(q).sort("name", 1)
+    cur = systems_col().find(q).sort("name", 1)
     out: list[SystemOut] = []
     async for doc in cur:
         doc = jsonable_encoder(doc)
@@ -37,23 +39,53 @@ async def list_systems(
 
 @router.get("/{sid}", response_model=SystemOut)
 async def get_system(sid: str):
-    doc = await systems.find_one({"_id": sid})
+    doc = await systems_col().find_one({"_id": sid})
     if not doc:
         raise HTTPException(404, "Not found")
+    doc = jsonable_encoder(doc)
     doc["id"] = doc.pop("_id")
     return SystemOut(**doc)
 
 @router.post("", response_model=SystemOut, dependencies=[Depends(require_admin_key)])
 async def create_system(payload: SystemIn):
-    if await systems.find_one({"_id": payload.id}):
+    # ID único
+    if await systems_col().find_one({"_id": payload.id}):
         raise HTTPException(409, "ID already exists")
 
+    # Si es aerolínea, provisiona Oracle ANTES de guardar
+    oracle_info = None
+    if payload.type == "aerolinea":
+        try:
+            oracle_info = provision_oracle_schema(
+                tenant_id=payload.id,
+                db_user=None,
+                db_pass=None,
+                db_dsn=None,
+            )
+        except Exception as e:
+            msg = getattr(e, "detail", str(e)) or "Error al crear BD"
+            raise HTTPException(500, f"No se pudo crear esquema Oracle: {msg}")
+
+    # Construye documento final
     doc = jsonable_encoder(payload)
     doc["base_url"] = _norm_url(doc.get("base_url"))
     doc["frontend_base"] = _norm_url(doc.get("frontend_base"))
     doc["_id"] = doc.pop("id")
-    await systems.insert_one(doc)
 
+    if oracle_info:
+        doc.update({
+            "db_user":  oracle_info["db_user"],
+            "db_pass":  oracle_info["db_pass"],
+            "db_dsn":   oracle_info["db_dsn"],
+            "jdbc_url": oracle_info["jdbc_url"],
+            "bootstrap": {
+                "admin_email":     oracle_info.get("admin_email"),
+                "admin_temp_pass": oracle_info.get("admin_temp_pass"),
+                "shown": False
+            }
+        })
+
+    await systems_col().insert_one(doc)
     doc_out = {**doc, "id": doc["_id"]}
     return SystemOut(**doc_out)
 
@@ -67,7 +99,7 @@ async def update_system(sid: str, payload: SystemIn):
     doc["frontend_base"] = _norm_url(doc.get("frontend_base"))
     doc["_id"] = doc.pop("id")
 
-    res = await systems.replace_one({"_id": sid}, doc)
+    res = await systems_col().replace_one({"_id": sid}, doc)
     if res.matched_count == 0:
         raise HTTPException(404, "Not found")
 
@@ -76,22 +108,14 @@ async def update_system(sid: str, payload: SystemIn):
 
 @router.delete("/{sid}", dependencies=[Depends(require_admin_key)])
 async def delete_system(sid: str):
-    has_active_link = await partnerships.find_one(
+    # No eliminar si tiene partnerships activos
+    has_active_link = await partnerships_col().find_one(
         {"$or": [{"from_id": sid}, {"to_id": sid}], "active": True}
     )
     if has_active_link:
         raise HTTPException(409, "No se puede eliminar: tiene partnerships activos")
 
-    res = await systems.delete_one({"_id": sid})
+    res = await systems_col().delete_one({"_id": sid})
     if res.deleted_count == 0:
         raise HTTPException(404, "No encontrado")
     return {"ok": True}
-
-@router.get("/{sid}", response_model=SystemOut)
-async def get_system(sid: str):
-    doc = await systems.find_one({"_id": sid})
-    if not doc:
-        raise HTTPException(404, "Not found")
-    doc = jsonable_encoder(doc)
-    doc["id"] = doc.pop("_id")
-    return SystemOut(**doc)
