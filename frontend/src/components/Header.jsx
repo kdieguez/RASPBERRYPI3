@@ -324,6 +324,15 @@ export default function Header() {
                 >
                   Páginas informativas
                 </Link>
+                {/* NUEVO: Contenido del Home (tips + noticias) */}
+                <Link
+                  to="/admin/contenido-home"
+                  className="hdr__drop-item"
+                  role="menuitem"
+                  onClick={closeMenus}
+                >
+                  Contenido Home
+                </Link>
               </div>
             </div>
           )}

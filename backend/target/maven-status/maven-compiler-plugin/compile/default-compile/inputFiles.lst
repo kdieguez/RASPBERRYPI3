@@ -7,6 +7,7 @@ C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\middleware\Cors.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\PerfilController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\MediaDAO.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\ContenidoHomeController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\middleware\Auth.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\util\PdfBoleto.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\SeccionDTO.java
@@ -18,9 +19,11 @@ C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\util\PasswordUtil.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\CiudadController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\ComentarioDTO.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\NoticiaDTO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\RatingDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\ConfigDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\ClaseDAO.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\NoticiaDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\SeccionDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\RatingController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\util\Mailer.java
@@ -41,6 +44,7 @@ C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\RutaDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\ConfigController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\ComentarioDAO.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\TipDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\http\JsonErrorHandler.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\AuthDTOs.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\util\CaptchaUtil.java
@@ -50,6 +54,7 @@ C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\PaisDTOs.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\CiudadDTOs.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\ClaseDTOs.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\TipDTO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\ComentarioController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\UsuarioAdminDTOs.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\VueloDAO.java

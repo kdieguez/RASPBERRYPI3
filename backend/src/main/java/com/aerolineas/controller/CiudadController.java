@@ -8,21 +8,27 @@ import io.javalin.Javalin;
 import java.util.Map;
 
 public class CiudadController {
+
     private final CiudadDAO dao = new CiudadDAO();
 
     public void routes(Javalin app) {
+
         app.get("/api/public/ciudades", ctx -> {
             Long idPais = ctx.queryParamAsClass("idPais", Long.class)
-                             .allowNullable()
-                             .get();
+                    .allowNullable()
+                    .get();
             ctx.json(dao.listAll(idPais));
+        });
+
+        app.get("/api/public/clima/ciudades", ctx -> {
+            ctx.json(dao.listForWeather());
         });
 
         app.before("/api/v1/ciudades", Auth.adminOrEmpleado());
         app.before("/api/v1/ciudades/*", Auth.adminOrEmpleado());
 
         app.post("/api/v1/ciudades", ctx -> {
-            var dto = ctx.bodyAsClass(CiudadDTOs.Create.class);
+            CiudadDTOs.Create dto = ctx.bodyAsClass(CiudadDTOs.Create.class);
             long id = dao.create(dto);
             ctx.status(201).json(Map.of("idCiudad", id));
         });

@@ -129,9 +129,8 @@ public class App {
     new ComprasController().register(app);
     new ComentarioController().routes(app);
     new RatingController().routes(app);
-
-    // Informativas (usa InfoController con sus propios guards)
     new PaginasController().routes(app);
+    new ContenidoHomeController().routes(app);
 
     app.exception(Exception.class, JsonErrorHandler.of(500));
   }

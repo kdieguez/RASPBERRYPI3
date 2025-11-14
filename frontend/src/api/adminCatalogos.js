@@ -6,8 +6,14 @@ export const paisesApi = {
 };
 
 export const ciudadesApi = {
-  create: (idPais, nombre) => axios.post("/api/v1/ciudades", { idPais, nombre }),
-  list:   (idPais)         => axios.get("/api/public/ciudades", { params: { idPais } }),
+    create: (idPais, nombre, weatherQuery) =>
+    axios.post("/api/v1/ciudades", { idPais, nombre, weatherQuery }),
+
+    list: (idPais) =>
+    axios.get("/api/public/ciudades", { params: { idPais } }),
+
+    toggle: (idCiudad) =>
+    axios.put(`/api/v1/ciudades/${idCiudad}/toggle`),
 };
 
 export const rutasApi = {
@@ -40,8 +46,8 @@ export const vuelosApi = {
 
 export const vuelosConEscalaApi = {
   listPublic: () => axios.get("/api/public/vuelos/con-escala"),
-  listAdmin: () => axios.get("/api/v1/admin/vuelos/con-escala"),
-  getPublic: (id) => axios.get(`/api/public/vuelos/con-escala/${id}`),
-  getAdmin: (id) => axios.get(`/api/v1/admin/vuelos/con-escala/${id}`),
-  createAdmin: (dto) => axios.post("/api/v1/admin/vuelos/con-escala", dto),
+  listAdmin:  () => axios.get("/api/v1/admin/vuelos/con-escala"),
+  getPublic:  (id) => axios.get(`/api/public/vuelos/con-escala/${id}`),
+  getAdmin:   (id) => axios.get(`/api/v1/admin/vuelos/con-escala/${id}`),
+  createAdmin:(dto) => axios.post("/api/v1/admin/vuelos/con-escala", dto),
 };
