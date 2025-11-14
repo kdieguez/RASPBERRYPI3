@@ -165,22 +165,23 @@ export default function VueloDetalle() {
         setLoading(true);
         setErr("");
         
-        // Intentar cargar como vuelo con escala primero
         let vueloConEscala = null;
         try {
           const { data } = await vuelosConEscalaApi.getAdmin(id);
           vueloConEscala = data;
         } catch {
-          // No es un vuelo con escala, continuar con vuelo normal
         }
 
         if (vueloConEscala) {
-          // Es un vuelo con escala
           setEsVueloConEscala(true);
           setV(vueloConEscala);
           setRegreso(null);
+          const { data: catClases } = await clasesApi.list();
+          setClasesCat(Array.isArray(catClases) ? catClases : []);
+          setIdClaseSel(
+            vueloConEscala?.clases?.[0]?.idClase ?? null
+          );
         } else {
-          // Es un vuelo normal
           setEsVueloConEscala(false);
           const [{ data: vuelo }, { data: catClases }] = await Promise.all([
             fetchVueloSmart(id),
@@ -189,6 +190,7 @@ export default function VueloDetalle() {
 
           setV(vuelo);
           setClasesCat(Array.isArray(catClases) ? catClases : []);
+          setIdClaseSel(vuelo?.clases?.[0]?.idClase ?? null);
 
           if (vuelo?.idVueloPareja && Number(vuelo.idVueloPareja) !== Number(id)) {
             try {
@@ -201,12 +203,6 @@ export default function VueloDetalle() {
             setRegreso(null);
           }
         }
-
-        const [{ data: catClases }] = await Promise.all([
-          clasesApi.list(),
-        ]);
-        setClasesCat(Array.isArray(catClases) ? catClases : []);
-        setIdClaseSel(vueloConEscala?.clases?.[0]?.idClase ?? v?.clases?.[0]?.idClase ?? null);
       } catch (e) {
         setErr(e?.response?.data?.error || "No se pudo cargar el vuelo");
       } finally {
@@ -234,7 +230,6 @@ export default function VueloDetalle() {
     }
   };
 
-  //
   const publicar = async () => {
     const u = getUser();
     if (!u) { nav("/login"); return; }
@@ -344,34 +339,58 @@ export default function VueloDetalle() {
   const salida = fmtDateTime(v.fechaSalida);
   const llegada = fmtDateTime(v.fechaLlegada);
 
+  const ahora = new Date();
+  const fechaSalidaReal = esVueloConEscala
+    ? toDate(v?.primerTramo?.fechaSalida)
+    : toDate(v?.fechaSalida);
+  const haIniciado = !!fechaSalidaReal && ahora >= fechaSalidaReal;
+
   const comprar = async () => {
     const u = getUser();
     if (!u) { nav("/login"); return; }
+
     if (esCancelado || v.activo === false) {
       alert("Este vuelo no está disponible para compra.");
       return;
     }
+
+    const fsReal = fechaSalidaReal;
+    if (fsReal && new Date() >= fsReal) {
+      alert("No es posible comprar: el vuelo ya inició.");
+      return;
+    }
+
     const idClase = idClaseSel ?? v?.clases?.[0]?.idClase;
     if (!idClase) { alert("Selecciona una clase."); return; }
+
     try {
       if (esVueloConEscala) {
-        await comprasApi.addItem({
-          idVuelo: Number(v.primerTramo.idVuelo),
-          idClase: Number(idClase),
-          cantidad: Number(cant || 1),
-        }, { pair: true });
-        
-        await comprasApi.addItem({
-          idVuelo: Number(v.segundoTramo.idVuelo),
-          idClase: Number(idClase),
-          cantidad: Number(cant || 1),
-        }, { pair: true });
+        await comprasApi.addItem(
+          {
+            idVuelo: Number(v.primerTramo.idVuelo),
+            idClase: Number(idClase),
+            cantidad: Number(cant || 1),
+          },
+          { pair: true }
+        );
+
+        await comprasApi.addItem(
+          {
+            idVuelo: Number(v.segundoTramo.idVuelo),
+            idClase: Number(idClase),
+            cantidad: Number(cant || 1),
+          },
+          { pair: true }
+        );
       } else {
-        await comprasApi.addItem({
-          idVuelo: Number(v.idVuelo),
-          idClase: Number(idClase),
-          cantidad: Number(cant || 1),
-        }, { pair: !!regreso && !!regreso.idVuelo });
+        await comprasApi.addItem(
+          {
+            idVuelo: Number(v.idVuelo),
+            idClase: Number(idClase),
+            cantidad: Number(cant || 1),
+          },
+          { pair: !!regreso && !!regreso.idVuelo }
+        );
       }
       nav(`/compras/carrito`);
     } catch (e) {
@@ -393,7 +412,8 @@ export default function VueloDetalle() {
           </div>
           <div className="vd__header__text">
             <h2>
-              {esVueloConEscala ? "Vuelo con Escala" : "Vuelo"} <span className="vd__code">{v.codigo || `#${id}`}</span>
+              {esVueloConEscala ? "Vuelo con Escala" : "Vuelo"}{" "}
+              <span className="vd__code">{v.codigo || `#${id}`}</span>
             </h2>
             <p className="subtitle">
               <Link to="/vuelos">← Volver a la lista</Link>
@@ -541,24 +561,28 @@ export default function VueloDetalle() {
                     </div>
                   </div>
                   <div style={{ marginTop: 6, display: "flex", gap: 12, flexWrap: "wrap" }}>
-                    <span className="label">Origen:</span> <strong>{regreso.origen || "—"}</strong>
-                    <span className="label">Destino:</span> <strong>{regreso.destino || "—"}</strong>
+                    <span className="label">Origen:</span>{" "}
+                    <strong>{regreso.origen || "—"}</strong>
+                    <span className="label">Destino:</span>{" "}
+                    <strong>{regreso.destino || "—"}</strong>
                   </div>
                   {Array.isArray(regreso.clases) && regreso.clases.length > 0 ? (
-      <div className="vd__classgrid" style={{ marginTop: 10 }}>
-        {regreso.clases.map((c, i) => (
-          <div className="vd__classcard" key={i}>
-            <div className="vd__classname">{claseName(c.idClase)}</div>
-            <div className="vd__classmeta">
-              <span className="label">Cupo {c.cupoTotal}</span>
-             <span className="label">Precio: {fmtMoney(c.precio)}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <p className="hint" style={{ marginTop: 8 }}>No hay clases configuradas para el regreso.</p>
-    )}
+                    <div className="vd__classgrid" style={{ marginTop: 10 }}>
+                      {regreso.clases.map((c, i) => (
+                        <div className="vd__classcard" key={i}>
+                          <div className="vd__classname">{claseName(c.idClase)}</div>
+                          <div className="vd__classmeta">
+                            <span className="label">Cupo {c.cupoTotal}</span>
+                            <span className="label">Precio: {fmtMoney(c.precio)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="hint" style={{ marginTop: 8 }}>
+                      No hay clases configuradas para el regreso.
+                    </p>
+                  )}
                 </div>
               </section>
             )}
@@ -601,45 +625,71 @@ export default function VueloDetalle() {
           </section>
         </div>
 
-        <div className="actions" style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
-          <Link to="/vuelos" className="btn">Cerrar</Link>
+        <div
+          className="actions"
+          style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}
+        >
+          <Link to="/vuelos" className="btn">
+            Cerrar
+          </Link>
 
           {logged ? (
-            v?.clases?.length > 0 && (
-              <>
-                <select
-                  className="input"
-                  value={idClaseSel ?? ""}
-                  onChange={(e) => setIdClaseSel(Number(e.target.value))}
-                >
-                  {v.clases.map((c) => (
-                    <option key={c.idClase} value={c.idClase}>
-                      {claseName(c.idClase)}
-                    </option>
-                  ))}
-                </select>
+            haIniciado ? (
+              <span className="hint">
+                La compra ya no está disponible porque el vuelo ya inició.
+              </span>
+            ) : (
+              v?.clases?.length > 0 && (
+                <>
+                  <select
+                    className="input"
+                    value={idClaseSel ?? ""}
+                    onChange={(e) => setIdClaseSel(Number(e.target.value))}
+                  >
+                    {v.clases.map((c) => (
+                      <option key={c.idClase} value={c.idClase}>
+                        {claseName(c.idClase)}
+                      </option>
+                    ))}
+                  </select>
 
-                <input
-                  className="input"
-                  type="number"
-                  min={1}
-                  max={9}
-                  value={cant}
-                  onChange={(e) => setCant(Math.max(1, Math.min(9, Number(e.target.value) || 1)))}
-                  style={{ width: 64 }}
-                />
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    max={9}
+                    value={cant}
+                    onChange={(e) =>
+                      setCant(
+                        Math.max(1, Math.min(9, Number(e.target.value) || 1))
+                      )
+                    }
+                    style={{ width: 64 }}
+                  />
 
-                <button
-                  className="btn btn-secondary"
-                  onClick={comprar}
-                  disabled={esCancelado || v.activo === false || !v?.clases?.length}
-                >
-                  Añadir a carrito
-                </button>
-              </>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={comprar}
+                    disabled={
+                      esCancelado ||
+                      v.activo === false ||
+                      !v?.clases?.length
+                    }
+                  >
+                    Añadir a carrito
+                  </button>
+                </>
+              )
             )
+          ) : haIniciado ? (
+            <span className="hint">
+              La compra ya no está disponible porque el vuelo ya inició.
+            </span>
           ) : (
-            <button className="btn btn-secondary" onClick={() => nav("/login")}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => nav("/login")}
+            >
               Añadir a carrito
             </button>
           )}
@@ -659,7 +709,9 @@ export default function VueloDetalle() {
                 <strong>{avg?.toFixed(1) ?? "0.0"}</strong>
                 <span className="label">promedio</span>
                 <span className="sep">•</span>
-                <span className="label">{total} {total === 1 ? "voto" : "votos"}</span>
+                <span className="label">
+                  {total} {total === 1 ? "voto" : "votos"}
+                </span>
               </div>
             </div>
           )}
@@ -667,17 +719,23 @@ export default function VueloDetalle() {
           <div className="cmt__form">
             {!logged ? (
               <div className="hint">
-                <button className="link" onClick={() => nav("/login")}>Inicia sesión</button> para calificar y comentar.
+                <button className="link" onClick={() => nav("/login")}>
+                  Inicia sesión
+                </button>{" "}
+                para calificar y comentar.
               </div>
-            ) : ((v?.estado || "").toLowerCase().includes("cancel")) ? (
+            ) : (v?.estado || "").toLowerCase().includes("cancel") ? (
               <div className="hint">
-                Este vuelo está cancelado. Las calificaciones y comentarios están deshabilitados.
+                Este vuelo está cancelado. Las calificaciones y comentarios
+                están deshabilitados.
               </div>
             ) : (
               <>
                 <div className="label" style={{ marginBottom: 6 }}>
                   {myRating != null ? (
-                    <>Tu calificación: <b>{myRating}★</b></>
+                    <>
+                      Tu calificación: <b>{myRating}★</b>
+                    </>
                   ) : (
                     "Tu calificación:"
                   )}
@@ -703,8 +761,13 @@ export default function VueloDetalle() {
                 {replyTo && (
                   <div className="hint" style={{ marginBottom: 6 }}>
                     Respondiendo al comentario de{" "}
-                    <strong>{replyMeta?.autor || `Usuario #${replyTo}`}</strong>{" "}
-                    <button className="link" onClick={() => setReplyTo(null)}>
+                    <strong>
+                      {replyMeta?.autor || `Usuario #${replyTo}`}
+                    </strong>{" "}
+                    <button
+                      className="link"
+                      onClick={() => setReplyTo(null)}
+                    >
                       (cancelar)
                     </button>
                   </div>
@@ -727,7 +790,11 @@ export default function VueloDetalle() {
                   </button>
                   <button
                     className="btn"
-                    onClick={() => { setText(""); setReplyTo(null); if (myRating == null) setSel(0); }}
+                    onClick={() => {
+                      setText("");
+                      setReplyTo(null);
+                      if (myRating == null) setSel(0);
+                    }}
                     disabled={publishing}
                   >
                     Limpiar

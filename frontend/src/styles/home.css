@@ -310,3 +310,130 @@
 .btn-link:hover {
   text-decoration: underline;
 }
+
+.home-block--accent {
+  background: linear-gradient(135deg, #f5f7ff, #ffffff);
+  border-radius: 16px;
+  padding: 20px 24px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.home-block__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.home-block__subtitle {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+/* Vuelos de hoy */
+
+.home-today {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-today__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.home-today__left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.home-today__route {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.home-today__countries {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.home-today__times {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.9rem;
+}
+
+.home-today__right {
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.home-today__status {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.home-today__bar-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.home-today__bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3b82f6, #6366f1);
+}
+
+.home-today__label {
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+/* Top destinos simple */
+
+.home-top-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-top-list__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+
+.home-top-list__rank {
+  font-weight: 600;
+  color: #1d4ed8;
+}
+
+.home-top-list__city {
+  flex: 1;
+}
