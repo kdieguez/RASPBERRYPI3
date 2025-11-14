@@ -211,3 +211,102 @@
     flex-wrap: wrap;
   }
 }
+
+.home-top-destinos-block {
+  border-radius: 16px;
+  padding: 20px 24px;
+  background: #ffffff;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+}
+
+.home-block__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.home-block__subtitle {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.home-top-destinos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.home-top-destinos__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.home-top-destinos__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-top-destinos__rank {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.95rem;
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.home-top-destinos__info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.home-top-destinos__city {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.home-top-destinos__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.home-top-destinos__cta {
+  white-space: nowrap;
+}
+.btn-link {
+  border: none;
+  background: transparent;
+  color: #0369a1;
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+}

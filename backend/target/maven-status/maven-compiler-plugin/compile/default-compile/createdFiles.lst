@@ -25,6 +25,7 @@ com\aerolineas\dto\ClaseDTOs$View.class
 com\aerolineas\dao\ComprasDAO$ClaseInfo.class
 com\aerolineas\dto\CompraDTO$CarritoResp.class
 com\aerolineas\util\EstadosVuelo.class
+com\aerolineas\dto\CompraDTO$TopDestino.class
 com\aerolineas\util\PdfBoleto.class
 com\aerolineas\controller\VueloController$LinkReq.class
 com\aerolineas\util\JwtUtil.class

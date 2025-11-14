@@ -16,10 +16,13 @@ function authHeaders() {
     u?.idUsuario ?? u?.id ?? u?.userId ?? u?.ID_Usuario ?? u?.userid;
   if (uid) h["X-User-Id"] = String(uid);
 
-  const email = u?.email ?? u?.correo ?? u?.mail ?? u?.Email ?? u?.Correo ?? u?.EMAIL;
-  if (email && String(email).includes("@")) h["X-User-Email"] = String(email).trim();
+  const email =
+    u?.email ?? u?.correo ?? u?.mail ?? u?.Email ?? u?.Correo ?? u?.EMAIL;
+  if (email && String(email).includes("@"))
+    h["X-User-Email"] = String(email).trim();
 
-  const name = u?.nombre ?? u?.name ?? u?.fullName ?? u?.usuario ?? u?.username;
+  const name =
+    u?.nombre ?? u?.name ?? u?.fullName ?? u?.usuario ?? u?.username;
   if (name && String(name).trim()) h["X-User-Name"] = String(name).trim();
 
   return h;
@@ -64,7 +67,9 @@ export const comprasApi = {
   },
 
   checkout(payload) {
-    return api.post("/api/compras/checkout", payload || {}, { headers: authHeaders() });
+    return api.post("/api/compras/checkout", payload || {}, {
+      headers: authHeaders(),
+    });
   },
 
   listReservas() {
@@ -76,7 +81,11 @@ export const comprasApi = {
   },
 
   cancelReserva(id) {
-    return api.post(`/api/compras/reservas/${id}/cancelar`, {}, { headers: authHeaders() });
+    return api.post(
+      `/api/compras/reservas/${id}/cancelar`,
+      {},
+      { headers: authHeaders() }
+    );
   },
 
   downloadBoleto(id) {
@@ -87,12 +96,21 @@ export const comprasApi = {
   },
 
   adminListReservas(params) {
-    return api.get("/api/admin/reservas", { headers: authHeaders(), params });
+    return api.get("/api/admin/reservas", {
+      headers: authHeaders(),
+      params,
+    });
   },
+
   adminGetReserva(id) {
     return api.get(`/api/admin/reservas/${id}`, { headers: authHeaders() });
   },
+
   adminListEstados() {
     return api.get("/api/admin/reservas/estados", { headers: authHeaders() });
+  },
+
+  topDestinos(params) {
+    return api.get("/api/public/stats/top-destinos", { params });
   },
 };

@@ -9,8 +9,7 @@ public class CompraDTO {
     public long idVuelo;
     public int idClase;
     public int cantidad;
-    
-    public Boolean incluirPareja; 
+    public Boolean incluirPareja;
   }
 
   public static class UpdateQtyReq {
@@ -119,5 +118,12 @@ public class CompraDTO {
   public static class EstadoReserva {
     public int idEstado;
     public String nombre;
+  }
+
+  public static class TopDestino {
+    public long idCiudadDestino;
+    public String ciudadDestino;
+    public String paisDestino;
+    public long boletos;
   }
 }

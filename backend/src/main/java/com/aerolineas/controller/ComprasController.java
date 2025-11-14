@@ -18,6 +18,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Map;
+import java.sql.Timestamp;
 
 import com.aerolineas.util.Mailer;
 import com.aerolineas.util.PdfBoleto;
@@ -342,6 +343,41 @@ public class ComprasController {
       long id = Long.parseLong(ctx.pathParam("id"));
       var det = dao.getReservaDetalleAdmin(id);
       ctx.json(det);
+    });
+
+    app.get("/api/public/stats/top-destinos", ctx -> {
+      try {
+        String desdeStr = ctx.queryParam("desde"); 
+        String hastaStr = ctx.queryParam("hasta"); 
+        String limitStr = ctx.queryParam("limit");
+
+        Timestamp desde = null;
+        Timestamp hasta = null;
+
+        try {
+          if (desdeStr != null && !desdeStr.isBlank()) {
+            desde = Timestamp.valueOf(desdeStr.trim() + " 00:00:00");
+          }
+        } catch (Exception ignore) {}
+
+        try {
+          if (hastaStr != null && !hastaStr.isBlank()) {
+            hasta = Timestamp.valueOf(hastaStr.trim() + " 23:59:59");
+          }
+        } catch (Exception ignore) {}
+
+        int limit = 5;
+        try {
+          if (limitStr != null && !limitStr.isBlank()) {
+            limit = Integer.parseInt(limitStr.trim());
+          }
+        } catch (Exception ignore) {}
+
+        var list = dao.listTopDestinos(desde, hasta, limit);
+        ctx.json(list);
+      } catch (Exception e) {
+        ctx.status(400).json(Map.of("error", e.getMessage()));
+      }
     });
   }
 

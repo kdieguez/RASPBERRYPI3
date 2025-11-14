@@ -530,137 +530,127 @@ public class ComprasDAO {
   }
 
   public CompraDTO.ReservaDetalle getReservaDetalle(long userId, long idReserva) throws Exception {
-    ReservaDetalle det = new ReservaDetalle();
-    det.items = new ArrayList<>();
+  ReservaDetalle det = new ReservaDetalle();
+  det.items = new ArrayList<>();
 
-    try (Connection cn = getConn()) {
-      try (PreparedStatement ps = cn.prepareStatement(
-           "SELECT r.ID_USUARIO, r.ID_ESTADO, r.TOTAL, r.CREADA_EN, r.CODIGO, " +
-           "       u.NOMBRES, u.APELLIDOS, u.EMAIL " +
-           "FROM AEROLINEA.RESERVA r " +
-           "JOIN AEROLINEA.USUARIO u ON u.ID_USUARIO = r.ID_USUARIO " +
-           "WHERE r.ID_RESERVA = ?")) {
-        ps.setLong(1, idReserva);
-        try (ResultSet rs = ps.executeQuery()) {
-          if (!rs.next()) throw new IllegalArgumentException("Reserva no encontrada.");
-          long owner = rs.getLong("ID_USUARIO");
-          if (owner != userId) throw new IllegalStateException("No autorizado.");
-          det.idReserva = idReserva;
-          det.idUsuario = owner;
-          det.idEstado  = rs.getInt("ID_ESTADO");
-          det.total     = rs.getBigDecimal("TOTAL");
-          Timestamp ts = rs.getTimestamp("CREADA_EN");
-          det.creadaEn  = ts != null ? ts.toInstant().toString() : null;
-          det.codigo    = rs.getString("CODIGO");
-          String nombres   = rs.getString("NOMBRES");
-          String apellidos = rs.getString("APELLIDOS");
-          String email     = rs.getString("EMAIL");
-          det.compradorNombre = ((nombres == null ? "" : nombres) + " " + (apellidos == null ? "" : apellidos)).trim();
-          det.compradorEmail  = email;
-        }
-      }
+  try (Connection cn = getConn()) {
+    try (PreparedStatement ps = cn.prepareStatement(
+         "SELECT r.ID_USUARIO, r.ID_ESTADO, r.TOTAL, r.CREADA_EN, r.CODIGO, " +
+         "       u.NOMBRES, u.APELLIDOS, u.EMAIL " +
+         "FROM AEROLINEA.RESERVA r " +
+         "JOIN AEROLINEA.USUARIO u ON u.ID_USUARIO = r.ID_USUARIO " +
+         "WHERE r.ID_RESERVA = ?")) {
+      ps.setLong(1, idReserva);
+      try (ResultSet rs = ps.executeQuery()) {
+        if (!rs.next()) throw new IllegalArgumentException("Reserva no encontrada.");
+        long owner = rs.getLong("ID_USUARIO");
+        if (owner != userId) throw new IllegalStateException("No autorizado.");
+        det.idReserva = idReserva;
+        det.idUsuario = owner;
+        det.idEstado  = rs.getInt("ID_ESTADO");
+        det.total     = rs.getBigDecimal("TOTAL");
+        Timestamp ts  = rs.getTimestamp("CREADA_EN");
+        det.creadaEn  = ts != null ? ts.toInstant().toString() : null;
+        det.codigo    = rs.getString("CODIGO");
 
-      final String SQL_DET =
-        """
-        SELECT
-            (ri.ID_VUELO * 1000 + ri.ID_CLASE) AS ID_ITEM,
-            ri.ID_VUELO,
-            v.CODIGO AS CODIGO_VUELO,
-            v.FECHA_SALIDA,
-            v.FECHA_LLEGADA,
-            ri.ID_CLASE,
-            ca.NOMBRE AS NOMBRE_CLASE,
-            COUNT(*) AS CANTIDAD,
-            MIN(ri.PRECIO_UNITARIO) AS PRECIO_UNITARIO,
-            SUM(ri.PRECIO_UNITARIO) AS SUBTOTAL,
-            po.NOMBRE AS PAIS_ORIGEN,
-            pd.NOMBRE AS PAIS_DESTINO,
-            co.NOMBRE AS CIUDAD_ORIGEN,
-            cd.NOMBRE AS CIUDAD_DESTINO,
-            MIN(cesc.NOMBRE) AS ESCALA_CIUDAD,
-            MIN(pesc.NOMBRE) AS ESCALA_PAIS,
-            MIN(ve.LLEGADA) AS ESCALA_LLEGADA,
-            MIN(ve.SALIDA) AS ESCALA_SALIDA,
-            MIN(vp.CODIGO) AS REGRESO_CODIGO,
-            MIN(vp.FECHA_SALIDA) AS REGRESO_SALIDA,
-            MIN(vp.FECHA_LLEGADA) AS REGRESO_LLEGADA,
-            MIN(corp.NOMBRE) AS REGRESO_CIUDAD_ORIGEN,
-            MIN(pop.NOMBRE) AS REGRESO_PAIS_ORIGEN,
-            MIN(cdp.NOMBRE) AS REGRESO_CIUDAD_DESTINO,
-            MIN(pdp.NOMBRE) AS REGRESO_PAIS_DESTINO
-        FROM AEROLINEA.RESERVA_ITEM ri
-        JOIN AEROLINEA.VUELO v            ON v.ID_VUELO = ri.ID_VUELO
-        JOIN AEROLINEA.CLASE_ASIENTO ca   ON ca.ID_CLASE = ri.ID_CLASE
-        JOIN AEROLINEA.RUTA r             ON r.ID_RUTA = v.ID_RUTA
-        JOIN AEROLINEA.CIUDAD co          ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN
-        JOIN AEROLINEA.CIUDAD cd          ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO
-        JOIN AEROLINEA.PAIS po            ON po.ID_PAIS = co.ID_PAIS
-        JOIN AEROLINEA.PAIS pd            ON pd.ID_PAIS = cd.ID_PAIS
-        LEFT JOIN AEROLINEA.VUELO_ESCALA ve ON ve.ID_VUELO = v.ID_VUELO
-        LEFT JOIN AEROLINEA.CIUDAD cesc      ON cesc.ID_CIUDAD = ve.ID_CIUDAD
-        LEFT JOIN AEROLINEA.PAIS pesc        ON pesc.ID_PAIS   = cesc.ID_PAIS
-        LEFT JOIN AEROLINEA.VUELO vp        ON vp.ID_VUELO = v.ID_VUELO_PAREJA
-        LEFT JOIN AEROLINEA.RUTA rp         ON rp.ID_RUTA = vp.ID_RUTA
-        LEFT JOIN AEROLINEA.CIUDAD corp     ON corp.ID_CIUDAD = rp.ID_CIUDAD_ORIGEN
-        LEFT JOIN AEROLINEA.CIUDAD cdp      ON cdp.ID_CIUDAD  = rp.ID_CIUDAD_DESTINO
-        LEFT JOIN AEROLINEA.PAIS pop        ON pop.ID_PAIS    = corp.ID_PAIS
-        LEFT JOIN AEROLINEA.PAIS pdp        ON pdp.ID_PAIS    = cdp.ID_PAIS
-        WHERE ri.ID_RESERVA = ?
-        GROUP BY
-            ri.ID_VUELO, v.CODIGO, v.FECHA_SALIDA, v.FECHA_LLEGADA,
-            ri.ID_CLASE, ca.NOMBRE,
-            po.NOMBRE, pd.NOMBRE, co.NOMBRE, cd.NOMBRE
-        ORDER BY v.FECHA_SALIDA, ri.ID_CLASE
-        """;
-
-      try (PreparedStatement ps = cn.prepareStatement(SQL_DET)) {
-        ps.setLong(1, idReserva);
-        try (ResultSet rs = ps.executeQuery()) {
-          while (rs.next()) {
-            ReservaItem it = new ReservaItem();
-            it.idItem         = rs.getLong("ID_ITEM");
-            it.idVuelo        = rs.getLong("ID_VUELO");
-            it.codigoVuelo    = rs.getString("CODIGO_VUELO");
-            Timestamp ts1     = rs.getTimestamp("FECHA_SALIDA");
-            Timestamp ts2     = rs.getTimestamp("FECHA_LLEGADA");
-            it.fechaSalida    = ts1 != null ? ts1.toInstant().toString() : null;
-            it.fechaLlegada   = ts2 != null ? ts2.toInstant().toString() : null;
-            it.idClase        = rs.getInt("ID_CLASE");
-            it.clase          = rs.getString("NOMBRE_CLASE");
-            it.cantidad       = rs.getInt("CANTIDAD");
-            it.precioUnitario = rs.getBigDecimal("PRECIO_UNITARIO");
-            it.subtotal       = rs.getBigDecimal("SUBTOTAL");
-
-            setFieldIfExists(it, "paisOrigen",    rs.getString("PAIS_ORIGEN"));
-            setFieldIfExists(it, "paisDestino",   rs.getString("PAIS_DESTINO"));
-            setFieldIfExists(it, "ciudadOrigen",  rs.getString("CIUDAD_ORIGEN"));
-            setFieldIfExists(it, "ciudadDestino", rs.getString("CIUDAD_DESTINO"));
-
-            setFieldIfExists(it, "escalaCiudad",  rs.getString("ESCALA_CIUDAD"));
-            setFieldIfExists(it, "escalaPais",    rs.getString("ESCALA_PAIS"));
-            Timestamp esl = rs.getTimestamp("ESCALA_LLEGADA");
-            Timestamp ess = rs.getTimestamp("ESCALA_SALIDA");
-            setFieldIfExists(it, "escalaLlegada", esl != null ? esl.toInstant().toString() : null);
-            setFieldIfExists(it, "escalaSalida",  ess != null ? ess.toInstant().toString() : null);
-
-            setFieldIfExists(it, "regresoCodigo",          rs.getString("REGRESO_CODIGO"));
-            Timestamp rsl = rs.getTimestamp("REGRESO_SALIDA");
-            Timestamp rll = rs.getTimestamp("REGRESO_LLEGADA");
-            setFieldIfExists(it, "regresoFechaSalida",     rsl != null ? rsl.toInstant().toString() : null);
-            setFieldIfExists(it, "regresoFechaLlegada",    rll != null ? rll.toInstant().toString() : null);
-            setFieldIfExists(it, "regresoCiudadOrigen",    rs.getString("REGRESO_CIUDAD_ORIGEN"));
-            setFieldIfExists(it, "regresoPaisOrigen",      rs.getString("REGRESO_PAIS_ORIGEN"));
-            setFieldIfExists(it, "regresoCiudadDestino",   rs.getString("REGRESO_CIUDAD_DESTINO"));
-            setFieldIfExists(it, "regresoPaisDestino",     rs.getString("REGRESO_PAIS_DESTINO"));
-
-            det.items.add(it);
-          }
-        }
+        String nombres   = rs.getString("NOMBRES");
+        String apellidos = rs.getString("APELLIDOS");
+        String email     = rs.getString("EMAIL");
+        det.compradorNombre = ((nombres == null ? "" : nombres) + " " +
+                               (apellidos == null ? "" : apellidos)).trim();
+        det.compradorEmail  = email;
       }
     }
 
-    return det;
+    final String SQL_DET =
+      """
+      SELECT
+          (ri.ID_VUELO * 1000 + ri.ID_CLASE) AS ID_ITEM,
+          ri.ID_VUELO,
+          v.CODIGO AS CODIGO_VUELO,
+          v.FECHA_SALIDA,
+          v.FECHA_LLEGADA,
+          ri.ID_CLASE,
+          ca.NOMBRE AS NOMBRE_CLASE,
+          COUNT(*) AS CANTIDAD,
+          MIN(ri.PRECIO_UNITARIO) AS PRECIO_UNITARIO,
+          SUM(ri.PRECIO_UNITARIO) AS SUBTOTAL,
+          po.NOMBRE AS PAIS_ORIGEN,
+          pd.NOMBRE AS PAIS_DESTINO,
+          co.NOMBRE AS CIUDAD_ORIGEN,
+          cd.NOMBRE AS CIUDAD_DESTINO,
+          MIN(vp.CODIGO)        AS REGRESO_CODIGO,
+          MIN(vp.FECHA_SALIDA)  AS REGRESO_SALIDA,
+          MIN(vp.FECHA_LLEGADA) AS REGRESO_LLEGADA,
+          MIN(corp.NOMBRE)      AS REGRESO_CIUDAD_ORIGEN,
+          MIN(pop.NOMBRE)       AS REGRESO_PAIS_ORIGEN,
+          MIN(cdp.NOMBRE)       AS REGRESO_CIUDAD_DESTINO,
+          MIN(pdp.NOMBRE)       AS REGRESO_PAIS_DESTINO
+      FROM AEROLINEA.RESERVA_ITEM ri
+      JOIN AEROLINEA.VUELO v            ON v.ID_VUELO = ri.ID_VUELO
+      JOIN AEROLINEA.CLASE_ASIENTO ca   ON ca.ID_CLASE = ri.ID_CLASE
+      JOIN AEROLINEA.RUTA r             ON r.ID_RUTA = v.ID_RUTA
+      JOIN AEROLINEA.CIUDAD co          ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN
+      JOIN AEROLINEA.CIUDAD cd          ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO
+      JOIN AEROLINEA.PAIS po            ON po.ID_PAIS = co.ID_PAIS
+      JOIN AEROLINEA.PAIS pd            ON pd.ID_PAIS = cd.ID_PAIS
+      LEFT JOIN AEROLINEA.VUELO vp      ON vp.ID_VUELO = v.ID_VUELO_PAREJA
+      LEFT JOIN AEROLINEA.RUTA rp       ON rp.ID_RUTA = vp.ID_RUTA
+      LEFT JOIN AEROLINEA.CIUDAD corp   ON corp.ID_CIUDAD = rp.ID_CIUDAD_ORIGEN
+      LEFT JOIN AEROLINEA.CIUDAD cdp    ON cdp.ID_CIUDAD  = rp.ID_CIUDAD_DESTINO
+      LEFT JOIN AEROLINEA.PAIS pop      ON pop.ID_PAIS    = corp.ID_PAIS
+      LEFT JOIN AEROLINEA.PAIS pdp      ON pdp.ID_PAIS    = cdp.ID_PAIS
+      WHERE ri.ID_RESERVA = ?
+      GROUP BY
+          ri.ID_VUELO, v.CODIGO, v.FECHA_SALIDA, v.FECHA_LLEGADA,
+          ri.ID_CLASE, ca.NOMBRE,
+          po.NOMBRE, pd.NOMBRE, co.NOMBRE, cd.NOMBRE
+      ORDER BY v.FECHA_SALIDA, ri.ID_CLASE
+      """;
+
+    try (PreparedStatement ps = cn.prepareStatement(SQL_DET)) {
+      ps.setLong(1, idReserva);
+      try (ResultSet rs = ps.executeQuery()) {
+        while (rs.next()) {
+          ReservaItem it = new ReservaItem();
+          it.idItem         = rs.getLong("ID_ITEM");
+          it.idVuelo        = rs.getLong("ID_VUELO");
+          it.codigoVuelo    = rs.getString("CODIGO_VUELO");
+          Timestamp ts1     = rs.getTimestamp("FECHA_SALIDA");
+          Timestamp ts2     = rs.getTimestamp("FECHA_LLEGADA");
+          it.fechaSalida    = ts1 != null ? ts1.toInstant().toString() : null;
+          it.fechaLlegada   = ts2 != null ? ts2.toInstant().toString() : null;
+          it.idClase        = rs.getInt("ID_CLASE");
+          it.clase          = rs.getString("NOMBRE_CLASE");
+          it.cantidad       = rs.getInt("CANTIDAD");
+          it.precioUnitario = rs.getBigDecimal("PRECIO_UNITARIO");
+          it.subtotal       = rs.getBigDecimal("SUBTOTAL");
+
+    
+          setFieldIfExists(it, "paisOrigen",    rs.getString("PAIS_ORIGEN"));
+          setFieldIfExists(it, "paisDestino",   rs.getString("PAIS_DESTINO"));
+          setFieldIfExists(it, "ciudadOrigen",  rs.getString("CIUDAD_ORIGEN"));
+          setFieldIfExists(it, "ciudadDestino", rs.getString("CIUDAD_DESTINO"));
+
+    
+          setFieldIfExists(it, "regresoCodigo",        rs.getString("REGRESO_CODIGO"));
+          Timestamp rsl = rs.getTimestamp("REGRESO_SALIDA");
+          Timestamp rll = rs.getTimestamp("REGRESO_LLEGADA");
+          setFieldIfExists(it, "regresoFechaSalida",   rsl != null ? rsl.toInstant().toString() : null);
+          setFieldIfExists(it, "regresoFechaLlegada",  rll != null ? rll.toInstant().toString() : null);
+          setFieldIfExists(it, "regresoCiudadOrigen",  rs.getString("REGRESO_CIUDAD_ORIGEN"));
+          setFieldIfExists(it, "regresoPaisOrigen",    rs.getString("REGRESO_PAIS_ORIGEN"));
+          setFieldIfExists(it, "regresoCiudadDestino", rs.getString("REGRESO_CIUDAD_DESTINO"));
+          setFieldIfExists(it, "regresoPaisDestino",   rs.getString("REGRESO_PAIS_DESTINO"));
+
+          det.items.add(it);
+        }
+      }
+    }
   }
+
+  return det;
+}
 
   public List<CompraDTO.ReservaListItem> listReservasAdmin(
       String q, String usuario, String codigo, String vuelo,
@@ -764,112 +754,124 @@ public class ComprasDAO {
   }
 
   public CompraDTO.ReservaDetalle getReservaDetalleAdmin(long idReserva) throws Exception {
-    CompraDTO.ReservaDetalle det = new CompraDTO.ReservaDetalle();
-    det.items = new ArrayList<>();
+  CompraDTO.ReservaDetalle det = new CompraDTO.ReservaDetalle();
+  det.items = new ArrayList<>();
 
-    try (Connection cn = getConn()) {
-      try (PreparedStatement ps = cn.prepareStatement(
-           "SELECT r.ID_USUARIO, r.ID_ESTADO, r.TOTAL, r.CREADA_EN, r.CODIGO, " +
-           "       u.NOMBRES, u.APELLIDOS, u.EMAIL " +
-           "FROM AEROLINEA.RESERVA r " +
-           "JOIN AEROLINEA.USUARIO u ON u.ID_USUARIO = r.ID_USUARIO " +
-           "WHERE r.ID_RESERVA = ?")) {
-        ps.setLong(1, idReserva);
-        try (ResultSet rs = ps.executeQuery()) {
-          if (!rs.next()) throw new IllegalArgumentException("Reserva no encontrada.");
-          det.idReserva = idReserva;
-          det.idUsuario = rs.getLong("ID_USUARIO");
-          det.idEstado  = rs.getInt("ID_ESTADO");
-          det.total     = rs.getBigDecimal("TOTAL");
-          Timestamp ts = rs.getTimestamp("CREADA_EN");
-          det.creadaEn  = ts != null ? ts.toInstant().toString() : null;
-          det.codigo    = rs.getString("CODIGO");
-          String nombres   = rs.getString("NOMBRES");
-          String apellidos = rs.getString("APELLIDOS");
-          String email     = rs.getString("EMAIL");
-          det.compradorNombre = ((nombres == null ? "" : nombres) + " " + (apellidos == null ? "" : apellidos)).trim();
-          det.compradorEmail  = email;
-        }
+  try (Connection cn = getConn()) {
+    try (PreparedStatement ps = cn.prepareStatement(
+         "SELECT r.ID_USUARIO, r.ID_ESTADO, r.TOTAL, r.CREADA_EN, r.CODIGO, " +
+         "       u.NOMBRES, u.APELLIDOS, u.EMAIL " +
+         "FROM AEROLINEA.RESERVA r " +
+         "JOIN AEROLINEA.USUARIO u ON u.ID_USUARIO = r.ID_USUARIO " +
+         "WHERE r.ID_RESERVA = ?")) {
+      ps.setLong(1, idReserva);
+      try (ResultSet rs = ps.executeQuery()) {
+        if (!rs.next()) throw new IllegalArgumentException("Reserva no encontrada.");
+        det.idReserva = idReserva;
+        det.idUsuario = rs.getLong("ID_USUARIO");
+        det.idEstado  = rs.getInt("ID_ESTADO");
+        det.total     = rs.getBigDecimal("TOTAL");
+        Timestamp ts  = rs.getTimestamp("CREADA_EN");
+        det.creadaEn  = ts != null ? ts.toInstant().toString() : null;
+        det.codigo    = rs.getString("CODIGO");
+
+        String nombres   = rs.getString("NOMBRES");
+        String apellidos = rs.getString("APELLIDOS");
+        String email     = rs.getString("EMAIL");
+        det.compradorNombre = ((nombres == null ? "" : nombres) + " " +
+                               (apellidos == null ? "" : apellidos)).trim();
+        det.compradorEmail  = email;
       }
+    }
 
-      final String SQL_DET = """
-        SELECT
-            (ri.ID_VUELO * 1000 + ri.ID_CLASE) AS ID_ITEM,
-            ri.ID_VUELO, v.CODIGO AS CODIGO_VUELO, v.FECHA_SALIDA, v.FECHA_LLEGADA,
-            ri.ID_CLASE, ca.NOMBRE AS NOMBRE_CLASE,
-            COUNT(*) AS CANTIDAD, MIN(ri.PRECIO_UNITARIO) AS PRECIO_UNITARIO, SUM(ri.PRECIO_UNITARIO) AS SUBTOTAL,
-            po.NOMBRE AS PAIS_ORIGEN, pd.NOMBRE AS PAIS_DESTINO, co.NOMBRE AS CIUDAD_ORIGEN, cd.NOMBRE AS CIUDAD_DESTINO,
-            MIN(cesc.NOMBRE) AS ESCALA_CIUDAD, MIN(pesc.NOMBRE) AS ESCALA_PAIS, MIN(ve.LLEGADA) AS ESCALA_LLEGADA, MIN(ve.SALIDA) AS ESCALA_SALIDA,
-            MIN(vp.CODIGO) AS REGRESO_CODIGO, MIN(vp.FECHA_SALIDA) AS REGRESO_SALIDA, MIN(vp.FECHA_LLEGADA) AS REGRESO_LLEGADA,
-            MIN(corp.NOMBRE) AS REGRESO_CIUDAD_ORIGEN, MIN(pop.NOMBRE) AS REGRESO_PAIS_ORIGEN,
-            MIN(cdp.NOMBRE) AS REGRESO_CIUDAD_DESTINO, MIN(pdp.NOMBRE) AS REGRESO_PAIS_DESTINO
-        FROM AEROLINEA.RESERVA_ITEM ri
-        JOIN AEROLINEA.VUELO v            ON v.ID_VUELO = ri.ID_VUELO
-        JOIN AEROLINEA.CLASE_ASIENTO ca   ON ca.ID_CLASE = ri.ID_CLASE
-        JOIN AEROLINEA.RUTA r             ON r.ID_RUTA = v.ID_RUTA
-        JOIN AEROLINEA.CIUDAD co          ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN
-        JOIN AEROLINEA.CIUDAD cd          ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO
-        JOIN AEROLINEA.PAIS po            ON po.ID_PAIS = co.ID_PAIS
-        JOIN AEROLINEA.PAIS pd            ON pd.ID_PAIS = cd.ID_PAIS
-        LEFT JOIN AEROLINEA.VUELO_ESCALA ve ON ve.ID_VUELO = v.ID_VUELO
-        LEFT JOIN AEROLINEA.CIUDAD cesc      ON cesc.ID_CIUDAD = ve.ID_CIUDAD
-        LEFT JOIN AEROLINEA.PAIS pesc        ON pesc.ID_PAIS   = cesc.ID_PAIS
-        LEFT JOIN AEROLINEA.VUELO vp        ON vp.ID_VUELO = v.ID_VUELO_PAREJA
-        LEFT JOIN AEROLINEA.RUTA rp         ON rp.ID_RUTA = vp.ID_RUTA
-        LEFT JOIN AEROLINEA.CIUDAD corp     ON corp.ID_CIUDAD = rp.ID_CIUDAD_ORIGEN
-        LEFT JOIN AEROLINEA.CIUDAD cdp      ON cdp.ID_CIUDAD  = rp.ID_CIUDAD_DESTINO
-        LEFT JOIN AEROLINEA.PAIS pop        ON pop.ID_PAIS    = corp.ID_PAIS
-        LEFT JOIN AEROLINEA.PAIS pdp        ON pdp.ID_PAIS    = cdp.ID_PAIS
-        WHERE ri.ID_RESERVA = ?
-        GROUP BY ri.ID_VUELO, v.CODIGO, v.FECHA_SALIDA, v.FECHA_LLEGADA,
-                 ri.ID_CLASE, ca.NOMBRE, po.NOMBRE, pd.NOMBRE, co.NOMBRE, cd.NOMBRE
-        ORDER BY v.FECHA_SALIDA, ri.ID_CLASE
+    final String SQL_DET =
+      """
+      SELECT
+          (ri.ID_VUELO * 1000 + ri.ID_CLASE) AS ID_ITEM,
+          ri.ID_VUELO,
+          v.CODIGO AS CODIGO_VUELO,
+          v.FECHA_SALIDA,
+          v.FECHA_LLEGADA,
+          ri.ID_CLASE,
+          ca.NOMBRE AS NOMBRE_CLASE,
+          COUNT(*) AS CANTIDAD,
+          MIN(ri.PRECIO_UNITARIO) AS PRECIO_UNITARIO,
+          SUM(ri.PRECIO_UNITARIO) AS SUBTOTAL,
+          po.NOMBRE AS PAIS_ORIGEN,
+          pd.NOMBRE AS PAIS_DESTINO,
+          co.NOMBRE AS CIUDAD_ORIGEN,
+          cd.NOMBRE AS CIUDAD_DESTINO,
+          MIN(vp.CODIGO)        AS REGRESO_CODIGO,
+          MIN(vp.FECHA_SALIDA)  AS REGRESO_SALIDA,
+          MIN(vp.FECHA_LLEGADA) AS REGRESO_LLEGADA,
+          MIN(corp.NOMBRE)      AS REGRESO_CIUDAD_ORIGEN,
+          MIN(pop.NOMBRE)       AS REGRESO_PAIS_ORIGEN,
+          MIN(cdp.NOMBRE)       AS REGRESO_CIUDAD_DESTINO,
+          MIN(pdp.NOMBRE)       AS REGRESO_PAIS_DESTINO
+      FROM AEROLINEA.RESERVA_ITEM ri
+      JOIN AEROLINEA.VUELO v            ON v.ID_VUELO = ri.ID_VUELO
+      JOIN AEROLINEA.CLASE_ASIENTO ca   ON ca.ID_CLASE = ri.ID_CLASE
+      JOIN AEROLINEA.RUTA r             ON r.ID_RUTA = v.ID_RUTA
+      JOIN AEROLINEA.CIUDAD co          ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN
+      JOIN AEROLINEA.CIUDAD cd          ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO
+      JOIN AEROLINEA.PAIS po            ON po.ID_PAIS = co.ID_PAIS
+      JOIN AEROLINEA.PAIS pd            ON pd.ID_PAIS = cd.ID_PAIS
+      LEFT JOIN AEROLINEA.VUELO vp      ON vp.ID_VUELO = v.ID_VUELO_PAREJA
+      LEFT JOIN AEROLINEA.RUTA rp       ON rp.ID_RUTA = vp.ID_RUTA
+      LEFT JOIN AEROLINEA.CIUDAD corp   ON corp.ID_CIUDAD = rp.ID_CIUDAD_ORIGEN
+      LEFT JOIN AEROLINEA.CIUDAD cdp    ON cdp.ID_CIUDAD  = rp.ID_CIUDAD_DESTINO
+      LEFT JOIN AEROLINEA.PAIS pop      ON pop.ID_PAIS    = corp.ID_PAIS
+      LEFT JOIN AEROLINEA.PAIS pdp      ON pdp.ID_PAIS    = cdp.ID_PAIS
+      WHERE ri.ID_RESERVA = ?
+      GROUP BY
+          ri.ID_VUELO, v.CODIGO, v.FECHA_SALIDA, v.FECHA_LLEGADA,
+          ri.ID_CLASE, ca.NOMBRE,
+          po.NOMBRE, pd.NOMBRE, co.NOMBRE, cd.NOMBRE
+      ORDER BY v.FECHA_SALIDA, ri.ID_CLASE
       """;
 
-      try (PreparedStatement ps = cn.prepareStatement(SQL_DET)) {
-        ps.setLong(1, idReserva);
-        try (ResultSet rs = ps.executeQuery()) {
-          while (rs.next()) {
-            var it = new CompraDTO.ReservaItem();
-            it.idItem         = rs.getLong("ID_ITEM");
-            it.idVuelo        = rs.getLong("ID_VUELO");
-            it.codigoVuelo    = rs.getString("CODIGO_VUELO");
-            Timestamp ts1     = rs.getTimestamp("FECHA_SALIDA");
-            Timestamp ts2     = rs.getTimestamp("FECHA_LLEGADA");
-            it.fechaSalida    = ts1 != null ? ts1.toInstant().toString() : null;
-            it.fechaLlegada   = ts2 != null ? ts2.toInstant().toString() : null;
-            it.idClase        = rs.getInt("ID_CLASE");
-            it.clase          = rs.getString("NOMBRE_CLASE");
-            it.cantidad       = rs.getInt("CANTIDAD");
-            it.precioUnitario = rs.getBigDecimal("PRECIO_UNITARIO");
-            it.subtotal       = rs.getBigDecimal("SUBTOTAL");
-            setFieldIfExists(it, "paisOrigen", rs.getString("PAIS_ORIGEN"));
-            setFieldIfExists(it, "paisDestino", rs.getString("PAIS_DESTINO"));
-            setFieldIfExists(it, "ciudadOrigen", rs.getString("CIUDAD_ORIGEN"));
-            setFieldIfExists(it, "ciudadDestino", rs.getString("CIUDAD_DESTINO"));
-            setFieldIfExists(it, "escalaCiudad", rs.getString("ESCALA_CIUDAD"));
-            setFieldIfExists(it, "escalaPais",   rs.getString("ESCALA_PAIS"));
-            Timestamp esl = rs.getTimestamp("ESCALA_LLEGADA");
-            Timestamp ess = rs.getTimestamp("ESCALA_SALIDA");
-            setFieldIfExists(it, "escalaLlegada", esl != null ? esl.toInstant().toString() : null);
-            setFieldIfExists(it, "escalaSalida",  ess != null ? ess.toInstant().toString() : null);
-            setFieldIfExists(it, "regresoCodigo",        rs.getString("REGRESO_CODIGO"));
-            Timestamp rsl = rs.getTimestamp("REGRESO_SALIDA");
-            Timestamp rll = rs.getTimestamp("REGRESO_LLEGADA");
-            setFieldIfExists(it, "regresoFechaSalida",   rsl != null ? rsl.toInstant().toString() : null);
-            setFieldIfExists(it, "regresoFechaLlegada",  rll != null ? rll.toInstant().toString() : null);
-            setFieldIfExists(it, "regresoCiudadOrigen",  rs.getString("REGRESO_CIUDAD_ORIGEN"));
-            setFieldIfExists(it, "regresoPaisOrigen",    rs.getString("REGRESO_PAIS_ORIGEN"));
-            setFieldIfExists(it, "regresoCiudadDestino", rs.getString("REGRESO_CIUDAD_DESTINO"));
-            setFieldIfExists(it, "regresoPaisDestino",   rs.getString("REGRESO_PAIS_DESTINO"));
-            det.items.add(it);
-          }
+    try (PreparedStatement ps = cn.prepareStatement(SQL_DET)) {
+      ps.setLong(1, idReserva);
+      try (ResultSet rs = ps.executeQuery()) {
+        while (rs.next()) {
+          var it = new CompraDTO.ReservaItem();
+          it.idItem         = rs.getLong("ID_ITEM");
+          it.idVuelo        = rs.getLong("ID_VUELO");
+          it.codigoVuelo    = rs.getString("CODIGO_VUELO");
+          Timestamp ts1     = rs.getTimestamp("FECHA_SALIDA");
+          Timestamp ts2     = rs.getTimestamp("FECHA_LLEGADA");
+          it.fechaSalida    = ts1 != null ? ts1.toInstant().toString() : null;
+          it.fechaLlegada   = ts2 != null ? ts2.toInstant().toString() : null;
+          it.idClase        = rs.getInt("ID_CLASE");
+          it.clase          = rs.getString("NOMBRE_CLASE");
+          it.cantidad       = rs.getInt("CANTIDAD");
+          it.precioUnitario = rs.getBigDecimal("PRECIO_UNITARIO");
+          it.subtotal       = rs.getBigDecimal("SUBTOTAL");
+
+          setFieldIfExists(it, "paisOrigen",    rs.getString("PAIS_ORIGEN"));
+          setFieldIfExists(it, "paisDestino",   rs.getString("PAIS_DESTINO"));
+          setFieldIfExists(it, "ciudadOrigen",  rs.getString("CIUDAD_ORIGEN"));
+          setFieldIfExists(it, "ciudadDestino", rs.getString("CIUDAD_DESTINO"));
+
+          setFieldIfExists(it, "regresoCodigo",        rs.getString("REGRESO_CODIGO"));
+          Timestamp rsl = rs.getTimestamp("REGRESO_SALIDA");
+          Timestamp rll = rs.getTimestamp("REGRESO_LLEGADA");
+          setFieldIfExists(it, "regresoFechaSalida",   rsl != null ? rsl.toInstant().toString() : null);
+          setFieldIfExists(it, "regresoFechaLlegada",  rll != null ? rll.toInstant().toString() : null);
+          setFieldIfExists(it, "regresoCiudadOrigen",  rs.getString("REGRESO_CIUDAD_ORIGEN"));
+          setFieldIfExists(it, "regresoPaisOrigen",    rs.getString("REGRESO_PAIS_ORIGEN"));
+          setFieldIfExists(it, "regresoCiudadDestino", rs.getString("REGRESO_CIUDAD_DESTINO"));
+          setFieldIfExists(it, "regresoPaisDestino",   rs.getString("REGRESO_PAIS_DESTINO"));
+
+          det.items.add(it);
         }
       }
     }
-    return det;
   }
 
+  return det;
+}
+  
   public List<CompraDTO.EstadoReserva> listEstadosReserva() throws Exception {
     var out = new ArrayList<CompraDTO.EstadoReserva>();
     try (Connection cn = getConn();
@@ -1037,4 +1039,68 @@ public class ComprasDAO {
       }
     }
   }
+
+  public List<CompraDTO.TopDestino> listTopDestinos(
+    java.sql.Timestamp desde,
+    java.sql.Timestamp hasta,
+    int limit
+    ) throws Exception {
+
+    var out = new ArrayList<CompraDTO.TopDestino>();
+
+    StringBuilder sb = new StringBuilder();
+    sb.append("""
+        SELECT
+            cd.ID_CIUDAD,
+            cd.NOMBRE AS CIUDAD,
+            pd.NOMBRE AS PAIS,
+            COUNT(*) AS BOLETOS
+        FROM AEROLINEA.RESERVA_ITEM ri
+        JOIN AEROLINEA.RESERVA r   ON r.ID_RESERVA = ri.ID_RESERVA
+        JOIN AEROLINEA.VUELO v     ON v.ID_VUELO   = ri.ID_VUELO
+        JOIN AEROLINEA.RUTA ru     ON ru.ID_RUTA   = v.ID_RUTA
+        JOIN AEROLINEA.CIUDAD cd   ON cd.ID_CIUDAD = ru.ID_CIUDAD_DESTINO
+        JOIN AEROLINEA.PAIS pd     ON pd.ID_PAIS   = cd.ID_PAIS
+        WHERE r.ID_ESTADO = 1
+        """);
+
+    var params = new ArrayList<Object>();
+
+    if (desde != null) {
+      sb.append(" AND r.CREADA_EN >= ? ");
+      params.add(desde);
+    }
+    if (hasta != null) {
+      sb.append(" AND r.CREADA_EN < ? ");
+      params.add(hasta);
+    }
+
+    sb.append(" GROUP BY cd.ID_CIUDAD, cd.NOMBRE, pd.NOMBRE ");
+    sb.append(" ORDER BY BOLETOS DESC ");
+
+    if (limit > 0) {
+      sb.append(" FETCH FIRST ").append(limit).append(" ROWS ONLY ");
+    }
+
+    try (Connection cn = getConn();
+         PreparedStatement ps = cn.prepareStatement(sb.toString())) {
+
+      for (int i = 0; i < params.size(); i++) {
+        ps.setObject(i + 1, params.get(i));
+      }
+
+      try (ResultSet rs = ps.executeQuery()) {
+        while (rs.next()) {
+          var d = new CompraDTO.TopDestino();
+          d.idCiudadDestino = rs.getLong("ID_CIUDAD");
+          d.ciudadDestino   = rs.getString("CIUDAD");
+          d.paisDestino     = rs.getString("PAIS");
+          d.boletos         = rs.getLong("BOLETOS");
+          out.add(d);
+        }
+      }
+    }
+    return out;
+  }
+
 }
