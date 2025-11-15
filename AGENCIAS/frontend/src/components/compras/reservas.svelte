@@ -16,9 +16,9 @@
 
   function estadoColor(idEstado) {
     const n = Number(idEstado);
-    if (n === 1) return '#2e7d32';
-    if (n === 2) return '#c62828';
-    if (n === 3) return '#1565c0';
+    if (n === 1) return '#2e7d32';  
+    if (n === 2) return '#c62828';  
+    if (n === 3) return '#1565c0';  
     return '#555';
   }
 
@@ -57,7 +57,6 @@
   }
 
   .badge {
-    background: #ddd;
     padding: 3px 8px;
     border-radius: 8px;
     font-size: 12px;
@@ -92,14 +91,17 @@
           <strong>Reserva #{r.idReserva}</strong>
           <span
             class="badge"
-            style="background:{estadoColor(r.idEstado)}; color:white;"
+            style={`background:${estadoColor(r.idEstado)}; color:white;`}
           >
             {estadoTexto(r.idEstado)}
           </span>
         </div>
 
         <div style="margin-top:0.5rem;">
-          Total: <strong>{r.total ?? '—'}</strong>
+          Total:
+          <strong>
+            {r.total != null ? Number(r.total).toFixed(2) : '—'}
+          </strong>
         </div>
 
         <small style="color:#666">

@@ -7,7 +7,8 @@
   let cart = null;
 
   async function load() {
-    loading = true; error = '';
+    loading = true;
+    error = '';
     try {
       cart = await ComprasAPI.getCart();
     } catch (e) {
@@ -56,23 +57,42 @@
           <div>
             <strong>{it.codigoVuelo || it.idVuelo}</strong> ({it.clase || `Clase ${it.idClase}`})
             <div><small>{it.fechaSalida} → {it.fechaLlegada}</small></div>
-            <div><small>{(it.ciudadOrigen || it.paisOrigen) ?? '—'} → {(it.ciudadDestino || it.paisDestino) ?? '—'}</small></div>
+            <div>
+              <small>
+                {(it.ciudadOrigen || it.paisOrigen) ?? '—'}
+                →
+                {(it.ciudadDestino || it.paisDestino) ?? '—'}
+              </small>
+            </div>
           </div>
           <button class="btn" on:click={() => removeItem(it)}>Eliminar</button>
         </div>
 
         <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
           <label>Cantidad</label>
-          <input class="input" type="number" min="1" value={it.cantidad}
-                 on:change={(e)=>updateQty(it, e.target.value)} />
-          <div style="margin-left:auto">Subtotal: <strong>{it.subtotal ?? '—'}</strong></div>
+          <input
+            class="input"
+            type="number"
+            min="1"
+            value={it.cantidad}
+            on:change={(e) => updateQty(it, e.target.value)}
+          />
+          <div style="margin-left:auto">
+            Subtotal:
+            <strong>
+              {it.subtotal != null ? Number(it.subtotal).toFixed(2) : '—'}
+            </strong>
+          </div>
         </div>
       </div>
     {/each}
 
     <div style="display:flex; justify-content:flex-end; margin-top:12px;">
       <div class="card">
-        Total: <strong>{cart.total ?? '—'}</strong>
+        Total:
+        <strong>
+          {cart.total != null ? Number(cart.total).toFixed(2) : '—'}
+        </strong>
         <div style="margin-top:8px">
           <button class="btn" on:click={goCheckout}>Continuar a pago</button>
         </div>
@@ -84,5 +104,7 @@
 </div>
 
 <style>
-  .error { color:#E62727; }
+  .error {
+    color: #e62727;
+  }
 </style>

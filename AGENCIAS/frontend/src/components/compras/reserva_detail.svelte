@@ -18,8 +18,14 @@
 
   async function load() {
     extractId();
-    if (!id) { error = 'ID inválido'; return; }
-    loading = true; error = ''; cancelError = ''; cancelSuccess = '';
+    if (!id) {
+      error = 'ID inválido';
+      return;
+    }
+    loading = true;
+    error = '';
+    cancelError = '';
+    cancelSuccess = '';
     try {
       det = await ComprasAPI.detail(id);
     } catch (e) {
@@ -34,9 +40,13 @@
       const blob = await ComprasAPI.boletoPdf(id);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `boleto-${id}.pdf`; a.click();
+      a.href = url;
+      a.download = `boleto-${id}.pdf`;
+      a.click();
       URL.revokeObjectURL(url);
-    } catch (e) { alert(e.message); }
+    } catch (e) {
+      alert(e.message);
+    }
   }
 
   async function cancelarReserva() {
@@ -75,9 +85,17 @@
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; gap: 1rem;">
         <div>
-          <div>Total: <strong>{det.total}</strong></div>
           <div>
-            <small>Estado: <strong>{estadoTexto(det.idEstado)}</strong></small>
+            Total:
+            <strong>
+              {det.total != null ? Number(det.total).toFixed(2) : '—'}
+            </strong>
+          </div>
+          <div>
+            <small>
+              Estado:
+              <strong>{estadoTexto(det.idEstado)}</strong>
+            </small>
           </div>
           {#if det.creadaEn}
             <div><small>Creada: {det.creadaEn}</small></div>
@@ -94,7 +112,7 @@
               class="btn"
               style="background:#c62828;color:white"
               disabled={cancelLoading}
-              on:click={cancelReserva}
+              on:click={cancelarReserva}
             >
               {cancelLoading ? 'Cancelando…' : 'Cancelar reserva'}
             </button>
@@ -116,7 +134,9 @@
       {#each det.items || [] as it}
         <div style="display:flex; justify-content:space-between; gap:10px;">
           <div>
-            <div><strong>{it.codigoVuelo || it.idVuelo}</strong> ({it.clase})</div>
+            <div>
+              <strong>{it.codigoVuelo || it.idVuelo}</strong> ({it.clase})
+            </div>
             <small>{it.fechaSalida} → {it.fechaLlegada}</small>
             <div>
               <small>
@@ -128,7 +148,10 @@
           </div>
           <div style="text-align:right">
             <div>Cant: {it.cantidad}</div>
-            <div>Subtotal: {it.subtotal ?? '—'}</div>
+            <div>
+              Subtotal:
+              {it.subtotal != null ? Number(it.subtotal).toFixed(2) : '—'}
+            </div>
           </div>
         </div>
         <div class="hr"></div>

@@ -13,8 +13,12 @@
     let sum = 0, alt = false;
     for (let i = s.length - 1; i >= 0; i--) {
       let n = parseInt(s[i], 10);
-      if (alt) { n *= 2; if (n > 9) n -= 9; }
-      sum += n; alt = !alt;
+      if (alt) {
+        n *= 2;
+        if (n > 9) n -= 9;
+      }
+      sum += n;
+      alt = !alt;
     }
     return sum % 10 === 0;
   }
@@ -36,7 +40,7 @@
         if (d.detail) return typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
         if (d.error) return d.error;
       }
-    } catch(_) {}
+    } catch (_) {}
     if (e?.message) return e.message;
     return 'Error procesando el pago';
   }
@@ -46,10 +50,12 @@
     normalize();
 
     if (!luhnOk(tarjeta.numero)) {
-      error = 'Número de tarjeta inválido.'; return;
+      error = 'Número de tarjeta inválido.';
+      return;
     }
     if (!/^\d{3,4}$/.test(tarjeta.cvv)) {
-      error = 'CVV inválido.'; return;
+      error = 'CVV inválido.';
+      return;
     }
 
     loading = true;
@@ -71,7 +77,9 @@
 
 <div class="container" role="form" on:keydown={onEnter}>
   <h2>Checkout</h2>
-  {#if error}<p style="color:#E62727; margin:8px 0">{error}</p>{/if}
+  {#if error}
+    <p style="color:#E62727; margin:8px 0">{error}</p>
+  {/if}
 
   <div class="card" style="display:grid; gap:12px; max-width:700px;">
     <div>
@@ -83,7 +91,7 @@
         placeholder="4111 1111 1111 1111"
         inputmode="numeric"
         maxlength="23"
-        on:input={(e)=> tarjeta.numero = e.target.value.replace(/[^\d ]/g,'')}
+        on:input={(e) => (tarjeta.numero = e.target.value.replace(/[^\d ]/g, ''))}
       />
       <small style="opacity:.7">No se guarda en el servidor.</small>
     </div>
@@ -97,7 +105,7 @@
         placeholder="123"
         inputmode="numeric"
         maxlength="4"
-        on:input={(e)=> tarjeta.cvv = e.target.value.replace(/\D/g,'')}
+        on:input={(e) => (tarjeta.cvv = e.target.value.replace(/\D/g, ''))}
       />
     </div>
 
@@ -133,5 +141,8 @@
 </div>
 
 <style>
-  .btn[disabled]{ opacity:.7; cursor:not-allowed;}
+  .btn[disabled] {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
 </style>

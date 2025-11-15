@@ -40,7 +40,10 @@ export async function request(path, opts = {}) {
   try { json = text ? JSON.parse(text) : null; } catch { json = null; }
 
   if (!res.ok) {
-    const msg = (json && (json.message || json.detail)) || text || `HTTP ${res.status} ${res.statusText}`;
+    const msg =
+      (json && (json.message || json.detail)) ||
+      text ||
+      `HTTP ${res.status} ${res.statusText}`;
     throw new Error(msg);
   }
   return json ?? { ok: true, raw: text };
@@ -57,17 +60,19 @@ export function qs(obj = {}) {
 }
 
 export const AuthAPI = {
-  register: (data) => request('/api/v1/auth/register', { method: 'POST', body: data }),
-  login:    (data) => request('/api/v1/auth/login',    { method: 'POST', body: data }),
-  me:       ()      => request('/api/v1/auth/me'),
+  register: (data) =>
+    request('/api/v1/auth/register', { method: 'POST', body: data }),
+  login: (data) =>
+    request('/api/v1/auth/login', { method: 'POST', body: data }),
+  me: () => request('/api/v1/auth/me'),
 };
 
 export const UsersAPI = {
-  list:   (params)        => request('/api/v1/users' + qs(params)),
-  get:    (id)            => request(`/api/v1/users/${id}`),
-  create: (body)          => request('/api/v1/users', { method: 'POST',  body }),
-  update: (id, body)      => request(`/api/v1/users/${id}`, { method: 'PATCH', body }),
-  remove: (id)            => request(`/api/v1/users/${id}`, { method: 'DELETE' }),
+  list:   (params)   => request('/api/v1/users' + qs(params)),
+  get:    (id)       => request(`/api/v1/users/${id}`),
+  create: (body)     => request('/api/v1/users', { method: 'POST', body }),
+  update: (id, body) => request(`/api/v1/users/${id}`, { method: 'PATCH', body }),
+  remove: (id)       => request(`/api/v1/users/${id}`, { method: 'DELETE' }),
 };
 
 /** @typedef {{origin?: string, destination?: string, date?: string, pax?: number}} SearchParams */
@@ -96,15 +101,21 @@ export const ComprasAPI = {
     }),
 
   updateQty: (idItem, cantidad, syncPareja = false) =>
-    request(`/compras/items/${idItem}?syncPareja=${syncPareja ? 'true' : 'false'}`, {
-      method: 'PUT',
-      body: { cantidad },
-    }),
+    request(
+      `/compras/items/${idItem}?syncPareja=${syncPareja ? 'true' : 'false'}`,
+      {
+        method: 'PUT',
+        body: { cantidad },
+      }
+    ),
 
   removeItem: (idItem, syncPareja = false) =>
-    request(`/compras/items/${idItem}?syncPareja=${syncPareja ? 'true' : 'false'}`, {
-      method: 'DELETE',
-    }),
+    request(
+      `/compras/items/${idItem}?syncPareja=${syncPareja ? 'true' : 'false'}`,
+      {
+        method: 'DELETE',
+      }
+    ),
 
   checkout: (payment) =>
     request('/compras/checkout', { method: 'POST', body: payment }),
@@ -136,26 +147,57 @@ export const ComprasAPI = {
     }
     return await res.blob();
   },
+
+  adminList: () => request('/compras/admin/reservas'),
+
+  adminDetail: (id) => request(`/compras/admin/reservas/${id}`),
+
+  adminCancel: (id) =>
+    request(`/compras/admin/reservas/${id}/cancelar`, {
+      method: 'POST',
+    }),
 };
 
 export function toDate(v) {
   if (v == null) return null;
   if (v instanceof Date) return isNaN(v) ? null : v;
-  if (typeof v === "number") return new Date(v > 1e12 ? v : v * 1000);
-  if (typeof v === "string") {
+  if (typeof v === 'number') return new Date(v > 1e12 ? v : v * 1000);
+  if (typeof v === 'string') {
     let s = v.trim();
 
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-      const d = new Date(s.replace(" ", "T"));
+      const d = new Date(s.replace(' ', 'T'));
       if (!isNaN(d)) return d;
     }
 
-    const m = s.match(/^(\d{2})-([A-Z]{3})-(\d{2,4})\s+(\d{2})\.(\d{2})\.(\d{2})/i);
+    const m = s.match(
+      /^(\d{2})-([A-Z]{3})-(\d{2,4})\s+(\d{2})\.(\d{2})\.(\d{2})/i
+    );
     if (m) {
       const [_, dd, mon, yy, hh, mm, ss] = m;
-      const months = { JAN:0, FEB:1, MAR:2, APR:3, MAY:4, JUN:5, JUL:6, AUG:7, SEP:8, OCT:9, NOV:10, DEC:11 };
+      const months = {
+        JAN: 0,
+        FEB: 1,
+        MAR: 2,
+        APR: 3,
+        MAY: 4,
+        JUN: 5,
+        JUL: 6,
+        AUG: 7,
+        SEP: 8,
+        OCT: 9,
+        NOV: 10,
+        DEC: 11,
+      };
       const year = Number(yy) < 100 ? 2000 + Number(yy) : Number(yy);
-      return new Date(year, months[mon.toUpperCase()] ?? 0, Number(dd), Number(hh), Number(mm), Number(ss));
+      return new Date(
+        year,
+        months[mon.toUpperCase()] ?? 0,
+        Number(dd),
+        Number(hh),
+        Number(mm),
+        Number(ss)
+      );
     }
 
     const d = new Date(s);
@@ -165,13 +207,13 @@ export function toDate(v) {
 }
 
 export function fmtDate(d, opts = {}) {
-  if (!d) return "";
-  return new Intl.DateTimeFormat("es-GT", {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
+  if (!d) return '';
+  return new Intl.DateTimeFormat('es-GT', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
     ...opts,
   }).format(d);
 }
