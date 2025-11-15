@@ -9,7 +9,8 @@ import java.util.*;
 public class MediaDAO {
 
   public long crear(long idSeccion, MediaDTO.Upsert dto) throws SQLException {
-    String sql = "INSERT INTO MEDIA_INFORMATIVA (ID_SECCION, TIPO_MEDIA, URL, ORDEN) VALUES (?,?,?, NVL(?,1))";
+    String mediaTable = DB.table("MEDIA_INFORMATIVA");
+    String sql = "INSERT INTO " + mediaTable + " (ID_SECCION, TIPO_MEDIA, URL, ORDEN) VALUES (?,?,?, NVL(?,1))";
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sql, new String[]{"ID_MEDIA"})) {
       ps.setLong(1, idSeccion);
@@ -25,15 +26,17 @@ public class MediaDAO {
   }
 
   public void eliminar(long idMedia) throws SQLException {
+    String mediaTable = DB.table("MEDIA_INFORMATIVA");
     try (Connection cn = DB.getConnection();
-         PreparedStatement ps = cn.prepareStatement("DELETE FROM MEDIA_INFORMATIVA WHERE ID_MEDIA=?")) {
+         PreparedStatement ps = cn.prepareStatement("DELETE FROM " + mediaTable + " WHERE ID_MEDIA=?")) {
       ps.setLong(1, idMedia);
       ps.executeUpdate();
     }
   }
 
   public void reordenar(long idSeccion, List<MediaDTO.Reordenar> items) throws SQLException {
-    String up = "UPDATE MEDIA_INFORMATIVA SET ORDEN=? WHERE ID_MEDIA=? AND ID_SECCION=?";
+    String mediaTable = DB.table("MEDIA_INFORMATIVA");
+    String up = "UPDATE " + mediaTable + " SET ORDEN=? WHERE ID_MEDIA=? AND ID_SECCION=?";
     try (Connection cn = DB.getConnection()) {
       cn.setAutoCommit(false);
       try (PreparedStatement ps = cn.prepareStatement(up)) {
@@ -50,12 +53,8 @@ public class MediaDAO {
   }
 
   public List<MediaDTO> listarPorSeccion(long idSeccion) throws SQLException {
-    String sql = """
-      SELECT ID_MEDIA, ID_SECCION, TIPO_MEDIA, URL, ORDEN
-        FROM MEDIA_INFORMATIVA
-       WHERE ID_SECCION=?
-       ORDER BY ORDEN, ID_MEDIA
-      """;
+    String mediaTable = DB.table("MEDIA_INFORMATIVA");
+    String sql = "SELECT ID_MEDIA, ID_SECCION, TIPO_MEDIA, URL, ORDEN FROM " + mediaTable + " WHERE ID_SECCION=? ORDER BY ORDEN, ID_MEDIA";
     List<MediaDTO> out = new ArrayList<>();
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sql)) {

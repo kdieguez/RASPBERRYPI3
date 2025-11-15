@@ -10,7 +10,8 @@ import java.util.List;
 public class ClaseDAO {
 
   public List<ClaseDTOs.View> listAll() throws Exception {
-    String sql = "SELECT ID_CLASE, NOMBRE FROM CLASE_ASIENTO ORDER BY ID_CLASE";
+    String claseTable = DB.table("CLASE_ASIENTO");
+    String sql = "SELECT ID_CLASE, NOMBRE FROM " + claseTable + " ORDER BY ID_CLASE";
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sql);
          ResultSet rs = ps.executeQuery()) {

@@ -13,6 +13,7 @@ import java.util.function.Function;
 
 public class DB {
   private static HikariDataSource ds;
+  private static String schema;
 
   public static void init() {
     try {
@@ -62,12 +63,42 @@ public class DB {
         return v;
       };
 
-      String user = get.apply("ORACLE_USER");
-      String pass = firstNonBlank(get.apply("ORACLE_PASSWORD"), get.apply("ORACLE_PASS"));
-      if (isBlank(user)) throw new RuntimeException("Falta ORACLE_USER (en .env o variables)");
-      if (isBlank(pass)) throw new RuntimeException("Falta ORACLE_PASSWORD u ORACLE_PASS (en .env o variables)");
+      // Usuario: Prioridad:
+      // 1. System property -Doracle.user= o --user=
+      // 2. Variable de entorno ORACLE_USER
+      // 3. Si no se especifica, se usará el schema como usuario
+      String userProp = System.getProperty("oracle.user");
+      String user = firstNonBlank(userProp, get.apply("ORACLE_USER"));
+      
+      // Contraseña: Prioridad:
+      // 1. System property -Doracle.password= o --password=
+      // 2. Variable de entorno ORACLE_PASSWORD u ORACLE_PASS
+      String passProp = System.getProperty("oracle.password");
+      String pass = firstNonBlank(passProp, get.apply("ORACLE_PASSWORD"), get.apply("ORACLE_PASS"));
+      
+      // Schema: Prioridad:
+      // 1. System property -Dschema= o --schema=
+      // 2. Variable de entorno ORACLE_SCHEMA
+      // 3. Fallback a ORACLE_USER (o al usuario especificado)
+      String schemaProp = System.getProperty("schema");
+      String schemaEnv = get.apply("ORACLE_SCHEMA");
+      schema = firstNonBlank(schemaProp, schemaEnv, user);
+      
+      // Si no se especificó usuario pero sí schema, usar schema como usuario
+      if (isBlank(user) && !isBlank(schema)) {
+        user = schema;
+      }
+      // Si no se especificó schema pero sí usuario, usar usuario como schema
+      if (isBlank(schema) && !isBlank(user)) {
+        schema = user;
+      }
+      
+      if (isBlank(user)) throw new RuntimeException("Falta ORACLE_USER o --user= (o especifica --schema= que se usará como usuario)");
+      if (isBlank(pass)) throw new RuntimeException("Falta ORACLE_PASSWORD u ORACLE_PASS (o especifica --password=)");
+      
       user = user.trim();
       pass = pass.trim();
+      schema = schema != null ? schema.trim().toUpperCase() : user.toUpperCase();
 
       String url = get.apply("ORACLE_JDBC_URL");
       if (isBlank(url)) {
@@ -93,7 +124,7 @@ public class DB {
       cfg.setDriverClassName("oracle.jdbc.OracleDriver");
       cfg.addDataSourceProperty("oracle.jdbc.fanEnabled", "false");
 
-      System.out.println("[DB] using url=" + url + " user=" + user + " pass.len=" + pass.length());
+      System.out.println("[DB] using url=" + url + " user=" + user + " schema=" + schema + " pass.len=" + pass.length());
 
       ds = new HikariDataSource(cfg);
       System.out.println("[DB] pool ready");
@@ -120,6 +151,34 @@ public class DB {
   public static boolean ping() {
     try (Connection c = getConnection()) { return c.isValid(2); }
     catch (Exception e) { return false; }
+  }
+
+  /**
+   * Obtiene el schema de Oracle configurado.
+   * Prioridad:
+   * 1. System property -Dschema=
+   * 2. Variable de entorno ORACLE_SCHEMA
+   * 3. Variable de entorno ORACLE_USER
+   * 4. Fallback a "AEROLINEA"
+   * @return El nombre del schema en mayúsculas
+   */
+  public static String getSchema() {
+    if (schema == null) {
+      String schemaProp = System.getProperty("schema");
+      String schemaEnv = System.getenv("ORACLE_SCHEMA");
+      String userEnv = System.getenv("ORACLE_USER");
+      schema = firstNonBlank(schemaProp, schemaEnv, userEnv, "AEROLINEA");
+      schema = schema != null ? schema.trim().toUpperCase() : "AEROLINEA";
+    }
+    return schema;
+  }
+
+  /**
+   * Construye un nombre de tabla completo con schema.
+   * Ejemplo: table("VUELO") -> "AEROLINEA.VUELO"
+   */
+  public static String table(String tableName) {
+    return getSchema() + "." + tableName;
   }
 
   private static boolean isBlank(String s){ return s==null || s.isBlank(); }

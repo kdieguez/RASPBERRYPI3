@@ -46,19 +46,10 @@ public class NotificacionesService {
   }
 
   private List<Destinatario> listarDestinatarios(long idVuelo) throws SQLException {
-    final String sql = """
-      SELECT DISTINCT r.ID_RESERVA,
-                      u.ID_USUARIO,
-                      u.EMAIL,
-                      u.NOMBRES,
-                      u.APELLIDOS
-        FROM AEROLINEA.RESERVA_ITEM ri
-        JOIN AEROLINEA.RESERVA      r ON r.ID_RESERVA   = ri.ID_RESERVA
-        JOIN AEROLINEA.USUARIO      u ON u.ID_USUARIO   = r.ID_USUARIO
-       WHERE ri.ID_VUELO = ?
-         AND r.ID_ESTADO IN (2,3)
-         AND NVL(u.HABILITADO,1) = 1
-      """;
+    String reservaItemTable = DB.table("RESERVA_ITEM");
+    String reservaTable = DB.table("RESERVA");
+    String usuarioTable = DB.table("USUARIO");
+    final String sql = "SELECT DISTINCT r.ID_RESERVA, u.ID_USUARIO, u.EMAIL, u.NOMBRES, u.APELLIDOS FROM " + reservaItemTable + " ri JOIN " + reservaTable + " r ON r.ID_RESERVA = ri.ID_RESERVA JOIN " + usuarioTable + " u ON u.ID_USUARIO = r.ID_USUARIO WHERE ri.ID_VUELO = ? AND r.ID_ESTADO IN (2,3) AND NVL(u.HABILITADO,1) = 1";
 
     List<Destinatario> list = new ArrayList<>();
     try (Connection cn = DB.getConnection();

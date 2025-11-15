@@ -17,7 +17,8 @@ public class PaisDAO {
             if (existePais(cn, dto.nombre())) {
                 throw new IllegalArgumentException("Ya existe un país con ese nombre.");
             }
-            String sql = "INSERT INTO PAIS (NOMBRE) VALUES (?)";
+            String paisTable = DB.table("PAIS");
+            String sql = "INSERT INTO " + paisTable + " (NOMBRE) VALUES (?)";
             try (PreparedStatement ps = cn.prepareStatement(sql, new String[]{"ID_PAIS"})) {
                 ps.setString(1, dto.nombre().trim());
                 ps.executeUpdate();
@@ -30,7 +31,8 @@ public class PaisDAO {
     }
 
     public List<PaisDTOs.View> listAll() throws Exception {
-        String sql = "SELECT ID_PAIS, NOMBRE FROM PAIS ORDER BY NOMBRE";
+        String paisTable = DB.table("PAIS");
+        String sql = "SELECT ID_PAIS, NOMBRE FROM " + paisTable + " ORDER BY NOMBRE";
         try (Connection cn = DB.getConnection();
              PreparedStatement ps = cn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
@@ -43,7 +45,8 @@ public class PaisDAO {
     }
 
     private boolean existePais(Connection cn, String nombre) throws Exception {
-        String sql = "SELECT 1 FROM PAIS WHERE UPPER(NOMBRE)=UPPER(?)";
+        String paisTable = DB.table("PAIS");
+        String sql = "SELECT 1 FROM " + paisTable + " WHERE UPPER(NOMBRE)=UPPER(?)";
         try (PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setString(1, nombre.trim());
             try (ResultSet rs = ps.executeQuery()) { return rs.next(); }

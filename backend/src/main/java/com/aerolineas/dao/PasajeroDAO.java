@@ -9,10 +9,8 @@ import java.time.LocalDate;
 public class PasajeroDAO {
 
   public Pasajero findByUsuario(long idUsuario) throws Exception {
-    String sql = """
-      SELECT ID_PASAJERO, FECHA_NACIMIENTO, ID_PAIS_DOCUMENTO, PASAPORTE, ID_USUARIO
-      FROM PASAJERO WHERE ID_USUARIO = ?
-    """;
+    String pasajeroTable = DB.table("PASAJERO");
+    String sql = "SELECT ID_PASAJERO, FECHA_NACIMIENTO, ID_PAIS_DOCUMENTO, PASAPORTE, ID_USUARIO FROM " + pasajeroTable + " WHERE ID_USUARIO = ?";
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sql)) {
       ps.setLong(1, idUsuario);
@@ -25,10 +23,8 @@ public class PasajeroDAO {
   public Pasajero upsert(long idUsuario, LocalDate fechaNac, Long idPais, String pasaporte) throws Exception {
     Pasajero cur = findByUsuario(idUsuario);
     if (cur == null) {
-      String ins = """
-        INSERT INTO PASAJERO (FECHA_NACIMIENTO, ID_PAIS_DOCUMENTO, PASAPORTE, ID_USUARIO)
-        VALUES (?, ?, ?, ?)
-      """;
+      String pasajeroTable = DB.table("PASAJERO");
+      String ins = "INSERT INTO " + pasajeroTable + " (FECHA_NACIMIENTO, ID_PAIS_DOCUMENTO, PASAPORTE, ID_USUARIO) VALUES (?, ?, ?, ?)";
       try (Connection cn = DB.getConnection();
            PreparedStatement ps = cn.prepareStatement(ins)) {
         if (fechaNac != null) ps.setDate(1, Date.valueOf(fechaNac)); else ps.setNull(1, Types.DATE);
@@ -38,10 +34,8 @@ public class PasajeroDAO {
         ps.executeUpdate();
       }
     } else {
-      String upd = """
-        UPDATE PASAJERO SET FECHA_NACIMIENTO=?, ID_PAIS_DOCUMENTO=?, PASAPORTE=?
-        WHERE ID_USUARIO=?
-      """;
+      String pasajeroTable = DB.table("PASAJERO");
+      String upd = "UPDATE " + pasajeroTable + " SET FECHA_NACIMIENTO=?, ID_PAIS_DOCUMENTO=?, PASAPORTE=? WHERE ID_USUARIO=?";
       try (Connection cn = DB.getConnection();
            PreparedStatement ps = cn.prepareStatement(upd)) {
         if (fechaNac != null) ps.setDate(1, Date.valueOf(fechaNac)); else ps.setNull(1, Types.DATE);

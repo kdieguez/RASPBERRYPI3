@@ -242,7 +242,7 @@ public class ComprasController {
         if (codigo == null || codigo.isBlank()) {
           try (var cn = com.aerolineas.config.DB.getConnection();
                var ps = cn.prepareStatement(
-                   "SELECT CODIGO FROM AEROLINEA.RESERVA WHERE ID_RESERVA = ? AND ID_USUARIO = ?")) {
+                   "SELECT CODIGO FROM " + com.aerolineas.config.DB.table("RESERVA") + " WHERE ID_RESERVA = ? AND ID_USUARIO = ?")) {
             ps.setLong(1, id);
             ps.setLong(2, userId);
             try (var rs = ps.executeQuery()) {

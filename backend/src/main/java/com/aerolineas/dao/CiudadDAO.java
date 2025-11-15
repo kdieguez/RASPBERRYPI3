@@ -20,10 +20,8 @@ public class CiudadDAO {
             if (existeCiudadEnPais(cn, dto.idPais(), dto.nombre()))
                 throw new IllegalArgumentException("Ya existe una ciudad con ese nombre en el país.");
 
-            String sql = """
-                INSERT INTO CIUDAD (ID_PAIS, NOMBRE, ACTIVO, WEATHER_QUERY)
-                VALUES (?,?,1,?)
-                """;
+            String ciudadTable = DB.table("CIUDAD");
+            String sql = "INSERT INTO " + ciudadTable + " (ID_PAIS, NOMBRE, ACTIVO, WEATHER_QUERY) VALUES (?,?,1,?)";
 
             try (PreparedStatement ps = cn.prepareStatement(sql, new String[]{"ID_CIUDAD"})) {
                 ps.setLong(1, dto.idPais());
@@ -46,15 +44,9 @@ public class CiudadDAO {
     }
 
     public List<CiudadDTOs.View> listAll(Long idPais) throws Exception {
-        String base = """
-            SELECT c.ID_CIUDAD,
-                   c.ID_PAIS,
-                   p.NOMBRE AS PAIS,
-                   c.NOMBRE,
-                   NVL(c.ACTIVO,1) AS ACTIVO
-              FROM CIUDAD c
-              JOIN PAIS p ON p.ID_PAIS = c.ID_PAIS
-            """;
+        String ciudadTable = DB.table("CIUDAD");
+        String paisTable = DB.table("PAIS");
+        String base = "SELECT c.ID_CIUDAD, c.ID_PAIS, p.NOMBRE AS PAIS, c.NOMBRE, NVL(c.ACTIVO,1) AS ACTIVO FROM " + ciudadTable + " c JOIN " + paisTable + " p ON p.ID_PAIS = c.ID_PAIS ";
         String order = " ORDER BY p.NOMBRE, c.NOMBRE";
 
         try (Connection cn = DB.getConnection();
@@ -81,17 +73,9 @@ public class CiudadDAO {
     }
 
    public List<CiudadDTOs.WeatherCity> listForWeather() throws Exception {
-        String sql = """
-            SELECT c.ID_CIUDAD,
-                   c.NOMBRE AS CIUDAD,
-                   p.NOMBRE AS PAIS,
-                   c.WEATHER_QUERY
-              FROM CIUDAD c
-              JOIN PAIS p ON p.ID_PAIS = c.ID_PAIS
-             WHERE NVL(c.ACTIVO,1)=1
-               AND c.WEATHER_QUERY IS NOT NULL
-             ORDER BY p.NOMBRE, c.NOMBRE
-            """;
+        String ciudadTable = DB.table("CIUDAD");
+        String paisTable = DB.table("PAIS");
+        String sql = "SELECT c.ID_CIUDAD, c.NOMBRE AS CIUDAD, p.NOMBRE AS PAIS, c.WEATHER_QUERY FROM " + ciudadTable + " c JOIN " + paisTable + " p ON p.ID_PAIS = c.ID_PAIS WHERE NVL(c.ACTIVO,1)=1 AND c.WEATHER_QUERY IS NOT NULL ORDER BY p.NOMBRE, c.NOMBRE";
 
         try (Connection cn = DB.getConnection();
              PreparedStatement ps = cn.prepareStatement(sql);
@@ -111,11 +95,8 @@ public class CiudadDAO {
     }
 
     public void toggleActiva(long idCiudad) throws Exception {
-        String sql = """
-            UPDATE CIUDAD
-               SET ACTIVO = CASE WHEN NVL(ACTIVO,1)=1 THEN 0 ELSE 1 END
-             WHERE ID_CIUDAD=?
-            """;
+        String ciudadTable = DB.table("CIUDAD");
+        String sql = "UPDATE " + ciudadTable + " SET ACTIVO = CASE WHEN NVL(ACTIVO,1)=1 THEN 0 ELSE 1 END WHERE ID_CIUDAD=?";
         try (Connection cn = DB.getConnection();
              PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setLong(1, idCiudad);
@@ -125,7 +106,8 @@ public class CiudadDAO {
     }
 
     private boolean existePais(Connection cn, long idPais) throws Exception {
-        String sql = "SELECT 1 FROM PAIS WHERE ID_PAIS=?";
+        String paisTable = DB.table("PAIS");
+        String sql = "SELECT 1 FROM " + paisTable + " WHERE ID_PAIS=?";
         try (PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setLong(1, idPais);
             try (ResultSet rs = ps.executeQuery()) {
@@ -135,7 +117,8 @@ public class CiudadDAO {
     }
 
     private boolean existeCiudadEnPais(Connection cn, long idPais, String nombre) throws Exception {
-        String sql = "SELECT 1 FROM CIUDAD WHERE ID_PAIS=? AND UPPER(NOMBRE)=UPPER(?)";
+        String ciudadTable = DB.table("CIUDAD");
+        String sql = "SELECT 1 FROM " + ciudadTable + " WHERE ID_PAIS=? AND UPPER(NOMBRE)=UPPER(?)";
         try (PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setLong(1, idPais);
             ps.setString(2, nombre.trim());

@@ -1,5 +1,6 @@
 package com.aerolineas.dao;
 
+import com.aerolineas.config.DB;
 import java.sql.*;
 import java.util.*;
 
@@ -12,12 +13,9 @@ public class ConfigDAO {
     }
 
     public Map<String, String> getSection(String section) throws SQLException {
-        String sql = """
-            SELECT d.NOMBRE, d.DESCRIPCION
-              FROM AEROLINEA.DATOS_ESTRUCTURA d
-              JOIN AEROLINEA.ESTRUCTURA e ON e.ID_ESTRUCTURA = d.ID_ESTRUCTURA
-             WHERE LOWER(e.SECCION) = ?
-            """;
+        String datosTable = DB.table("DATOS_ESTRUCTURA");
+        String estructuraTable = DB.table("ESTRUCTURA");
+        String sql = "SELECT d.NOMBRE, d.DESCRIPCION FROM " + datosTable + " d JOIN " + estructuraTable + " e ON e.ID_ESTRUCTURA = d.ID_ESTRUCTURA WHERE LOWER(e.SECCION) = ?";
         Map<String,String> out = new LinkedHashMap<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, section.toLowerCase());
@@ -31,18 +29,9 @@ public class ConfigDAO {
     }
 
     public void upsertItem(String section, String name, String value) throws SQLException {
-        String sql = """
-            MERGE INTO AEROLINEA.DATOS_ESTRUCTURA dst
-            USING (
-                SELECT ? AS NOMBRE,
-                       (SELECT ID_ESTRUCTURA FROM AEROLINEA.ESTRUCTURA WHERE LOWER(SECCION)=?) AS ID_ESTRUCTURA
-                FROM dual
-            ) src
-            ON (dst.NOMBRE = src.NOMBRE AND dst.ID_ESTRUCTURA = src.ID_ESTRUCTURA)
-            WHEN MATCHED THEN UPDATE SET dst.DESCRIPCION = ?
-            WHEN NOT MATCHED THEN INSERT (NOMBRE, DESCRIPCION, ID_ESTRUCTURA)
-                 VALUES (src.NOMBRE, ?, src.ID_ESTRUCTURA)
-            """;
+        String datosTable = DB.table("DATOS_ESTRUCTURA");
+        String estructuraTable = DB.table("ESTRUCTURA");
+        String sql = "MERGE INTO " + datosTable + " dst USING (SELECT ? AS NOMBRE, (SELECT ID_ESTRUCTURA FROM " + estructuraTable + " WHERE LOWER(SECCION)=?) AS ID_ESTRUCTURA FROM dual) src ON (dst.NOMBRE = src.NOMBRE AND dst.ID_ESTRUCTURA = src.ID_ESTRUCTURA) WHEN MATCHED THEN UPDATE SET dst.DESCRIPCION = ? WHEN NOT MATCHED THEN INSERT (NOMBRE, DESCRIPCION, ID_ESTRUCTURA) VALUES (src.NOMBRE, ?, src.ID_ESTRUCTURA)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, name);
             ps.setString(2, section.toLowerCase());

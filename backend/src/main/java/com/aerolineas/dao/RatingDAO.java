@@ -10,16 +10,9 @@ public class RatingDAO {
   public static record Resumen(Double promedio, Long total, Integer miRating) {}
 
   public Resumen resumen(long idVuelo, Long idUsuario) throws SQLException {
-    String qSum = """
-      SELECT AVG(CALIFICACION) AS PROM, COUNT(*) AS TOT
-        FROM AEROLINEA.RESENA_VUELO
-       WHERE ID_VUELO = ?
-    """;
-    String qMine = """
-      SELECT CALIFICACION
-        FROM AEROLINEA.RESENA_VUELO
-       WHERE ID_VUELO = ? AND ID_USUARIO_AUTOR = ?
-    """;
+    String table = DB.table("RESENA_VUELO");
+    String qSum = "SELECT AVG(CALIFICACION) AS PROM, COUNT(*) AS TOT FROM " + table + " WHERE ID_VUELO = ?";
+    String qMine = "SELECT CALIFICACION FROM " + table + " WHERE ID_VUELO = ? AND ID_USUARIO_AUTOR = ?";
 
     Double prom = 0d;
     long tot = 0L;
@@ -57,15 +50,9 @@ public class RatingDAO {
     if (calificacion < 1 || calificacion > 5)
       throw new SQLException("calificacion debe ser 1..5");
 
-    String upd = """
-      UPDATE AEROLINEA.RESENA_VUELO
-         SET CALIFICACION = ?, CREADA_EN = SYSTIMESTAMP
-       WHERE ID_VUELO = ? AND ID_USUARIO_AUTOR = ?
-    """;
-    String ins = """
-      INSERT INTO AEROLINEA.RESENA_VUELO (ID_VUELO, ID_USUARIO_AUTOR, CALIFICACION, CREADA_EN)
-      VALUES (?,?,?, SYSTIMESTAMP)
-    """;
+    String table = DB.table("RESENA_VUELO");
+    String upd = "UPDATE " + table + " SET CALIFICACION = ?, CREADA_EN = SYSTIMESTAMP WHERE ID_VUELO = ? AND ID_USUARIO_AUTOR = ?";
+    String ins = "INSERT INTO " + table + " (ID_VUELO, ID_USUARIO_AUTOR, CALIFICACION, CREADA_EN) VALUES (?,?,?, SYSTIMESTAMP)";
 
     try (Connection cn = DB.getConnection()) {
       cn.setAutoCommit(false);

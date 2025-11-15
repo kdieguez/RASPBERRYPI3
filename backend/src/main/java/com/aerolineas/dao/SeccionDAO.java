@@ -10,9 +10,8 @@ import java.util.*;
 public class SeccionDAO {
 
   public long crear(long idPagina, SeccionDTO.Upsert dto) throws SQLException {
-    String sql = "INSERT INTO SECCION_INFORMATIVA " +
-                 "(ID_PAGINA, NOMBRE_SECCION, DESCRIPCION, ORDEN) " +
-                 "VALUES (?,?,?,?)";
+    String seccionTable = DB.table("SECCION_INFORMATIVA");
+    String sql = "INSERT INTO " + seccionTable + " (ID_PAGINA, NOMBRE_SECCION, DESCRIPCION, ORDEN) VALUES (?,?,?,?)";
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sql, new String[]{"ID_SECCION"})) {
       ps.setLong(1, idPagina);
@@ -36,9 +35,8 @@ public class SeccionDAO {
   }
 
   public void actualizar(long idSeccion, SeccionDTO.Upsert dto) throws SQLException {
-    String sql = "UPDATE SECCION_INFORMATIVA " +
-                 "SET NOMBRE_SECCION = ?, DESCRIPCION = ?, ORDEN = NVL(?, ORDEN) " +
-                 "WHERE ID_SECCION = ?";
+    String seccionTable = DB.table("SECCION_INFORMATIVA");
+    String sql = "UPDATE " + seccionTable + " SET NOMBRE_SECCION = ?, DESCRIPCION = ?, ORDEN = NVL(?, ORDEN) WHERE ID_SECCION = ?";
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sql)) {
       ps.setString(1, dto.nombreSeccion);
@@ -58,23 +56,18 @@ public class SeccionDAO {
   }
 
   public void eliminar(long idSeccion) throws SQLException {
+    String seccionTable = DB.table("SECCION_INFORMATIVA");
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(
-           "DELETE FROM SECCION_INFORMATIVA WHERE ID_SECCION = ?")) {
+           "DELETE FROM " + seccionTable + " WHERE ID_SECCION = ?")) {
       ps.setLong(1, idSeccion);
       ps.executeUpdate();
     }
   }
 
   public List<SeccionDTO> listarPorPagina(long idPagina) throws SQLException {
-    String sql = """
-      SELECT ID_SECCION, ID_PAGINA, NOMBRE_SECCION,
-             DBMS_LOB.SUBSTR(DESCRIPCION, 4000, 1) AS DESCRIPCION,
-             ORDEN
-        FROM SECCION_INFORMATIVA
-       WHERE ID_PAGINA = ?
-       ORDER BY ORDEN ASC, ID_SECCION ASC
-      """;
+    String seccionTable = DB.table("SECCION_INFORMATIVA");
+    String sql = "SELECT ID_SECCION, ID_PAGINA, NOMBRE_SECCION, DBMS_LOB.SUBSTR(DESCRIPCION, 4000, 1) AS DESCRIPCION, ORDEN FROM " + seccionTable + " WHERE ID_PAGINA = ? ORDER BY ORDEN ASC, ID_SECCION ASC";
     List<SeccionDTO> out = new ArrayList<>();
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sql)) {
@@ -96,14 +89,9 @@ public class SeccionDAO {
   }
 
   public void reordenar(long idPagina, List<SeccionDTO.Reordenar> items) throws SQLException {
-    
-    String shiftSql = "UPDATE SECCION_INFORMATIVA " +
-                      "SET ORDEN = -ORDEN " +
-                      "WHERE ID_PAGINA = ? AND ORDEN IS NOT NULL";
-    
-    String upSql = "UPDATE SECCION_INFORMATIVA " +
-                   "SET ORDEN = ? " +
-                   "WHERE ID_SECCION = ? AND ID_PAGINA = ?";
+    String seccionTable = DB.table("SECCION_INFORMATIVA");
+    String shiftSql = "UPDATE " + seccionTable + " SET ORDEN = -ORDEN WHERE ID_PAGINA = ? AND ORDEN IS NOT NULL";
+    String upSql = "UPDATE " + seccionTable + " SET ORDEN = ? WHERE ID_SECCION = ? AND ID_PAGINA = ?";
     try (Connection cn = DB.getConnection()) {
       cn.setAutoCommit(false);
 

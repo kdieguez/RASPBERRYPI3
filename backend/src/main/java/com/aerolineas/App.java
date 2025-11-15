@@ -54,7 +54,40 @@ public class App {
     return 8080;
   }
 
+  private static void parseArgs(String[] args) {
+    if (args == null) return;
+    for (String arg : args) {
+      if (arg == null) continue;
+      // Parse --schema=SCHEMA_NAME
+      if (arg.startsWith("--schema=")) {
+        String schemaValue = arg.substring("--schema=".length());
+        if (!schemaValue.isBlank()) {
+          System.setProperty("schema", schemaValue);
+        }
+      }
+      // Parse --user=USER_NAME (usuario de Oracle)
+      if (arg.startsWith("--user=")) {
+        String userValue = arg.substring("--user=".length());
+        if (!userValue.isBlank()) {
+          System.setProperty("oracle.user", userValue);
+        }
+      }
+      // Parse --password=PASSWORD (contraseña de Oracle)
+      if (arg.startsWith("--password=")) {
+        String passValue = arg.substring("--password=".length());
+        if (!passValue.isBlank()) {
+          System.setProperty("oracle.password", passValue);
+        }
+      }
+      // Parse --port=PORT (ya manejado en resolvePort, pero lo dejamos para consistencia)
+      // Ya está manejado arriba
+    }
+  }
+
   public static void main(String[] args) {
+    // Parse argumentos de línea de comandos (--schema=, --port=)
+    parseArgs(args);
+    
     int port = resolvePort(args);
 
     var app = Javalin.create(cfg -> cfg.http.defaultContentType = "application/json").start(port);
@@ -101,6 +134,7 @@ public class App {
     var perfilCtrl = new PerfilController();
     var adminUsr   = new AdminUsuarioController();
     var configCtrl = new ConfigController();
+    var agenciasCtrl = new AgenciasConfigController();
 
     app.get("/health", ctx -> ctx.result("OK"));
     app.get("/api/db/ping", ctx -> ctx.json(DB.ping() ? "DB OK" : "DB FAIL"));
@@ -119,6 +153,13 @@ public class App {
     app.get("/api/config",                 configCtrl::getAll);
     app.get("/api/config/{section}",       configCtrl::getBySection);
     app.put("/api/admin/config/{section}", ctx -> requireAdmin(ctx, configCtrl::upsertSection));
+
+    // Configuración de agencias (requiere admin)
+    app.get("/api/admin/agencias",                    ctx -> requireAdmin(ctx, agenciasCtrl::list));
+    app.get("/api/admin/agencias/{id}",               ctx -> requireAdmin(ctx, agenciasCtrl::get));
+    app.post("/api/admin/agencias",                   ctx -> requireAdmin(ctx, agenciasCtrl::create));
+    app.put("/api/admin/agencias/{id}",               ctx -> requireAdmin(ctx, agenciasCtrl::update));
+    app.delete("/api/admin/agencias/{id}",            ctx -> requireAdmin(ctx, agenciasCtrl::delete));
 
     // Controladores de dominio
     new PaisController().routes(app);

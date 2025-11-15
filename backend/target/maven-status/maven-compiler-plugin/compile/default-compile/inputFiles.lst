@@ -22,12 +22,14 @@ C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\NoticiaDTO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\RatingDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\ConfigDAO.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\AgenciasConfigController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\ClaseDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\NoticiaDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\SeccionDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\RatingController.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\util\Mailer.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\controller\PaginasController.java
+C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\AgenciasConfigDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dao\ComprasDAO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\dto\RatingDTO.java
 C:\Users\danie\Documents\GitHub\AEROLINEAS\backend\src\main\java\com\aerolineas\App.java

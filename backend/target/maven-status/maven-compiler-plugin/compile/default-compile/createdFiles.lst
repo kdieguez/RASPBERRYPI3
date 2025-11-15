@@ -1,4 +1,5 @@
 com\aerolineas\controller\RutaController.class
+com\aerolineas\controller\AgenciasConfigController.class
 com\aerolineas\dto\MediaDTO$Upsert.class
 com\aerolineas\dto\TipDTO$Upsert.class
 com\aerolineas\dto\UsuarioAdminDTOs$Row.class
@@ -121,4 +122,5 @@ com\aerolineas\dto\AuthDTOs$LoginRequest.class
 com\aerolineas\dto\RutaDTOs$View.class
 com\aerolineas\dao\NoticiaDAO.class
 com\aerolineas\dto\AuthDTOs$LoginResponse.class
+com\aerolineas\dao\AgenciasConfigDAO.class
 com\aerolineas\dto\VueloDTO$ViewAdmin.class

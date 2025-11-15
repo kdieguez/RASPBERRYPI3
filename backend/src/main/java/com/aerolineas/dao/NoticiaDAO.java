@@ -9,16 +9,8 @@ import java.util.List;
 public class NoticiaDAO {
   
   public List<NoticiaDTO> listar() throws SQLException {
-    String sql = """
-      SELECT ID_NOTICIA,
-             TITULO,
-             DBMS_LOB.SUBSTR(CONTENIDO, 4000, 1) AS CONTENIDO,
-             FECHA_PUBLICACION,
-             ORDEN,
-             URL_IMAGEN
-        FROM NOTICIAS
-       ORDER BY ORDEN ASC, FECHA_PUBLICACION DESC, ID_NOTICIA DESC
-      """;
+    String noticiasTable = DB.table("NOTICIAS");
+    String sql = "SELECT ID_NOTICIA, TITULO, DBMS_LOB.SUBSTR(CONTENIDO, 4000, 1) AS CONTENIDO, FECHA_PUBLICACION, ORDEN, URL_IMAGEN FROM " + noticiasTable + " ORDER BY ORDEN ASC, FECHA_PUBLICACION DESC, ID_NOTICIA DESC";
     List<NoticiaDTO> out = new ArrayList<>();
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sql);
@@ -43,16 +35,8 @@ public class NoticiaDAO {
   }
 
   public NoticiaDTO obtenerPorId(long idNoticia) throws SQLException {
-    String sql = """
-      SELECT ID_NOTICIA,
-             TITULO,
-             DBMS_LOB.SUBSTR(CONTENIDO, 4000, 1) AS CONTENIDO,
-             FECHA_PUBLICACION,
-             ORDEN,
-             URL_IMAGEN
-        FROM NOTICIAS
-       WHERE ID_NOTICIA = ?
-      """;
+    String noticiasTable = DB.table("NOTICIAS");
+    String sql = "SELECT ID_NOTICIA, TITULO, DBMS_LOB.SUBSTR(CONTENIDO, 4000, 1) AS CONTENIDO, FECHA_PUBLICACION, ORDEN, URL_IMAGEN FROM " + noticiasTable + " WHERE ID_NOTICIA = ?";
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sql)) {
       ps.setLong(1, idNoticia);
@@ -80,9 +64,10 @@ public class NoticiaDAO {
       cn.setAutoCommit(false);
       try {
         
+        String noticiasTable = DB.table("NOTICIAS");
         int maxOrden = 0;
         try (PreparedStatement ps = cn.prepareStatement(
-            "SELECT NVL(MAX(ORDEN), 0) AS MAXO FROM NOTICIAS");
+            "SELECT NVL(MAX(ORDEN), 0) AS MAXO FROM " + noticiasTable);
              ResultSet rs = ps.executeQuery()) {
           if (rs.next()) maxOrden = rs.getInt("MAXO");
         }
@@ -98,18 +83,13 @@ public class NoticiaDAO {
         
         if (nuevoOrden <= maxOrden) {
           try (PreparedStatement ps = cn.prepareStatement(
-              "UPDATE NOTICIAS SET ORDEN = ORDEN + 1 WHERE ORDEN >= ?")) {
+              "UPDATE " + noticiasTable + " SET ORDEN = ORDEN + 1 WHERE ORDEN >= ?")) {
             ps.setInt(1, nuevoOrden);
             ps.executeUpdate();
           }
         }
         
-        String sql = """
-          INSERT INTO NOTICIAS
-            (TITULO, CONTENIDO, FECHA_PUBLICACION, ORDEN, URL_IMAGEN)
-          VALUES
-            (?, ?, NVL(?, SYSDATE), ?, ?)
-          """;
+        String sql = "INSERT INTO " + noticiasTable + " (TITULO, CONTENIDO, FECHA_PUBLICACION, ORDEN, URL_IMAGEN) VALUES (?, ?, NVL(?, SYSDATE), ?, ?)";
         try (PreparedStatement ps = cn.prepareStatement(sql, new String[]{"ID_NOTICIA"})) {
           ps.setString(1, dto.titulo);
           ps.setString(2, dto.contenido);
@@ -155,9 +135,10 @@ public class NoticiaDAO {
       cn.setAutoCommit(false);
       try {
         
+        String noticiasTable = DB.table("NOTICIAS");
         int ordenActual;
         try (PreparedStatement ps = cn.prepareStatement(
-            "SELECT ORDEN FROM NOTICIAS WHERE ID_NOTICIA = ? FOR UPDATE")) {
+            "SELECT ORDEN FROM " + noticiasTable + " WHERE ID_NOTICIA = ? FOR UPDATE")) {
           ps.setLong(1, idNoticia);
           try (ResultSet rs = ps.executeQuery()) {
             if (!rs.next()) throw new SQLException("Noticia no encontrada");
@@ -167,7 +148,7 @@ public class NoticiaDAO {
 
         int maxOrden = 0;
         try (PreparedStatement ps = cn.prepareStatement(
-            "SELECT NVL(MAX(ORDEN), 0) AS MAXO FROM NOTICIAS");
+            "SELECT NVL(MAX(ORDEN), 0) AS MAXO FROM " + noticiasTable);
              ResultSet rs = ps.executeQuery()) {
           if (rs.next()) maxOrden = rs.getInt("MAXO");
         }
@@ -185,9 +166,7 @@ public class NoticiaDAO {
           if (nuevoOrden < ordenActual) {
             
             try (PreparedStatement ps = cn.prepareStatement(
-                "UPDATE NOTICIAS " +
-                "   SET ORDEN = ORDEN + 1 " +
-                " WHERE ORDEN >= ? AND ORDEN < ? AND ID_NOTICIA <> ?")) {
+                "UPDATE " + noticiasTable + " SET ORDEN = ORDEN + 1 WHERE ORDEN >= ? AND ORDEN < ? AND ID_NOTICIA <> ?")) {
               ps.setInt(1, nuevoOrden);
               ps.setInt(2, ordenActual);
               ps.setLong(3, idNoticia);
@@ -196,9 +175,7 @@ public class NoticiaDAO {
           } else {
             
             try (PreparedStatement ps = cn.prepareStatement(
-                "UPDATE NOTICIAS " +
-                "   SET ORDEN = ORDEN - 1 " +
-                " WHERE ORDEN <= ? AND ORDEN > ? AND ID_NOTICIA <> ?")) {
+                "UPDATE " + noticiasTable + " SET ORDEN = ORDEN - 1 WHERE ORDEN <= ? AND ORDEN > ? AND ID_NOTICIA <> ?")) {
               ps.setInt(1, nuevoOrden);
               ps.setInt(2, ordenActual);
               ps.setLong(3, idNoticia);
@@ -207,15 +184,7 @@ public class NoticiaDAO {
           }
         }
         
-        String up = """
-          UPDATE NOTICIAS
-             SET TITULO = ?,
-                 CONTENIDO = ?,
-                 FECHA_PUBLICACION = NVL(?, FECHA_PUBLICACION),
-                 ORDEN = ?,
-                 URL_IMAGEN = ?
-           WHERE ID_NOTICIA = ?
-          """;
+        String up = "UPDATE " + noticiasTable + " SET TITULO = ?, CONTENIDO = ?, FECHA_PUBLICACION = NVL(?, FECHA_PUBLICACION), ORDEN = ?, URL_IMAGEN = ? WHERE ID_NOTICIA = ?";
         try (PreparedStatement ps = cn.prepareStatement(up)) {
           ps.setString(1, dto.titulo);
           ps.setString(2, dto.contenido);
@@ -257,9 +226,10 @@ public class NoticiaDAO {
     try (Connection cn = DB.getConnection()) {
       cn.setAutoCommit(false);
       try {
+        String noticiasTable = DB.table("NOTICIAS");
         Integer orden = null;
         try (PreparedStatement ps = cn.prepareStatement(
-            "SELECT ORDEN FROM NOTICIAS WHERE ID_NOTICIA = ?")) {
+            "SELECT ORDEN FROM " + noticiasTable + " WHERE ID_NOTICIA = ?")) {
           ps.setLong(1, idNoticia);
           try (ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
@@ -270,14 +240,14 @@ public class NoticiaDAO {
         }
 
         try (PreparedStatement ps = cn.prepareStatement(
-            "DELETE FROM NOTICIAS WHERE ID_NOTICIA = ?")) {
+            "DELETE FROM " + noticiasTable + " WHERE ID_NOTICIA = ?")) {
           ps.setLong(1, idNoticia);
           ps.executeUpdate();
         }
 
         if (orden != null) {
           try (PreparedStatement ps = cn.prepareStatement(
-              "UPDATE NOTICIAS SET ORDEN = ORDEN - 1 WHERE ORDEN > ?")) {
+              "UPDATE " + noticiasTable + " SET ORDEN = ORDEN - 1 WHERE ORDEN > ?")) {
             ps.setInt(1, orden);
             ps.executeUpdate();
           }

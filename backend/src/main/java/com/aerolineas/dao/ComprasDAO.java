@@ -1,5 +1,6 @@
 package com.aerolineas.dao;
 
+import com.aerolineas.config.DB;
 import java.sql.*;
 import java.util.*;
 import java.math.BigDecimal;
@@ -39,8 +40,9 @@ public class ComprasDAO {
   }
 
   private Long getParejaId(Connection cn, long idVuelo) throws SQLException {
+    String vueloTable = DB.table("VUELO");
     try (PreparedStatement ps = cn.prepareStatement(
-        "SELECT ID_VUELO_PAREJA FROM AEROLINEA.VUELO WHERE ID_VUELO=?")) {
+        "SELECT ID_VUELO_PAREJA FROM " + vueloTable + " WHERE ID_VUELO=?")) {
       ps.setLong(1, idVuelo);
       try (ResultSet rs = ps.executeQuery()) {
         if (rs.next()) {
@@ -53,9 +55,11 @@ public class ComprasDAO {
   }
 
   private void validarVueloDisponible(Connection cn, long idVuelo) throws SQLException {
+    String vueloTable = DB.table("VUELO");
+    String estadosTable = DB.table("ESTADOS");
     try (PreparedStatement ps = cn.prepareStatement(
         "SELECT NVL(v.ACTIVO,1) AS ACTIVO, UPPER(e.ESTADO) AS ESTADO " +
-        "FROM AEROLINEA.VUELO v JOIN AEROLINEA.ESTADOS e ON e.ID_ESTADO=v.ID_ESTADO " +
+        "FROM " + vueloTable + " v JOIN " + estadosTable + " e ON e.ID_ESTADO=v.ID_ESTADO " +
         "WHERE v.ID_VUELO = ?")) {
       ps.setLong(1, idVuelo);
       try (ResultSet rs = ps.executeQuery()) {
@@ -75,7 +79,9 @@ public class ComprasDAO {
   }
 
   private ClaseInfo getClaseInfo(Connection cn, long idVuelo, int idClase, boolean forUpdate) throws SQLException {
-    String sql = "SELECT CUPO_TOTAL, PRECIO FROM AEROLINEA.SALIDA_CLASE WHERE ID_VUELO = ? AND ID_CLASE = ?"
+    String salidaClaseTable = DB.table("SALIDA_CLASE");
+    String vueloClaseTable = DB.table("VUELO_CLASE");
+    String sql = "SELECT CUPO_TOTAL, PRECIO FROM " + salidaClaseTable + " WHERE ID_VUELO = ? AND ID_CLASE = ?"
                + (forUpdate ? " FOR UPDATE" : "");
     try (PreparedStatement ps = cn.prepareStatement(sql)) {
       ps.setLong(1, idVuelo);
@@ -87,7 +93,7 @@ public class ComprasDAO {
           ci.precio = rs.getBigDecimal("PRECIO");
           if (ci.precio == null) {
             try (PreparedStatement ps2 = cn.prepareStatement(
-                "SELECT PRECIO FROM AEROLINEA.VUELO_CLASE WHERE ID_VUELO = ? AND ID_CLASE = ?")) {
+                "SELECT PRECIO FROM " + vueloClaseTable + " WHERE ID_VUELO = ? AND ID_CLASE = ?")) {
               ps2.setLong(1, idVuelo);
               ps2.setInt(2, idClase);
               try (ResultSet rs2 = ps2.executeQuery()) {
@@ -103,9 +109,11 @@ public class ComprasDAO {
   }
 
   private int getReservados(Connection cn, long idVuelo, int idClase) throws SQLException {
+    String reservaItemTable = DB.table("RESERVA_ITEM");
+    String reservaTable = DB.table("RESERVA");
     try (PreparedStatement ps = cn.prepareStatement(
-        "SELECT NVL(COUNT(*),0) FROM AEROLINEA.RESERVA_ITEM ri " +
-        "JOIN AEROLINEA.RESERVA r ON r.ID_RESERVA = ri.ID_RESERVA " +
+        "SELECT NVL(COUNT(*),0) FROM " + reservaItemTable + " ri " +
+        "JOIN " + reservaTable + " r ON r.ID_RESERVA = ri.ID_RESERVA " +
         "WHERE ri.ID_VUELO=? AND ri.ID_CLASE=? AND r.ID_ESTADO=1")) {
       ps.setLong(1, idVuelo);
       ps.setInt(2, idClase);
@@ -115,8 +123,9 @@ public class ComprasDAO {
   }
 
   private int getEnCarritos(Connection cn, long idVuelo, int idClase) throws SQLException {
+    String carritoItemTable = DB.table("CARRITO_ITEM");
     try (PreparedStatement ps = cn.prepareStatement(
-        "SELECT NVL(SUM(CANTIDAD),0) FROM AEROLINEA.CARRITO_ITEM WHERE ID_VUELO=? AND ID_CLASE=?")) {
+        "SELECT NVL(SUM(CANTIDAD),0) FROM " + carritoItemTable + " WHERE ID_VUELO=? AND ID_CLASE=?")) {
       ps.setLong(1, idVuelo);
       ps.setInt(2, idClase);
       try (ResultSet rs = ps.executeQuery()) { if (rs.next()) return rs.getInt(1); }
@@ -125,8 +134,9 @@ public class ComprasDAO {
   }
 
   private Long findCartItemIdFor(Connection cn, long cartId, long idVuelo, int idClase) throws SQLException {
+    String carritoItemTable = DB.table("CARRITO_ITEM");
     try (PreparedStatement ps = cn.prepareStatement(
-        "SELECT ID_ITEM FROM AEROLINEA.CARRITO_ITEM WHERE ID_CARRITO=? AND ID_VUELO=? AND ID_CLASE=?")) {
+        "SELECT ID_ITEM FROM " + carritoItemTable + " WHERE ID_CARRITO=? AND ID_VUELO=? AND ID_CLASE=?")) {
       ps.setLong(1, cartId);
       ps.setLong(2, idVuelo);
       ps.setInt(3, idClase);
@@ -138,21 +148,22 @@ public class ComprasDAO {
   }
 
   public long ensureCartForUser(long userId) throws Exception {
+    String carritoTable = DB.table("CARRITO");
     try (Connection cn = getConn()) {
       try (PreparedStatement ps = cn.prepareStatement(
-          "SELECT ID_CARRITO FROM AEROLINEA.CARRITO WHERE ID_USUARIO = ?")) {
+          "SELECT ID_CARRITO FROM " + carritoTable + " WHERE ID_USUARIO = ?")) {
         ps.setLong(1, userId);
         try (ResultSet rs = ps.executeQuery()) {
           if (rs.next()) return rs.getLong(1);
         }
       }
       try (PreparedStatement ps = cn.prepareStatement(
-          "INSERT INTO AEROLINEA.CARRITO(ID_USUARIO) VALUES (?)")) {
+          "INSERT INTO " + carritoTable + "(ID_USUARIO) VALUES (?)")) {
         ps.setLong(1, userId);
         ps.executeUpdate();
       }
       try (PreparedStatement ps = cn.prepareStatement(
-          "SELECT ID_CARRITO FROM AEROLINEA.CARRITO WHERE ID_USUARIO = ?")) {
+          "SELECT ID_CARRITO FROM " + carritoTable + " WHERE ID_USUARIO = ?")) {
         ps.setLong(1, userId);
         try (ResultSet rs = ps.executeQuery()) {
           if (rs.next()) return rs.getLong(1);
@@ -168,9 +179,10 @@ public class ComprasDAO {
     out.items = new ArrayList<>();
 
     try (Connection cn = getConn()) {
+      String vwCarritoTable = DB.table("VW_CARRITO_RESUMEN");
       try (PreparedStatement ps = cn.prepareStatement(
           "SELECT ID_CARRITO, ID_USUARIO, FECHA_CREACION, TOTAL " +
-          "FROM AEROLINEA.VW_CARRITO_RESUMEN WHERE ID_CARRITO = ?")) {
+          "FROM " + vwCarritoTable + " WHERE ID_CARRITO = ?")) {
         ps.setLong(1, cartId);
         try (ResultSet rs = ps.executeQuery()) {
           if (rs.next()) {
@@ -184,6 +196,12 @@ public class ComprasDAO {
       }
       if (out.total == null) out.total = BigDecimal.ZERO;
 
+      String carritoItemTable = DB.table("CARRITO_ITEM");
+      String vueloTable = DB.table("VUELO");
+      String claseTable = DB.table("CLASE_ASIENTO");
+      String rutaTable = DB.table("RUTA");
+      String ciudadTable = DB.table("CIUDAD");
+      String paisTable = DB.table("PAIS");
       String SQL_ITEMS =
         "SELECT ci.ID_ITEM, ci.ID_CARRITO, ci.ID_VUELO, v.CODIGO AS CODIGO_VUELO, " +
         "       v.FECHA_SALIDA, v.FECHA_LLEGADA, " +
@@ -191,14 +209,14 @@ public class ComprasDAO {
         "       ci.CANTIDAD, ci.PRECIO_UNITARIO, (ci.CANTIDAD*ci.PRECIO_UNITARIO) AS SUBTOTAL, " +
         "       po.NOMBRE AS PAIS_ORIGEN, pd.NOMBRE AS PAIS_DESTINO, " +
         "       co.NOMBRE AS CIUDAD_ORIGEN, cd.NOMBRE AS CIUDAD_DESTINO " +
-        "FROM AEROLINEA.CARRITO_ITEM ci " +
-        "JOIN AEROLINEA.VUELO v ON v.ID_VUELO = ci.ID_VUELO " +
-        "JOIN AEROLINEA.CLASE_ASIENTO ca ON ca.ID_CLASE = ci.ID_CLASE " +
-        "JOIN AEROLINEA.RUTA r ON r.ID_RUTA = v.ID_RUTA " +
-        "JOIN AEROLINEA.CIUDAD co ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN " +
-        "JOIN AEROLINEA.CIUDAD cd ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO " +
-        "JOIN AEROLINEA.PAIS po ON po.ID_PAIS = co.ID_PAIS " +
-        "JOIN AEROLINEA.PAIS pd ON pd.ID_PAIS = cd.ID_PAIS " +
+        "FROM " + carritoItemTable + " ci " +
+        "JOIN " + vueloTable + " v ON v.ID_VUELO = ci.ID_VUELO " +
+        "JOIN " + claseTable + " ca ON ca.ID_CLASE = ci.ID_CLASE " +
+        "JOIN " + rutaTable + " r ON r.ID_RUTA = v.ID_RUTA " +
+        "JOIN " + ciudadTable + " co ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN " +
+        "JOIN " + ciudadTable + " cd ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO " +
+        "JOIN " + paisTable + " po ON po.ID_PAIS = co.ID_PAIS " +
+        "JOIN " + paisTable + " pd ON pd.ID_PAIS = cd.ID_PAIS " +
         "WHERE ci.ID_CARRITO = ? " +
         "ORDER BY ci.ID_ITEM";
 
@@ -269,8 +287,9 @@ public class ComprasDAO {
         }
 
 
+        String carritoItemTable = DB.table("CARRITO_ITEM");
         try (PreparedStatement ps = cn.prepareStatement(
-            "MERGE INTO AEROLINEA.CARRITO_ITEM t " +
+            "MERGE INTO " + carritoItemTable + " t " +
             "USING (SELECT ? idc, ? idv, ? idcl FROM dual) s " +
             "ON (t.ID_CARRITO = s.idc AND t.ID_VUELO = s.idv AND t.ID_CLASE = s.idcl) " +
             "WHEN MATCHED THEN UPDATE SET t.CANTIDAD = t.CANTIDAD + ? " +
@@ -287,8 +306,9 @@ public class ComprasDAO {
 
 
         if (parejaId != null) {
+          String carritoItemTable2 = DB.table("CARRITO_ITEM");
           try (PreparedStatement ps = cn.prepareStatement(
-              "MERGE INTO AEROLINEA.CARRITO_ITEM t " +
+              "MERGE INTO " + carritoItemTable2 + " t " +
               "USING (SELECT ? idc, ? idv, ? idcl FROM dual) s " +
               "ON (t.ID_CARRITO = s.idc AND t.ID_VUELO = s.idv AND t.ID_CLASE = s.idcl) " +
               "WHEN MATCHED THEN UPDATE SET t.CANTIDAD = t.CANTIDAD + ? " +
@@ -326,8 +346,9 @@ public class ComprasDAO {
       try {
 
         long idVuelo; int idClase; int cantActual;
+        String carritoItemTable = DB.table("CARRITO_ITEM");
         try (PreparedStatement ps = cn.prepareStatement(
-            "SELECT ID_VUELO, ID_CLASE, CANTIDAD FROM AEROLINEA.CARRITO_ITEM " +
+            "SELECT ID_VUELO, ID_CLASE, CANTIDAD FROM " + carritoItemTable + " " +
             "WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
           ps.setLong(1, idItem);
           ps.setLong(2, cartId);
@@ -352,7 +373,7 @@ public class ComprasDAO {
 
         if (!aumentando) {
           try (PreparedStatement ps = cn.prepareStatement(
-              "UPDATE AEROLINEA.CARRITO_ITEM SET CANTIDAD = ? WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
+              "UPDATE " + carritoItemTable + " SET CANTIDAD = ? WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
             ps.setInt(1, cantidad);
             ps.setLong(2, idItem);
             ps.setLong(3, cartId);
@@ -360,7 +381,7 @@ public class ComprasDAO {
           }
           if (syncPareja && parejaItemId != null) {
             try (PreparedStatement ps = cn.prepareStatement(
-                "UPDATE AEROLINEA.CARRITO_ITEM SET CANTIDAD = ? WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
+                "UPDATE " + carritoItemTable + " SET CANTIDAD = ? WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
               ps.setInt(1, cantidad);
               ps.setLong(2, parejaItemId);
               ps.setLong(3, cartId);
@@ -387,7 +408,7 @@ public class ComprasDAO {
 
           int cantActualP;
           try (PreparedStatement ps = cn.prepareStatement(
-              "SELECT CANTIDAD FROM AEROLINEA.CARRITO_ITEM WHERE ID_ITEM=? AND ID_CARRITO=?")) {
+              "SELECT CANTIDAD FROM " + carritoItemTable + " WHERE ID_ITEM=? AND ID_CARRITO=?")) {
             ps.setLong(1, parejaItemId);
             ps.setLong(2, cartId);
             try (ResultSet rs = ps.executeQuery()) { rs.next(); cantActualP = rs.getInt(1); }
@@ -401,7 +422,7 @@ public class ComprasDAO {
 
 
         try (PreparedStatement ps = cn.prepareStatement(
-            "UPDATE AEROLINEA.CARRITO_ITEM SET CANTIDAD = ? WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
+            "UPDATE " + carritoItemTable + " SET CANTIDAD = ? WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
           ps.setInt(1, cantidad);
           ps.setLong(2, idItem);
           ps.setLong(3, cartId);
@@ -409,7 +430,7 @@ public class ComprasDAO {
         }
         if (syncPareja && parejaItemId != null) {
           try (PreparedStatement ps = cn.prepareStatement(
-              "UPDATE AEROLINEA.CARRITO_ITEM SET CANTIDAD = ? WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
+              "UPDATE " + carritoItemTable + " SET CANTIDAD = ? WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
             ps.setInt(1, cantidad);
             ps.setLong(2, parejaItemId);
             ps.setLong(3, cartId);
@@ -436,8 +457,9 @@ public class ComprasDAO {
       cn.setAutoCommit(false);
       try {
         long idVuelo; int idClase;
+        String carritoItemTable = DB.table("CARRITO_ITEM");
         try (PreparedStatement ps = cn.prepareStatement(
-            "SELECT ID_VUELO, ID_CLASE FROM AEROLINEA.CARRITO_ITEM WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
+            "SELECT ID_VUELO, ID_CLASE FROM " + carritoItemTable + " WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
           ps.setLong(1, idItem);
           ps.setLong(2, cartId);
           try (ResultSet rs = ps.executeQuery()) {
@@ -456,7 +478,7 @@ public class ComprasDAO {
         }
 
         try (PreparedStatement ps = cn.prepareStatement(
-            "DELETE FROM AEROLINEA.CARRITO_ITEM WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
+            "DELETE FROM " + carritoItemTable + " WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
           ps.setLong(1, idItem);
           ps.setLong(2, cartId);
           ps.executeUpdate();
@@ -464,7 +486,7 @@ public class ComprasDAO {
 
         if (syncPareja && parejaItemId != null) {
           try (PreparedStatement ps = cn.prepareStatement(
-              "DELETE FROM AEROLINEA.CARRITO_ITEM WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
+              "DELETE FROM " + carritoItemTable + " WHERE ID_ITEM = ? AND ID_CARRITO = ?")) {
             ps.setLong(1, parejaItemId);
             ps.setLong(2, cartId);
             ps.executeUpdate();
@@ -483,8 +505,9 @@ public class ComprasDAO {
   public long checkout(long userId) throws Exception {
     long cartId = ensureCartForUser(userId);
     try (Connection cn = getConn()) {
+      String carritoItemTable = DB.table("CARRITO_ITEM");
       try (PreparedStatement ps = cn.prepareStatement(
-          "SELECT COUNT(*) FROM AEROLINEA.CARRITO_ITEM WHERE ID_CARRITO = ?")) {
+          "SELECT COUNT(*) FROM " + carritoItemTable + " WHERE ID_CARRITO = ?")) {
         ps.setLong(1, cartId);
         try (ResultSet rs = ps.executeQuery()) {
           if (rs.next() && rs.getInt(1) == 0) {
@@ -493,7 +516,8 @@ public class ComprasDAO {
         }
       }
       long idGenerado;
-      try (CallableStatement cs = cn.prepareCall("{ call AEROLINEA.PR_CHECKOUT_CARRITO(?,?,?) }")) {
+      String schema = DB.getSchema();
+      try (CallableStatement cs = cn.prepareCall("{ call " + schema + ".PR_CHECKOUT_CARRITO(?,?,?) }")) {
         cs.setLong(1, userId);
         cs.setLong(2, cartId);
         cs.registerOutParameter(3, java.sql.Types.NUMERIC);
@@ -506,10 +530,11 @@ public class ComprasDAO {
 
   public List<ReservaListItem> listReservasByUser(long userId) throws Exception {
     var out = new ArrayList<ReservaListItem>();
+    String reservaTable = DB.table("RESERVA");
     try (Connection cn = getConn();
          PreparedStatement ps = cn.prepareStatement(
            "SELECT ID_RESERVA, ID_USUARIO, ID_ESTADO, TOTAL, CREADA_EN, CODIGO " +
-           "FROM AEROLINEA.RESERVA WHERE ID_USUARIO = ? " +
+           "FROM " + reservaTable + " WHERE ID_USUARIO = ? " +
            "ORDER BY ID_RESERVA DESC")) {
       ps.setLong(1, userId);
       try (ResultSet rs = ps.executeQuery()) {
@@ -534,11 +559,13 @@ public class ComprasDAO {
   det.items = new ArrayList<>();
 
   try (Connection cn = getConn()) {
+    String reservaTable = DB.table("RESERVA");
+    String usuarioTable = DB.table("USUARIO");
     try (PreparedStatement ps = cn.prepareStatement(
          "SELECT r.ID_USUARIO, r.ID_ESTADO, r.TOTAL, r.CREADA_EN, r.CODIGO, " +
          "       u.NOMBRES, u.APELLIDOS, u.EMAIL " +
-         "FROM AEROLINEA.RESERVA r " +
-         "JOIN AEROLINEA.USUARIO u ON u.ID_USUARIO = r.ID_USUARIO " +
+         "FROM " + reservaTable + " r " +
+         "JOIN " + usuarioTable + " u ON u.ID_USUARIO = r.ID_USUARIO " +
          "WHERE r.ID_RESERVA = ?")) {
       ps.setLong(1, idReserva);
       try (ResultSet rs = ps.executeQuery()) {
@@ -562,51 +589,14 @@ public class ComprasDAO {
       }
     }
 
+    String reservaItemTable = DB.table("RESERVA_ITEM");
+    String vueloTable = DB.table("VUELO");
+    String claseTable = DB.table("CLASE_ASIENTO");
+    String rutaTable = DB.table("RUTA");
+    String ciudadTable = DB.table("CIUDAD");
+    String paisTable = DB.table("PAIS");
     final String SQL_DET =
-      """
-      SELECT
-          (ri.ID_VUELO * 1000 + ri.ID_CLASE) AS ID_ITEM,
-          ri.ID_VUELO,
-          v.CODIGO AS CODIGO_VUELO,
-          v.FECHA_SALIDA,
-          v.FECHA_LLEGADA,
-          ri.ID_CLASE,
-          ca.NOMBRE AS NOMBRE_CLASE,
-          COUNT(*) AS CANTIDAD,
-          MIN(ri.PRECIO_UNITARIO) AS PRECIO_UNITARIO,
-          SUM(ri.PRECIO_UNITARIO) AS SUBTOTAL,
-          po.NOMBRE AS PAIS_ORIGEN,
-          pd.NOMBRE AS PAIS_DESTINO,
-          co.NOMBRE AS CIUDAD_ORIGEN,
-          cd.NOMBRE AS CIUDAD_DESTINO,
-          MIN(vp.CODIGO)        AS REGRESO_CODIGO,
-          MIN(vp.FECHA_SALIDA)  AS REGRESO_SALIDA,
-          MIN(vp.FECHA_LLEGADA) AS REGRESO_LLEGADA,
-          MIN(corp.NOMBRE)      AS REGRESO_CIUDAD_ORIGEN,
-          MIN(pop.NOMBRE)       AS REGRESO_PAIS_ORIGEN,
-          MIN(cdp.NOMBRE)       AS REGRESO_CIUDAD_DESTINO,
-          MIN(pdp.NOMBRE)       AS REGRESO_PAIS_DESTINO
-      FROM AEROLINEA.RESERVA_ITEM ri
-      JOIN AEROLINEA.VUELO v            ON v.ID_VUELO = ri.ID_VUELO
-      JOIN AEROLINEA.CLASE_ASIENTO ca   ON ca.ID_CLASE = ri.ID_CLASE
-      JOIN AEROLINEA.RUTA r             ON r.ID_RUTA = v.ID_RUTA
-      JOIN AEROLINEA.CIUDAD co          ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN
-      JOIN AEROLINEA.CIUDAD cd          ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO
-      JOIN AEROLINEA.PAIS po            ON po.ID_PAIS = co.ID_PAIS
-      JOIN AEROLINEA.PAIS pd            ON pd.ID_PAIS = cd.ID_PAIS
-      LEFT JOIN AEROLINEA.VUELO vp      ON vp.ID_VUELO = v.ID_VUELO_PAREJA
-      LEFT JOIN AEROLINEA.RUTA rp       ON rp.ID_RUTA = vp.ID_RUTA
-      LEFT JOIN AEROLINEA.CIUDAD corp   ON corp.ID_CIUDAD = rp.ID_CIUDAD_ORIGEN
-      LEFT JOIN AEROLINEA.CIUDAD cdp    ON cdp.ID_CIUDAD  = rp.ID_CIUDAD_DESTINO
-      LEFT JOIN AEROLINEA.PAIS pop      ON pop.ID_PAIS    = corp.ID_PAIS
-      LEFT JOIN AEROLINEA.PAIS pdp      ON pdp.ID_PAIS    = cdp.ID_PAIS
-      WHERE ri.ID_RESERVA = ?
-      GROUP BY
-          ri.ID_VUELO, v.CODIGO, v.FECHA_SALIDA, v.FECHA_LLEGADA,
-          ri.ID_CLASE, ca.NOMBRE,
-          po.NOMBRE, pd.NOMBRE, co.NOMBRE, cd.NOMBRE
-      ORDER BY v.FECHA_SALIDA, ri.ID_CLASE
-      """;
+      "SELECT (ri.ID_VUELO * 1000 + ri.ID_CLASE) AS ID_ITEM, ri.ID_VUELO, v.CODIGO AS CODIGO_VUELO, v.FECHA_SALIDA, v.FECHA_LLEGADA, ri.ID_CLASE, ca.NOMBRE AS NOMBRE_CLASE, COUNT(*) AS CANTIDAD, MIN(ri.PRECIO_UNITARIO) AS PRECIO_UNITARIO, SUM(ri.PRECIO_UNITARIO) AS SUBTOTAL, po.NOMBRE AS PAIS_ORIGEN, pd.NOMBRE AS PAIS_DESTINO, co.NOMBRE AS CIUDAD_ORIGEN, cd.NOMBRE AS CIUDAD_DESTINO, MIN(vp.CODIGO) AS REGRESO_CODIGO, MIN(vp.FECHA_SALIDA) AS REGRESO_SALIDA, MIN(vp.FECHA_LLEGADA) AS REGRESO_LLEGADA, MIN(corp.NOMBRE) AS REGRESO_CIUDAD_ORIGEN, MIN(pop.NOMBRE) AS REGRESO_PAIS_ORIGEN, MIN(cdp.NOMBRE) AS REGRESO_CIUDAD_DESTINO, MIN(pdp.NOMBRE) AS REGRESO_PAIS_DESTINO FROM " + reservaItemTable + " ri JOIN " + vueloTable + " v ON v.ID_VUELO = ri.ID_VUELO JOIN " + claseTable + " ca ON ca.ID_CLASE = ri.ID_CLASE JOIN " + rutaTable + " r ON r.ID_RUTA = v.ID_RUTA JOIN " + ciudadTable + " co ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN JOIN " + ciudadTable + " cd ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO JOIN " + paisTable + " po ON po.ID_PAIS = co.ID_PAIS JOIN " + paisTable + " pd ON pd.ID_PAIS = cd.ID_PAIS LEFT JOIN " + vueloTable + " vp ON vp.ID_VUELO = v.ID_VUELO_PAREJA LEFT JOIN " + rutaTable + " rp ON rp.ID_RUTA = vp.ID_RUTA LEFT JOIN " + ciudadTable + " corp ON corp.ID_CIUDAD = rp.ID_CIUDAD_ORIGEN LEFT JOIN " + ciudadTable + " cdp ON cdp.ID_CIUDAD = rp.ID_CIUDAD_DESTINO LEFT JOIN " + paisTable + " pop ON pop.ID_PAIS = corp.ID_PAIS LEFT JOIN " + paisTable + " pdp ON pdp.ID_PAIS = cdp.ID_PAIS WHERE ri.ID_RESERVA = ? GROUP BY ri.ID_VUELO, v.CODIGO, v.FECHA_SALIDA, v.FECHA_LLEGADA, ri.ID_CLASE, ca.NOMBRE, po.NOMBRE, pd.NOMBRE, co.NOMBRE, cd.NOMBRE ORDER BY v.FECHA_SALIDA, ri.ID_CLASE";
 
     try (PreparedStatement ps = cn.prepareStatement(SQL_DET)) {
       ps.setLong(1, idReserva);
@@ -659,19 +649,16 @@ public class ComprasDAO {
 
     var out = new ArrayList<CompraDTO.ReservaListItem>();
 
+    String reservaTable = DB.table("RESERVA");
+    String usuarioTable = DB.table("USUARIO");
+    String reservaItemTable = DB.table("RESERVA_ITEM");
+    String vueloTable = DB.table("VUELO");
     StringBuilder sb = new StringBuilder();
-    sb.append("""
-        SELECT r.ID_RESERVA, r.ID_USUARIO, r.ID_ESTADO, r.TOTAL, r.CREADA_EN, r.CODIGO
-        FROM AEROLINEA.RESERVA r
-        JOIN AEROLINEA.USUARIO u ON u.ID_USUARIO = r.ID_USUARIO
-        """);
+    sb.append("SELECT r.ID_RESERVA, r.ID_USUARIO, r.ID_ESTADO, r.TOTAL, r.CREADA_EN, r.CODIGO FROM " + reservaTable + " r JOIN " + usuarioTable + " u ON u.ID_USUARIO = r.ID_USUARIO ");
 
     boolean joinVuelo = (vuelo != null && !vuelo.isBlank());
     if (joinVuelo) {
-      sb.append("""
-          JOIN AEROLINEA.RESERVA_ITEM ri ON ri.ID_RESERVA = r.ID_RESERVA
-          JOIN AEROLINEA.VUELO v ON v.ID_VUELO = ri.ID_VUELO
-          """);
+      sb.append("JOIN " + reservaItemTable + " ri ON ri.ID_RESERVA = r.ID_RESERVA JOIN " + vueloTable + " v ON v.ID_VUELO = ri.ID_VUELO ");
     }
 
     sb.append(" WHERE 1=1 ");
@@ -758,11 +745,13 @@ public class ComprasDAO {
   det.items = new ArrayList<>();
 
   try (Connection cn = getConn()) {
+    String reservaTable = DB.table("RESERVA");
+    String usuarioTable = DB.table("USUARIO");
     try (PreparedStatement ps = cn.prepareStatement(
          "SELECT r.ID_USUARIO, r.ID_ESTADO, r.TOTAL, r.CREADA_EN, r.CODIGO, " +
          "       u.NOMBRES, u.APELLIDOS, u.EMAIL " +
-         "FROM AEROLINEA.RESERVA r " +
-         "JOIN AEROLINEA.USUARIO u ON u.ID_USUARIO = r.ID_USUARIO " +
+         "FROM " + reservaTable + " r " +
+         "JOIN " + usuarioTable + " u ON u.ID_USUARIO = r.ID_USUARIO " +
          "WHERE r.ID_RESERVA = ?")) {
       ps.setLong(1, idReserva);
       try (ResultSet rs = ps.executeQuery()) {
@@ -784,51 +773,14 @@ public class ComprasDAO {
       }
     }
 
+    String reservaItemTable = DB.table("RESERVA_ITEM");
+    String vueloTable = DB.table("VUELO");
+    String claseTable = DB.table("CLASE_ASIENTO");
+    String rutaTable = DB.table("RUTA");
+    String ciudadTable = DB.table("CIUDAD");
+    String paisTable = DB.table("PAIS");
     final String SQL_DET =
-      """
-      SELECT
-          (ri.ID_VUELO * 1000 + ri.ID_CLASE) AS ID_ITEM,
-          ri.ID_VUELO,
-          v.CODIGO AS CODIGO_VUELO,
-          v.FECHA_SALIDA,
-          v.FECHA_LLEGADA,
-          ri.ID_CLASE,
-          ca.NOMBRE AS NOMBRE_CLASE,
-          COUNT(*) AS CANTIDAD,
-          MIN(ri.PRECIO_UNITARIO) AS PRECIO_UNITARIO,
-          SUM(ri.PRECIO_UNITARIO) AS SUBTOTAL,
-          po.NOMBRE AS PAIS_ORIGEN,
-          pd.NOMBRE AS PAIS_DESTINO,
-          co.NOMBRE AS CIUDAD_ORIGEN,
-          cd.NOMBRE AS CIUDAD_DESTINO,
-          MIN(vp.CODIGO)        AS REGRESO_CODIGO,
-          MIN(vp.FECHA_SALIDA)  AS REGRESO_SALIDA,
-          MIN(vp.FECHA_LLEGADA) AS REGRESO_LLEGADA,
-          MIN(corp.NOMBRE)      AS REGRESO_CIUDAD_ORIGEN,
-          MIN(pop.NOMBRE)       AS REGRESO_PAIS_ORIGEN,
-          MIN(cdp.NOMBRE)       AS REGRESO_CIUDAD_DESTINO,
-          MIN(pdp.NOMBRE)       AS REGRESO_PAIS_DESTINO
-      FROM AEROLINEA.RESERVA_ITEM ri
-      JOIN AEROLINEA.VUELO v            ON v.ID_VUELO = ri.ID_VUELO
-      JOIN AEROLINEA.CLASE_ASIENTO ca   ON ca.ID_CLASE = ri.ID_CLASE
-      JOIN AEROLINEA.RUTA r             ON r.ID_RUTA = v.ID_RUTA
-      JOIN AEROLINEA.CIUDAD co          ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN
-      JOIN AEROLINEA.CIUDAD cd          ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO
-      JOIN AEROLINEA.PAIS po            ON po.ID_PAIS = co.ID_PAIS
-      JOIN AEROLINEA.PAIS pd            ON pd.ID_PAIS = cd.ID_PAIS
-      LEFT JOIN AEROLINEA.VUELO vp      ON vp.ID_VUELO = v.ID_VUELO_PAREJA
-      LEFT JOIN AEROLINEA.RUTA rp       ON rp.ID_RUTA = vp.ID_RUTA
-      LEFT JOIN AEROLINEA.CIUDAD corp   ON corp.ID_CIUDAD = rp.ID_CIUDAD_ORIGEN
-      LEFT JOIN AEROLINEA.CIUDAD cdp    ON cdp.ID_CIUDAD  = rp.ID_CIUDAD_DESTINO
-      LEFT JOIN AEROLINEA.PAIS pop      ON pop.ID_PAIS    = corp.ID_PAIS
-      LEFT JOIN AEROLINEA.PAIS pdp      ON pdp.ID_PAIS    = cdp.ID_PAIS
-      WHERE ri.ID_RESERVA = ?
-      GROUP BY
-          ri.ID_VUELO, v.CODIGO, v.FECHA_SALIDA, v.FECHA_LLEGADA,
-          ri.ID_CLASE, ca.NOMBRE,
-          po.NOMBRE, pd.NOMBRE, co.NOMBRE, cd.NOMBRE
-      ORDER BY v.FECHA_SALIDA, ri.ID_CLASE
-      """;
+      "SELECT (ri.ID_VUELO * 1000 + ri.ID_CLASE) AS ID_ITEM, ri.ID_VUELO, v.CODIGO AS CODIGO_VUELO, v.FECHA_SALIDA, v.FECHA_LLEGADA, ri.ID_CLASE, ca.NOMBRE AS NOMBRE_CLASE, COUNT(*) AS CANTIDAD, MIN(ri.PRECIO_UNITARIO) AS PRECIO_UNITARIO, SUM(ri.PRECIO_UNITARIO) AS SUBTOTAL, po.NOMBRE AS PAIS_ORIGEN, pd.NOMBRE AS PAIS_DESTINO, co.NOMBRE AS CIUDAD_ORIGEN, cd.NOMBRE AS CIUDAD_DESTINO, MIN(vp.CODIGO) AS REGRESO_CODIGO, MIN(vp.FECHA_SALIDA) AS REGRESO_SALIDA, MIN(vp.FECHA_LLEGADA) AS REGRESO_LLEGADA, MIN(corp.NOMBRE) AS REGRESO_CIUDAD_ORIGEN, MIN(pop.NOMBRE) AS REGRESO_PAIS_ORIGEN, MIN(cdp.NOMBRE) AS REGRESO_CIUDAD_DESTINO, MIN(pdp.NOMBRE) AS REGRESO_PAIS_DESTINO FROM " + reservaItemTable + " ri JOIN " + vueloTable + " v ON v.ID_VUELO = ri.ID_VUELO JOIN " + claseTable + " ca ON ca.ID_CLASE = ri.ID_CLASE JOIN " + rutaTable + " r ON r.ID_RUTA = v.ID_RUTA JOIN " + ciudadTable + " co ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN JOIN " + ciudadTable + " cd ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO JOIN " + paisTable + " po ON po.ID_PAIS = co.ID_PAIS JOIN " + paisTable + " pd ON pd.ID_PAIS = cd.ID_PAIS LEFT JOIN " + vueloTable + " vp ON vp.ID_VUELO = v.ID_VUELO_PAREJA LEFT JOIN " + rutaTable + " rp ON rp.ID_RUTA = vp.ID_RUTA LEFT JOIN " + ciudadTable + " corp ON corp.ID_CIUDAD = rp.ID_CIUDAD_ORIGEN LEFT JOIN " + ciudadTable + " cdp ON cdp.ID_CIUDAD = rp.ID_CIUDAD_DESTINO LEFT JOIN " + paisTable + " pop ON pop.ID_PAIS = corp.ID_PAIS LEFT JOIN " + paisTable + " pdp ON pdp.ID_PAIS = cdp.ID_PAIS WHERE ri.ID_RESERVA = ? GROUP BY ri.ID_VUELO, v.CODIGO, v.FECHA_SALIDA, v.FECHA_LLEGADA, ri.ID_CLASE, ca.NOMBRE, po.NOMBRE, pd.NOMBRE, co.NOMBRE, cd.NOMBRE ORDER BY v.FECHA_SALIDA, ri.ID_CLASE";
 
     try (PreparedStatement ps = cn.prepareStatement(SQL_DET)) {
       ps.setLong(1, idReserva);
@@ -874,9 +826,10 @@ public class ComprasDAO {
   
   public List<CompraDTO.EstadoReserva> listEstadosReserva() throws Exception {
     var out = new ArrayList<CompraDTO.EstadoReserva>();
+    String estadoReservaTable = DB.table("ESTADO_RESERVA");
     try (Connection cn = getConn();
          PreparedStatement ps = cn.prepareStatement(
-           "SELECT ID_ESTADO, ESTADO FROM AEROLINEA.ESTADO_RESERVA ORDER BY ID_ESTADO")) {
+           "SELECT ID_ESTADO, ESTADO FROM " + estadoReservaTable + " ORDER BY ID_ESTADO")) {
       try (ResultSet rs = ps.executeQuery()) {
         while (rs.next()) {
           var e = new CompraDTO.EstadoReserva();
@@ -895,8 +848,9 @@ public class ComprasDAO {
       try {
         long owner; int estado;
 
+        String reservaTable = DB.table("RESERVA");
         try (PreparedStatement ps = cn.prepareStatement(
-            "SELECT ID_USUARIO, ID_ESTADO FROM AEROLINEA.RESERVA WHERE ID_RESERVA = ? FOR UPDATE")) {
+            "SELECT ID_USUARIO, ID_ESTADO FROM " + reservaTable + " WHERE ID_RESERVA = ? FOR UPDATE")) {
           ps.setLong(1, idReserva);
           try (ResultSet rs = ps.executeQuery()) {
             if (!rs.next()) throw new IllegalArgumentException("Reserva no encontrada.");
@@ -917,14 +871,16 @@ public class ComprasDAO {
         }
 
 
+        String reservaItemTable = DB.table("RESERVA_ITEM");
+        String salidaClaseTable = DB.table("SALIDA_CLASE");
         try (PreparedStatement ps = cn.prepareStatement(
             "SELECT ID_VUELO, ID_CLASE, COUNT(*) AS CANT " +
-            "FROM AEROLINEA.RESERVA_ITEM WHERE ID_RESERVA = ? " +
+            "FROM " + reservaItemTable + " WHERE ID_RESERVA = ? " +
             "GROUP BY ID_VUELO, ID_CLASE")) {
           ps.setLong(1, idReserva);
           try (ResultSet rs = ps.executeQuery()) {
             try (PreparedStatement upd = cn.prepareStatement(
-                "UPDATE AEROLINEA.SALIDA_CLASE " +
+                "UPDATE " + salidaClaseTable + " " +
                 "SET CUPO_TOTAL = CUPO_TOTAL + ? " +
                 "WHERE ID_VUELO = ? AND ID_CLASE = ?")) {
               while (rs.next()) {
@@ -941,14 +897,13 @@ public class ComprasDAO {
           }
         }
 
-
         try (PreparedStatement ps = cn.prepareStatement(
-            "UPDATE AEROLINEA.RESERVA SET ID_ESTADO = 2 WHERE ID_RESERVA = ?")) {
+            "UPDATE " + reservaTable + " SET ID_ESTADO = 2 WHERE ID_RESERVA = ?")) {
           ps.setLong(1, idReserva);
           ps.executeUpdate();
         }
         try (PreparedStatement ps = cn.prepareStatement(
-            "UPDATE AEROLINEA.RESERVA_ITEM SET ID_ESTADO_RESERVA = 2 WHERE ID_RESERVA = ?")) {
+            "UPDATE " + reservaItemTable + " SET ID_ESTADO_RESERVA = 2 WHERE ID_RESERVA = ?")) {
           ps.setLong(1, idReserva);
           ps.executeUpdate();
         }
@@ -978,19 +933,23 @@ public class ComprasDAO {
     try (Connection cn = getConn()) {
       cn.setAutoCommit(false);
       try {
+        String vueloTable = DB.table("VUELO");
+        String estadosTable = DB.table("ESTADOS");
         try (PreparedStatement ps = cn.prepareStatement(
-            "UPDATE AEROLINEA.VUELO SET ID_ESTADO = " +
-            "(SELECT ID_ESTADO FROM AEROLINEA.ESTADOS WHERE ESTADO = 'CANCELADO' FETCH FIRST 1 ROWS ONLY) " +
+            "UPDATE " + vueloTable + " SET ID_ESTADO = " +
+            "(SELECT ID_ESTADO FROM " + estadosTable + " WHERE ESTADO = 'CANCELADO' FETCH FIRST 1 ROWS ONLY) " +
             "WHERE ID_VUELO = ?")) {
           ps.setLong(1, idVuelo);
           ps.executeUpdate();
         }
 
         List<Long> ids = new ArrayList<>();
+        String reservaTable = DB.table("RESERVA");
+        String reservaItemTable = DB.table("RESERVA_ITEM");
         try (PreparedStatement ps = cn.prepareStatement(
             "SELECT DISTINCT r.ID_RESERVA " +
-            "FROM AEROLINEA.RESERVA r " +
-            "JOIN AEROLINEA.RESERVA_ITEM ri ON ri.ID_RESERVA = r.ID_RESERVA " +
+            "FROM " + reservaTable + " r " +
+            "JOIN " + reservaItemTable + " ri ON ri.ID_RESERVA = r.ID_RESERVA " +
             "WHERE r.ID_ESTADO = 1 AND ri.ID_VUELO = ?")) {
           ps.setLong(1, idVuelo);
           try (ResultSet rs = ps.executeQuery()) {
@@ -1000,15 +959,16 @@ public class ComprasDAO {
 
         int updated = 0;
         if (!ids.isEmpty()) {
+          String salidaClaseTable = DB.table("SALIDA_CLASE");
           for (Long idRes : ids) {
             try (PreparedStatement ps = cn.prepareStatement(
                 "SELECT ID_VUELO, ID_CLASE, COUNT(*) AS CANT " +
-                "FROM AEROLINEA.RESERVA_ITEM WHERE ID_RESERVA = ? " +
+                "FROM " + reservaItemTable + " WHERE ID_RESERVA = ? " +
                 "GROUP BY ID_VUELO, ID_CLASE")) {
               ps.setLong(1, idRes);
               try (ResultSet rs = ps.executeQuery()) {
                 try (PreparedStatement upd = cn.prepareStatement(
-                    "UPDATE AEROLINEA.SALIDA_CLASE SET CUPO_TOTAL = CUPO_TOTAL + ? WHERE ID_VUELO=? AND ID_CLASE=?")) {
+                    "UPDATE " + salidaClaseTable + " SET CUPO_TOTAL = CUPO_TOTAL + ? WHERE ID_VUELO=? AND ID_CLASE=?")) {
                   while (rs.next()) {
                     upd.setInt(1, rs.getInt("CANT"));
                     upd.setLong(2, rs.getLong("ID_VUELO"));
@@ -1023,7 +983,7 @@ public class ComprasDAO {
 
           String inSql = String.join(",", Collections.nCopies(ids.size(), "?"));
           try (PreparedStatement ps = cn.prepareStatement(
-              "UPDATE AEROLINEA.RESERVA SET ID_ESTADO = 2 WHERE ID_RESERVA IN (" + inSql + ")")) {
+              "UPDATE " + reservaTable + " SET ID_ESTADO = 2 WHERE ID_RESERVA IN (" + inSql + ")")) {
             for (int i = 0; i < ids.size(); i++) ps.setLong(i + 1, ids.get(i));
             updated = ps.executeUpdate();
           }
@@ -1048,21 +1008,14 @@ public class ComprasDAO {
 
     var out = new ArrayList<CompraDTO.TopDestino>();
 
+    String reservaItemTable = DB.table("RESERVA_ITEM");
+    String reservaTable = DB.table("RESERVA");
+    String vueloTable = DB.table("VUELO");
+    String rutaTable = DB.table("RUTA");
+    String ciudadTable = DB.table("CIUDAD");
+    String paisTable = DB.table("PAIS");
     StringBuilder sb = new StringBuilder();
-    sb.append("""
-        SELECT
-            cd.ID_CIUDAD,
-            cd.NOMBRE AS CIUDAD,
-            pd.NOMBRE AS PAIS,
-            COUNT(*) AS BOLETOS
-        FROM AEROLINEA.RESERVA_ITEM ri
-        JOIN AEROLINEA.RESERVA r   ON r.ID_RESERVA = ri.ID_RESERVA
-        JOIN AEROLINEA.VUELO v     ON v.ID_VUELO   = ri.ID_VUELO
-        JOIN AEROLINEA.RUTA ru     ON ru.ID_RUTA   = v.ID_RUTA
-        JOIN AEROLINEA.CIUDAD cd   ON cd.ID_CIUDAD = ru.ID_CIUDAD_DESTINO
-        JOIN AEROLINEA.PAIS pd     ON pd.ID_PAIS   = cd.ID_PAIS
-        WHERE r.ID_ESTADO = 1
-        """);
+    sb.append("SELECT cd.ID_CIUDAD, cd.NOMBRE AS CIUDAD, pd.NOMBRE AS PAIS, COUNT(*) AS BOLETOS FROM " + reservaItemTable + " ri JOIN " + reservaTable + " r ON r.ID_RESERVA = ri.ID_RESERVA JOIN " + vueloTable + " v ON v.ID_VUELO = ri.ID_VUELO JOIN " + rutaTable + " ru ON ru.ID_RUTA = v.ID_RUTA JOIN " + ciudadTable + " cd ON cd.ID_CIUDAD = ru.ID_CIUDAD_DESTINO JOIN " + paisTable + " pd ON pd.ID_PAIS = cd.ID_PAIS WHERE r.ID_ESTADO = 1 ");
 
     var params = new ArrayList<Object>();
 

@@ -28,11 +28,8 @@ public class UsuarioDAO {
   }
 
   public Usuario findByEmail(String email) {
-    final String sql = """
-      SELECT ID_USUARIO, EMAIL, CONTRASENA, NOMBRES, APELLIDOS, HABILITADO, ID_ROL
-      FROM USUARIO
-      WHERE LOWER(EMAIL) = LOWER(?)
-    """;
+    String usuarioTable = DB.table("USUARIO");
+    final String sql = "SELECT ID_USUARIO, EMAIL, CONTRASENA, NOMBRES, APELLIDOS, HABILITADO, ID_ROL FROM " + usuarioTable + " WHERE LOWER(EMAIL) = LOWER(?)";
     System.out.println("[DAO] findByEmail start " + email);
     try (Connection conn = DB.getConnection();
          PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -53,10 +50,8 @@ public class UsuarioDAO {
   }
 
   public Usuario create(String email, String passHash, String nombres, String apellidos) {
-    final String insert = """
-      INSERT INTO USUARIO (EMAIL, CONTRASENA, NOMBRES, APELLIDOS, HABILITADO, ID_ROL)
-      VALUES (?, ?, ?, ?, 1, 3)
-    """;
+    String usuarioTable = DB.table("USUARIO");
+    final String insert = "INSERT INTO " + usuarioTable + " (EMAIL, CONTRASENA, NOMBRES, APELLIDOS, HABILITADO, ID_ROL) VALUES (?, ?, ?, ?, 1, 3)";
     System.out.println("[DAO] create start " + email);
     try (Connection conn = DB.getConnection();
          PreparedStatement ps = conn.prepareStatement(insert)) {
@@ -75,11 +70,8 @@ public class UsuarioDAO {
   }
 
   public Usuario findById(long id) throws Exception {
-    String sql = """
-      SELECT ID_USUARIO, EMAIL, CONTRASENA, NOMBRES, APELLIDOS, HABILITADO, ID_ROL
-      FROM USUARIO
-      WHERE ID_USUARIO = ?
-    """;
+    String usuarioTable = DB.table("USUARIO");
+    String sql = "SELECT ID_USUARIO, EMAIL, CONTRASENA, NOMBRES, APELLIDOS, HABILITADO, ID_ROL FROM " + usuarioTable + " WHERE ID_USUARIO = ?";
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sql)) {
       ps.setLong(1, id);
@@ -100,12 +92,9 @@ public class UsuarioDAO {
   }
 
   public List<UsuarioAdminDTOs.Row> adminList(String q, int offset, int limit) throws Exception {
-    String base = """
-      SELECT u.ID_USUARIO, u.EMAIL, u.NOMBRES, u.APELLIDOS, u.ID_ROL, r.NOMBRE AS ROL_NOMBRE, u.HABILITADO
-      FROM USUARIO u
-      JOIN ROL r ON r.ID_ROL = u.ID_ROL
-      WHERE 1=1
-    """;
+    String usuarioTable = DB.table("USUARIO");
+    String rolTable = DB.table("ROL");
+    String base = "SELECT u.ID_USUARIO, u.EMAIL, u.NOMBRES, u.APELLIDOS, u.ID_ROL, r.NOMBRE AS ROL_NOMBRE, u.HABILITADO FROM " + usuarioTable + " u JOIN " + rolTable + " r ON r.ID_ROL = u.ID_ROL WHERE 1=1 ";
     boolean hasQ = q != null && !q.isBlank();
     String where = hasQ
         ? " AND (LOWER(u.EMAIL) LIKE ? OR LOWER(u.NOMBRES) LIKE ? OR LOWER(u.APELLIDOS) LIKE ?) "
@@ -144,14 +133,10 @@ public class UsuarioDAO {
   }
 
   public UsuarioAdminDTOs.View adminGet(long id) throws Exception {
-    String sql = """
-      SELECT u.ID_USUARIO, u.EMAIL, u.NOMBRES, u.APELLIDOS, u.ID_ROL, r.NOMBRE AS ROL_NOMBRE, u.HABILITADO,
-             p.FECHA_NACIMIENTO, p.ID_PAIS_DOCUMENTO, p.PASAPORTE
-      FROM USUARIO u
-      JOIN ROL r ON r.ID_ROL = u.ID_ROL
-      LEFT JOIN PASAJERO p ON p.ID_USUARIO = u.ID_USUARIO
-      WHERE u.ID_USUARIO = ?
-    """;
+    String usuarioTable = DB.table("USUARIO");
+    String rolTable = DB.table("ROL");
+    String pasajeroTable = DB.table("PASAJERO");
+    String sql = "SELECT u.ID_USUARIO, u.EMAIL, u.NOMBRES, u.APELLIDOS, u.ID_ROL, r.NOMBRE AS ROL_NOMBRE, u.HABILITADO, p.FECHA_NACIMIENTO, p.ID_PAIS_DOCUMENTO, p.PASAPORTE FROM " + usuarioTable + " u JOIN " + rolTable + " r ON r.ID_ROL = u.ID_ROL LEFT JOIN " + pasajeroTable + " p ON p.ID_USUARIO = u.ID_USUARIO WHERE u.ID_USUARIO = ?";
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sql)) {
       ps.setLong(1, id);
@@ -180,7 +165,8 @@ public class UsuarioDAO {
     try (Connection cn = DB.getConnection()) {
       cn.setAutoCommit(false);
       try {
-        String up = "UPDATE USUARIO SET NOMBRES=?, APELLIDOS=?, ID_ROL=?, HABILITADO=?"
+        String usuarioTable = DB.table("USUARIO");
+        String up = "UPDATE " + usuarioTable + " SET NOMBRES=?, APELLIDOS=?, ID_ROL=?, HABILITADO=?"
                   + (dto.newPassword()!=null && !dto.newPassword().isBlank() ? ", CONTRASENA=?" : "")
                   + " WHERE ID_USUARIO=?";
         try (PreparedStatement ps = cn.prepareStatement(up)) {
@@ -197,13 +183,14 @@ public class UsuarioDAO {
         }
 
         // Pasajero (upsert)
+        String pasajeroTable = DB.table("PASAJERO");
         boolean exists;
-        try (PreparedStatement ps = cn.prepareStatement("SELECT 1 FROM PASAJERO WHERE ID_USUARIO=?")) {
+        try (PreparedStatement ps = cn.prepareStatement("SELECT 1 FROM " + pasajeroTable + " WHERE ID_USUARIO=?")) {
           ps.setLong(1, id);
           try (ResultSet rs = ps.executeQuery()) { exists = rs.next(); }
         }
         if (!exists) {
-          String ins = "INSERT INTO PASAJERO (FECHA_NACIMIENTO, ID_PAIS_DOCUMENTO, PASAPORTE, ID_USUARIO) VALUES (?,?,?,?)";
+          String ins = "INSERT INTO " + pasajeroTable + " (FECHA_NACIMIENTO, ID_PAIS_DOCUMENTO, PASAPORTE, ID_USUARIO) VALUES (?,?,?,?)";
           try (PreparedStatement ps = cn.prepareStatement(ins)) {
             if (dto.fechaNacimiento()!=null && !dto.fechaNacimiento().isBlank())
               ps.setDate(1, Date.valueOf(dto.fechaNacimiento()));
@@ -215,7 +202,7 @@ public class UsuarioDAO {
             ps.executeUpdate();
           }
         } else {
-          String upd = "UPDATE PASAJERO SET FECHA_NACIMIENTO=?, ID_PAIS_DOCUMENTO=?, PASAPORTE=? WHERE ID_USUARIO=?";
+          String upd = "UPDATE " + pasajeroTable + " SET FECHA_NACIMIENTO=?, ID_PAIS_DOCUMENTO=?, PASAPORTE=? WHERE ID_USUARIO=?";
           try (PreparedStatement ps = cn.prepareStatement(upd)) {
             if (dto.fechaNacimiento()!=null && !dto.fechaNacimiento().isBlank())
               ps.setDate(1, Date.valueOf(dto.fechaNacimiento()));
@@ -242,7 +229,8 @@ public class UsuarioDAO {
     try (Connection cn = DB.getConnection()) {
       cn.setAutoCommit(false);
       try {
-        String up = "UPDATE USUARIO SET NOMBRES=?, APELLIDOS=?"
+        String usuarioTable = DB.table("USUARIO");
+        String up = "UPDATE " + usuarioTable + " SET NOMBRES=?, APELLIDOS=?"
                   + (dto.newPassword()!=null && !dto.newPassword().isBlank() ? ", CONTRASENA=?" : "")
                   + " WHERE ID_USUARIO=?";
         try (PreparedStatement ps = cn.prepareStatement(up)) {
@@ -256,13 +244,14 @@ public class UsuarioDAO {
           ps.executeUpdate();
         }
 
+        String pasajeroTable = DB.table("PASAJERO");
         boolean exists;
-        try (PreparedStatement ps = cn.prepareStatement("SELECT 1 FROM PASAJERO WHERE ID_USUARIO=?")) {
+        try (PreparedStatement ps = cn.prepareStatement("SELECT 1 FROM " + pasajeroTable + " WHERE ID_USUARIO=?")) {
           ps.setLong(1, id);
           try (ResultSet rs = ps.executeQuery()) { exists = rs.next(); }
         }
         if (!exists) {
-          String ins = "INSERT INTO PASAJERO (FECHA_NACIMIENTO, ID_PAIS_DOCUMENTO, PASAPORTE, ID_USUARIO) VALUES (?,?,?,?)";
+          String ins = "INSERT INTO " + pasajeroTable + " (FECHA_NACIMIENTO, ID_PAIS_DOCUMENTO, PASAPORTE, ID_USUARIO) VALUES (?,?,?,?)";
           try (PreparedStatement ps = cn.prepareStatement(ins)) {
             if (dto.fechaNacimiento()!=null && !dto.fechaNacimiento().isBlank())
               ps.setDate(1, Date.valueOf(dto.fechaNacimiento()));
@@ -274,7 +263,7 @@ public class UsuarioDAO {
             ps.executeUpdate();
           }
         } else {
-          String upd = "UPDATE PASAJERO SET FECHA_NACIMIENTO=?, ID_PAIS_DOCUMENTO=?, PASAPORTE=? WHERE ID_USUARIO=?";
+          String upd = "UPDATE " + pasajeroTable + " SET FECHA_NACIMIENTO=?, ID_PAIS_DOCUMENTO=?, PASAPORTE=? WHERE ID_USUARIO=?";
           try (PreparedStatement ps = cn.prepareStatement(upd)) {
             if (dto.fechaNacimiento()!=null && !dto.fechaNacimiento().isBlank())
               ps.setDate(1, Date.valueOf(dto.fechaNacimiento()));
@@ -298,13 +287,9 @@ public class UsuarioDAO {
   }
 
   public VueloDTO.View obtenerVuelo(long id) throws Exception {
-    String sql = """
-        SELECT v.ID_VUELO, v.CODIGO, v.ID_RUTA, v.FECHA_SALIDA, v.FECHA_LLEGADA, v.ACTIVO,
-               sc.ID_CLASE, sc.CUPO_TOTAL, sc.PRECIO
-        FROM VUELO v
-        LEFT JOIN SALIDA_CLASE sc ON v.ID_VUELO = sc.ID_VUELO
-        WHERE v.ID_VUELO = ?
-        """;
+    String vueloTable = DB.table("VUELO");
+    String salidaClaseTable = DB.table("SALIDA_CLASE");
+    String sql = "SELECT v.ID_VUELO, v.CODIGO, v.ID_RUTA, v.FECHA_SALIDA, v.FECHA_LLEGADA, v.ACTIVO, sc.ID_CLASE, sc.CUPO_TOTAL, sc.PRECIO FROM " + vueloTable + " v LEFT JOIN " + salidaClaseTable + " sc ON v.ID_VUELO = sc.ID_VUELO WHERE v.ID_VUELO = ?";
 
     VueloDTO.View view = null;
     List<VueloDTO.ClaseConfig> clases = new ArrayList<>();
@@ -339,14 +324,10 @@ public class UsuarioDAO {
     }
     if (view == null) return null;
 
-    String sqlEsc = """
-        SELECT ve.ID_CIUDAD, c.NOMBRE AS CIUDAD, p.NOMBRE AS PAIS,
-               ve.LLEGADA, ve.SALIDA
-        FROM VUELO_ESCALA ve
-        JOIN CIUDAD c ON c.ID_CIUDAD = ve.ID_CIUDAD
-        JOIN PAIS p ON p.ID_PAIS = c.ID_PAIS
-        WHERE ve.ID_VUELO = ?
-        """;
+    String vueloEscalaTable = DB.table("VUELO_ESCALA");
+    String ciudadTable = DB.table("CIUDAD");
+    String paisTable = DB.table("PAIS");
+    String sqlEsc = "SELECT ve.ID_CIUDAD, c.NOMBRE AS CIUDAD, p.NOMBRE AS PAIS, ve.LLEGADA, ve.SALIDA FROM " + vueloEscalaTable + " ve JOIN " + ciudadTable + " c ON c.ID_CIUDAD = ve.ID_CIUDAD JOIN " + paisTable + " p ON p.ID_PAIS = c.ID_PAIS WHERE ve.ID_VUELO = ?";
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sqlEsc)) {
       ps.setLong(1, id);
@@ -369,7 +350,10 @@ public class UsuarioDAO {
     try (Connection cn = DB.getConnection()) {
       cn.setAutoCommit(false);
       try {
-        String up = "UPDATE VUELO SET CODIGO=?, ID_RUTA=?, FECHA_SALIDA=?, FECHA_LLEGADA=?, ACTIVO=? WHERE ID_VUELO=?";
+        String vueloTable = DB.table("VUELO");
+        String salidaClaseTable = DB.table("SALIDA_CLASE");
+        String vueloEscalaTable = DB.table("VUELO_ESCALA");
+        String up = "UPDATE " + vueloTable + " SET CODIGO=?, ID_RUTA=?, FECHA_SALIDA=?, FECHA_LLEGADA=?, ACTIVO=? WHERE ID_VUELO=?";
         try (PreparedStatement ps = cn.prepareStatement(up)) {
           ps.setString(1, dto.codigo().trim());
           ps.setLong(2, dto.idRuta());
@@ -382,14 +366,14 @@ public class UsuarioDAO {
         }
 
         // Reemplazar clases
-        try (PreparedStatement del = cn.prepareStatement("DELETE FROM SALIDA_CLASE WHERE ID_VUELO=?")) {
+        try (PreparedStatement del = cn.prepareStatement("DELETE FROM " + salidaClaseTable + " WHERE ID_VUELO=?")) {
           del.setLong(1, idVuelo);
           del.executeUpdate();
         }
         if (dto.clases() != null) {
           for (VueloDTO.ClaseConfig c : dto.clases()) {
             try (PreparedStatement ins = cn.prepareStatement(
-                "INSERT INTO SALIDA_CLASE (ID_VUELO, ID_CLASE, CUPO_TOTAL, PRECIO) VALUES (?,?,?,?)")) {
+                "INSERT INTO " + salidaClaseTable + " (ID_VUELO, ID_CLASE, CUPO_TOTAL, PRECIO) VALUES (?,?,?,?)")) {
               ins.setLong(1, idVuelo);
               ins.setInt(2, c.idClase());
               ins.setInt(3, c.cupoTotal());
@@ -400,7 +384,7 @@ public class UsuarioDAO {
         }
 
         // Reemplazar escala (0..1)
-        try (PreparedStatement delE = cn.prepareStatement("DELETE FROM VUELO_ESCALA WHERE ID_VUELO=?")) {
+        try (PreparedStatement delE = cn.prepareStatement("DELETE FROM " + vueloEscalaTable + " WHERE ID_VUELO=?")) {
           delE.setLong(1, idVuelo);
           delE.executeUpdate();
         }
@@ -410,7 +394,7 @@ public class UsuarioDAO {
           if (e.llegada().isAfter(e.salida()))
             throw new SQLException("La hora de SALIDA de la escala debe ser >= LLEGADA");
           try (PreparedStatement insE = cn.prepareStatement(
-              "INSERT INTO VUELO_ESCALA (ID_VUELO, ID_CIUDAD, LLEGADA, SALIDA) VALUES (?,?,?,?)")) {
+              "INSERT INTO " + vueloEscalaTable + " (ID_VUELO, ID_CIUDAD, LLEGADA, SALIDA) VALUES (?,?,?,?)")) {
             insE.setLong(1, idVuelo);
             insE.setLong(2, e.idCiudad());
             insE.setTimestamp(3, Timestamp.valueOf(e.llegada()));

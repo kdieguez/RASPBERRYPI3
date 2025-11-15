@@ -26,7 +26,8 @@ public class RutaDAO {
                 throw new IllegalArgumentException("Ya existe una ruta con ese origen y destino.");
             }
 
-            String sql = "INSERT INTO RUTA (ID_CIUDAD_ORIGEN, ID_CIUDAD_DESTINO, ACTIVA) VALUES (?,?,1)";
+            String rutaTable = DB.table("RUTA");
+            String sql = "INSERT INTO " + rutaTable + " (ID_CIUDAD_ORIGEN, ID_CIUDAD_DESTINO, ACTIVA) VALUES (?,?,1)";
             try (PreparedStatement ps = cn.prepareStatement(sql, new String[]{"ID_RUTA"})) {
                 ps.setLong(1, dto.idCiudadOrigen());
                 ps.setLong(2, dto.idCiudadDestino());
@@ -41,16 +42,9 @@ public class RutaDAO {
     }
 
     public List<RutaDTOs.View> listAll() throws Exception {
-        String sql = """
-            SELECT r.ID_RUTA,
-                   r.ID_CIUDAD_ORIGEN, co.NOMBRE AS CIUDAD_ORIGEN,
-                   r.ID_CIUDAD_DESTINO, cd.NOMBRE AS CIUDAD_DESTINO,
-                   r.ACTIVA
-            FROM RUTA r
-            JOIN CIUDAD co ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN
-            JOIN CIUDAD cd ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO
-            ORDER BY co.NOMBRE, cd.NOMBRE
-            """;
+        String rutaTable = DB.table("RUTA");
+        String ciudadTable = DB.table("CIUDAD");
+        String sql = "SELECT r.ID_RUTA, r.ID_CIUDAD_ORIGEN, co.NOMBRE AS CIUDAD_ORIGEN, r.ID_CIUDAD_DESTINO, cd.NOMBRE AS CIUDAD_DESTINO, r.ACTIVA FROM " + rutaTable + " r JOIN " + ciudadTable + " co ON co.ID_CIUDAD = r.ID_CIUDAD_ORIGEN JOIN " + ciudadTable + " cd ON cd.ID_CIUDAD = r.ID_CIUDAD_DESTINO ORDER BY co.NOMBRE, cd.NOMBRE";
         try (Connection cn = DB.getConnection();
              PreparedStatement ps = cn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
@@ -71,7 +65,8 @@ public class RutaDAO {
     }
 
     public void toggleActiva(long idRuta) throws Exception {
-        String sql = "UPDATE RUTA SET ACTIVA = CASE WHEN ACTIVA=1 THEN 0 ELSE 1 END WHERE ID_RUTA=?";
+        String rutaTable = DB.table("RUTA");
+        String sql = "UPDATE " + rutaTable + " SET ACTIVA = CASE WHEN ACTIVA=1 THEN 0 ELSE 1 END WHERE ID_RUTA=?";
         try (Connection cn = DB.getConnection();
              PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setLong(1, idRuta);
@@ -82,7 +77,8 @@ public class RutaDAO {
 
     // ===== Helpers =====
     private boolean existeCiudadActiva(Connection cn, long idCiudad) throws Exception {
-        String sql = "SELECT 1 FROM CIUDAD WHERE ID_CIUDAD=? AND (ACTIVO=1 OR ACTIVO IS NULL)";
+        String ciudadTable = DB.table("CIUDAD");
+        String sql = "SELECT 1 FROM " + ciudadTable + " WHERE ID_CIUDAD=? AND (ACTIVO=1 OR ACTIVO IS NULL)";
         try (PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setLong(1, idCiudad);
             try (ResultSet rs = ps.executeQuery()) { return rs.next(); }
@@ -90,7 +86,8 @@ public class RutaDAO {
     }
 
     private boolean existeRuta(Connection cn, long idOrigen, long idDestino) throws Exception {
-        String sql = "SELECT 1 FROM RUTA WHERE ID_CIUDAD_ORIGEN=? AND ID_CIUDAD_DESTINO=?";
+        String rutaTable = DB.table("RUTA");
+        String sql = "SELECT 1 FROM " + rutaTable + " WHERE ID_CIUDAD_ORIGEN=? AND ID_CIUDAD_DESTINO=?";
         try (PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setLong(1, idOrigen);
             ps.setLong(2, idDestino);

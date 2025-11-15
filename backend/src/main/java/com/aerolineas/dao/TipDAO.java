@@ -10,14 +10,8 @@ import java.util.List;
 public class TipDAO {
 
   public List<TipDTO> listar() throws SQLException {
-    String sql = """
-      SELECT ID_TIP,
-             TITULO,
-             DBMS_LOB.SUBSTR(DESCRIPCION, 4000, 1) AS DESCRIPCION,
-             ORDEN
-        FROM TIPS
-       ORDER BY ORDEN ASC, ID_TIP ASC
-      """;
+    String tipsTable = DB.table("TIPS");
+    String sql = "SELECT ID_TIP, TITULO, DBMS_LOB.SUBSTR(DESCRIPCION, 4000, 1) AS DESCRIPCION, ORDEN FROM " + tipsTable + " ORDER BY ORDEN ASC, ID_TIP ASC";
     List<TipDTO> out = new ArrayList<>();
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sql);
@@ -35,14 +29,8 @@ public class TipDAO {
   }
 
   public TipDTO obtenerPorId(long idTip) throws SQLException {
-    String sql = """
-      SELECT ID_TIP,
-             TITULO,
-             DBMS_LOB.SUBSTR(DESCRIPCION, 4000, 1) AS DESCRIPCION,
-             ORDEN
-        FROM TIPS
-       WHERE ID_TIP = ?
-      """;
+    String tipsTable = DB.table("TIPS");
+    String sql = "SELECT ID_TIP, TITULO, DBMS_LOB.SUBSTR(DESCRIPCION, 4000, 1) AS DESCRIPCION, ORDEN FROM " + tipsTable + " WHERE ID_TIP = ?";
     try (Connection cn = DB.getConnection();
          PreparedStatement ps = cn.prepareStatement(sql)) {
       ps.setLong(1, idTip);
@@ -62,9 +50,10 @@ public class TipDAO {
     try (Connection cn = DB.getConnection()) {
       cn.setAutoCommit(false);
       try {
+        String tipsTable = DB.table("TIPS");
         int maxOrden = 0;
         try (PreparedStatement ps = cn.prepareStatement(
-            "SELECT NVL(MAX(ORDEN), 0) AS MAXO FROM TIPS");
+            "SELECT NVL(MAX(ORDEN), 0) AS MAXO FROM " + tipsTable);
              ResultSet rs = ps.executeQuery()) {
           if (rs.next()) maxOrden = rs.getInt("MAXO");
         }
@@ -80,13 +69,13 @@ public class TipDAO {
 
         if (nuevoOrden <= maxOrden) {
           try (PreparedStatement ps = cn.prepareStatement(
-              "UPDATE TIPS SET ORDEN = ORDEN + 1 WHERE ORDEN >= ?")) {
+              "UPDATE " + tipsTable + " SET ORDEN = ORDEN + 1 WHERE ORDEN >= ?")) {
             ps.setInt(1, nuevoOrden);
             ps.executeUpdate();
           }
         }
 
-        String sql = "INSERT INTO TIPS (TITULO, DESCRIPCION, ORDEN) VALUES (?,?,?)";
+        String sql = "INSERT INTO " + tipsTable + " (TITULO, DESCRIPCION, ORDEN) VALUES (?,?,?)";
         try (PreparedStatement ps = cn.prepareStatement(sql, new String[]{"ID_TIP"})) {
           ps.setString(1, dto.titulo);
           ps.setString(2, dto.descripcion);
@@ -118,9 +107,10 @@ public class TipDAO {
     try (Connection cn = DB.getConnection()) {
       cn.setAutoCommit(false);
       try {
+        String tipsTable = DB.table("TIPS");
         int ordenActual;
         try (PreparedStatement ps = cn.prepareStatement(
-            "SELECT ORDEN FROM TIPS WHERE ID_TIP = ? FOR UPDATE")) {
+            "SELECT ORDEN FROM " + tipsTable + " WHERE ID_TIP = ? FOR UPDATE")) {
           ps.setLong(1, idTip);
           try (ResultSet rs = ps.executeQuery()) {
             if (!rs.next()) throw new SQLException("Tip no encontrado");
@@ -130,7 +120,7 @@ public class TipDAO {
 
         int maxOrden = 0;
         try (PreparedStatement ps = cn.prepareStatement(
-            "SELECT NVL(MAX(ORDEN), 0) AS MAXO FROM TIPS");
+            "SELECT NVL(MAX(ORDEN), 0) AS MAXO FROM " + tipsTable);
              ResultSet rs = ps.executeQuery()) {
           if (rs.next()) maxOrden = rs.getInt("MAXO");
         }
@@ -148,9 +138,7 @@ public class TipDAO {
           if (nuevoOrden < ordenActual) {
         
             try (PreparedStatement ps = cn.prepareStatement(
-                "UPDATE TIPS " +
-                "   SET ORDEN = ORDEN + 1 " +
-                " WHERE ORDEN >= ? AND ORDEN < ? AND ID_TIP <> ?")) {
+                "UPDATE " + tipsTable + " SET ORDEN = ORDEN + 1 WHERE ORDEN >= ? AND ORDEN < ? AND ID_TIP <> ?")) {
               ps.setInt(1, nuevoOrden);
               ps.setInt(2, ordenActual);
               ps.setLong(3, idTip);
@@ -158,9 +146,7 @@ public class TipDAO {
             }
           } else {
             try (PreparedStatement ps = cn.prepareStatement(
-                "UPDATE TIPS " +
-                "   SET ORDEN = ORDEN - 1 " +
-                " WHERE ORDEN <= ? AND ORDEN > ? AND ID_TIP <> ?")) {
+                "UPDATE " + tipsTable + " SET ORDEN = ORDEN - 1 WHERE ORDEN <= ? AND ORDEN > ? AND ID_TIP <> ?")) {
               ps.setInt(1, nuevoOrden);
               ps.setInt(2, ordenActual);
               ps.setLong(3, idTip);
@@ -169,7 +155,7 @@ public class TipDAO {
           }
         }
 
-        String up = "UPDATE TIPS SET TITULO = ?, DESCRIPCION = ?, ORDEN = ? WHERE ID_TIP = ?";
+        String up = "UPDATE " + tipsTable + " SET TITULO = ?, DESCRIPCION = ?, ORDEN = ? WHERE ID_TIP = ?";
         try (PreparedStatement ps = cn.prepareStatement(up)) {
           ps.setString(1, dto.titulo);
           ps.setString(2, dto.descripcion);
@@ -197,9 +183,10 @@ public class TipDAO {
     try (Connection cn = DB.getConnection()) {
       cn.setAutoCommit(false);
       try {
+        String tipsTable = DB.table("TIPS");
         Integer orden = null;
         try (PreparedStatement ps = cn.prepareStatement(
-            "SELECT ORDEN FROM TIPS WHERE ID_TIP = ?")) {
+            "SELECT ORDEN FROM " + tipsTable + " WHERE ID_TIP = ?")) {
           ps.setLong(1, idTip);
           try (ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
@@ -209,14 +196,14 @@ public class TipDAO {
         }
 
         try (PreparedStatement ps = cn.prepareStatement(
-            "DELETE FROM TIPS WHERE ID_TIP = ?")) {
+            "DELETE FROM " + tipsTable + " WHERE ID_TIP = ?")) {
           ps.setLong(1, idTip);
           ps.executeUpdate();
         }
 
         if (orden != null) {
           try (PreparedStatement ps = cn.prepareStatement(
-              "UPDATE TIPS SET ORDEN = ORDEN - 1 WHERE ORDEN > ?")) {
+              "UPDATE " + tipsTable + " SET ORDEN = ORDEN - 1 WHERE ORDEN > ?")) {
             ps.setInt(1, orden);
             ps.executeUpdate();
           }
