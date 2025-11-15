@@ -9,14 +9,14 @@
   let ui = { header: {} };
   let q = '';
 
-  onMount(async () => { 
-    try { 
-      ui = await fetchUI(); 
-    } catch {} 
+  onMount(async () => {
+    try {
+      ui = await fetchUI();
+    } catch {}
   });
 
   $: isStaff = ['admin', 'empleado'].includes(($user?.rol || '').toLowerCase());
-  $: isAdmin = (($user?.rol || '').toLowerCase() === 'admin');
+  $: isAdmin = ($user?.rol || '').toLowerCase() === 'admin';
 
   function goSearch(e) {
     e.preventDefault();
@@ -64,7 +64,6 @@
       </a>
 
       {#if $isLoggedIn}
-        <!-- NUEVO: botón para el historial de reservas -->
         <a
           class="btn {current === 'reservas' ? 'primary' : 'ghost'}"
           aria-current={current === 'reservas' ? 'page' : undefined}
@@ -88,6 +87,15 @@
         {/if}
 
         {#if isAdmin}
+          <a
+            class="btn {current === 'admin-reservas' ? 'primary' : 'ghost'}"
+            aria-current={current === 'admin-reservas' ? 'page' : undefined}
+            href="/admin/reservas"
+            use:link
+          >
+            Reservas (admin)
+          </a>
+
           <a
             class="btn {current === 'portal' ? 'primary' : 'ghost'}"
             aria-current={current === 'portal' ? 'page' : undefined}
@@ -134,7 +142,6 @@
     top: 0;
     z-index: 10;
   }
-
   .wrap {
     max-width: 960px;
     margin: 0 auto;
@@ -145,7 +152,6 @@
     justify-content: space-between;
     gap: 12px;
   }
-
   .brand {
     display: flex;
     align-items: center;
@@ -154,7 +160,6 @@
     color: inherit;
     text-decoration: none;
   }
-
   .brand img {
     height: 28px;
     border-radius: 6px;
@@ -169,28 +174,23 @@
     text-decoration: none;
     display: inline-block;
   }
-
   .btn.ghost {
     background: transparent;
   }
-
   .btn.primary {
     background: #277b29;
     color: #fff;
   }
-
   .btn.danger {
     background: #2a0b0b;
     color: #ffd6d6;
   }
-
   .search {
     display: flex;
     gap: 6px;
     align-items: center;
     margin-right: 6px;
   }
-
   .search input {
     padding: 7px 10px;
     border: 1px solid #c7c7c7;

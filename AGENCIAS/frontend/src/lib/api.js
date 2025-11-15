@@ -22,10 +22,10 @@ export async function request(path, opts = {}) {
       Accept: 'application/json',
       ...(body ? { 'Content-Type': 'application/json' } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(headers || {})
+      ...(headers || {}),
     },
     body: body ? JSON.stringify(body) : undefined,
-    signal: controller.signal
+    signal: controller.signal,
   }).catch((e) => {
     clearTimeout(id);
     throw new Error(e?.message || 'No se pudo conectar con el servidor');
@@ -37,7 +37,11 @@ export async function request(path, opts = {}) {
 
   const text = await res.text();
   let json = null;
-  try { json = text ? JSON.parse(text) : null; } catch { json = null; }
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
 
   if (!res.ok) {
     const msg =
@@ -60,19 +64,17 @@ export function qs(obj = {}) {
 }
 
 export const AuthAPI = {
-  register: (data) =>
-    request('/api/v1/auth/register', { method: 'POST', body: data }),
-  login: (data) =>
-    request('/api/v1/auth/login', { method: 'POST', body: data }),
+  register: (data) => request('/api/v1/auth/register', { method: 'POST', body: data }),
+  login: (data) => request('/api/v1/auth/login', { method: 'POST', body: data }),
   me: () => request('/api/v1/auth/me'),
 };
 
 export const UsersAPI = {
-  list:   (params)   => request('/api/v1/users' + qs(params)),
-  get:    (id)       => request(`/api/v1/users/${id}`),
-  create: (body)     => request('/api/v1/users', { method: 'POST', body }),
+  list: (params) => request('/api/v1/users' + qs(params)),
+  get: (id) => request(`/api/v1/users/${id}`),
+  create: (body) => request('/api/v1/users', { method: 'POST', body }),
   update: (id, body) => request(`/api/v1/users/${id}`, { method: 'PATCH', body }),
-  remove: (id)       => request(`/api/v1/users/${id}`, { method: 'DELETE' }),
+  remove: (id) => request(`/api/v1/users/${id}`, { method: 'DELETE' }),
 };
 
 /** @typedef {{origin?: string, destination?: string, date?: string, pax?: number}} SearchParams */
@@ -92,6 +94,7 @@ export const VuelosAPI = {
 };
 
 export const ComprasAPI = {
+  // Cliente normal
   getCart: () => request('/compras/carrito'),
 
   addItem: ({ idVuelo, idClase, cantidad = 1, pair = false }) =>
@@ -101,21 +104,15 @@ export const ComprasAPI = {
     }),
 
   updateQty: (idItem, cantidad, syncPareja = false) =>
-    request(
-      `/compras/items/${idItem}?syncPareja=${syncPareja ? 'true' : 'false'}`,
-      {
-        method: 'PUT',
-        body: { cantidad },
-      }
-    ),
+    request(`/compras/items/${idItem}?syncPareja=${syncPareja ? 'true' : 'false'}`, {
+      method: 'PUT',
+      body: { cantidad },
+    }),
 
   removeItem: (idItem, syncPareja = false) =>
-    request(
-      `/compras/items/${idItem}?syncPareja=${syncPareja ? 'true' : 'false'}`,
-      {
-        method: 'DELETE',
-      }
-    ),
+    request(`/compras/items/${idItem}?syncPareja=${syncPareja ? 'true' : 'false'}`, {
+      method: 'DELETE',
+    }),
 
   checkout: (payment) =>
     request('/compras/checkout', { method: 'POST', body: payment }),
@@ -148,11 +145,11 @@ export const ComprasAPI = {
     return await res.blob();
   },
 
-  adminList: () => request('/compras/admin/reservas'),
+  listAdmin: () => request('/compras/admin/reservas'),
 
-  adminDetail: (id) => request(`/compras/admin/reservas/${id}`),
+  detailAdmin: (id) => request(`/compras/admin/reservas/${id}`),
 
-  adminCancel: (id) =>
+  cancelAdmin: (id) =>
     request(`/compras/admin/reservas/${id}/cancelar`, {
       method: 'POST',
     }),

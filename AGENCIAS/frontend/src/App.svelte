@@ -16,6 +16,9 @@
   import Reservas from "@/components/compras/reservas.svelte";
   import ReservaDetail from "@/components/compras/reserva_detail.svelte";
 
+  import AdminReservas from "@/components/admin/reservas_admin.svelte";
+  import AdminReservaDetail from "@/components/admin/reserva_detail_admin.svelte";
+
   let current = "/";
   const unsub = path.subscribe((p) => (current = p));
 
@@ -30,6 +33,7 @@
     if (match("/vuelos", p).ok || match("/vuelos/:id", p).ok) return "vuelos";
     if (match("/carrito", p).ok) return "carrito";
     if (match("/reservas", p).ok || match("/reservas/:id", p).ok) return "reservas";
+    if (p === "/admin/reservas" || match("/admin/reservas/:id", p).ok) return "admin-reservas";
     return "";
   }
 
@@ -40,6 +44,9 @@
   $: isCheckout      = match("/checkout", current).ok;
   $: isReservas      = match("/reservas", current).ok;
   $: isReservaDetail = match("/reservas/:id", current).ok;
+
+  $: isAdminReservas      = match("/admin/reservas", current).ok;
+  $: isAdminReservaDetail = match("/admin/reservas/:id", current).ok;
 </script>
 
 <Header current={headerCurrent(current)} />
@@ -60,6 +67,11 @@
     <Reservas />
   {:else if isReservaDetail}
     <ReservaDetail />
+
+  {:else if isAdminReservas}
+    <AdminReservas />
+  {:else if isAdminReservaDetail}
+    <AdminReservaDetail />
 
   {:else if current === '/admin/users'}
     <AdminUsers />
