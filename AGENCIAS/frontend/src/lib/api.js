@@ -88,23 +88,35 @@ export const VuelosAPI = {
 
 export const ComprasAPI = {
   getCart: () => request('/compras/carrito'),
+
   addItem: ({ idVuelo, idClase, cantidad = 1, pair = false }) =>
     request(`/compras/items?pair=${pair ? 'true' : 'false'}`, {
       method: 'POST',
       body: { idVuelo, idClase, cantidad },
     }),
+
   updateQty: (idItem, cantidad, syncPareja = false) =>
     request(`/compras/items/${idItem}?syncPareja=${syncPareja ? 'true' : 'false'}`, {
       method: 'PUT',
       body: { cantidad },
     }),
+
   removeItem: (idItem, syncPareja = false) =>
     request(`/compras/items/${idItem}?syncPareja=${syncPareja ? 'true' : 'false'}`, {
       method: 'DELETE',
     }),
-  checkout: (payment) => request('/compras/checkout', { method: 'POST', body: payment }),
+
+  checkout: (payment) =>
+    request('/compras/checkout', { method: 'POST', body: payment }),
+
   list: () => request('/compras/reservas'),
+
   detail: (id) => request(`/compras/reservas/${id}`),
+
+  cancel: (id) =>
+    request(`/compras/reservas/${id}/cancelar`, {
+      method: 'POST',
+    }),
 
   boletoPdf: async (id) => {
     const BASEURL = import.meta.env.VITE_API_URL || '';

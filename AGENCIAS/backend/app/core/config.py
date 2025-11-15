@@ -37,7 +37,7 @@ MONGO_DB = os.getenv("MONGO_DB") or os.getenv("MONGODB_DB") or "agencia_viajes"
 
 ALLOWED_ORIGINS = getenv_list(
     "ALLOWED_ORIGINS",
-    ["http://localhost:5173", "http://127.0.0.1:5173"]
+    ["http://localhost:5174", "http://127.0.0.1:5174"]
 )
 
 CAPTCHA_SECRET   = os.getenv("CAPTCHA_SECRET", "")

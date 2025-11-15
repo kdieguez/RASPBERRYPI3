@@ -11,6 +11,6 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"), // <-- alias único para 'src'
     },
   },
-  server: { port: 5173 },
+  server: { port: 5174 },
   preview: { port: 4173 },
 });

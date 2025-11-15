@@ -7,6 +7,7 @@ from app.core.config import AEROLINEAS_API_URL, AEROLINEAS_TIMEOUT
 WS_TOKEN = os.getenv("AEROLINEAS_WS_TOKEN", "").strip()
 AER_FALLBACK_USER_ID = (os.getenv("AEROLINEAS_FALLBACK_USER_ID") or "").strip()
 
+
 def _sanitize_user_id(user_id: Optional[str]) -> str:
     """
     Aerolíneas requiere X-User-Id numérico (long).
@@ -22,9 +23,14 @@ def _sanitize_user_id(user_id: Optional[str]) -> str:
         "Define AEROLINEAS_FALLBACK_USER_ID en .env o guarda aeroUserId numérico por usuario."
     )
 
-def _headers_for(user_id: Optional[str], email: Optional[str] = None, name: Optional[str] = None) -> Dict[str, str]:
+
+def _headers_for(
+    user_id: Optional[str],
+    email: Optional[str] = None,
+    name: Optional[str] = None,
+) -> Dict[str, str]:
     uid = _sanitize_user_id(user_id)
-    h = {
+    h: Dict[str, str] = {
         "Accept": "application/json",
         "X-User-Id": uid,
     }
@@ -36,39 +42,103 @@ def _headers_for(user_id: Optional[str], email: Optional[str] = None, name: Opti
         h["Authorization"] = f"Bearer {WS_TOKEN}"
     return h
 
-async def add_item(user_id: str, id_vuelo: int, id_clase: int, cantidad: int, incluir_pareja: bool = False) -> None:
+
+async def add_item(
+    user_id: str,
+    id_vuelo: int,
+    id_clase: int,
+    cantidad: int,
+    incluir_pareja: bool = False,
+) -> None:
     url = f"{AEROLINEAS_API_URL}/api/compras/items"
     payload = {"idVuelo": id_vuelo, "idClase": id_clase, "cantidad": cantidad}
     qp = "?pair=true" if incluir_pareja else ""
-    async with httpx.AsyncClient(timeout=AEROLINEAS_TIMEOUT, headers=_headers_for(user_id)) as client:
+    async with httpx.AsyncClient(
+        timeout=AEROLINEAS_TIMEOUT,
+        headers=_headers_for(user_id),
+    ) as client:
         r = await client.post(url + qp, json=payload)
         r.raise_for_status()
 
-async def update_item(user_id: str, id_item: int, cantidad: int, sync_pareja: bool = False) -> None:
+
+async def update_item(
+    user_id: str,
+    id_item: int,
+    cantidad: int,
+    sync_pareja: bool = False,
+) -> None:
     url = f"{AEROLINEAS_API_URL}/api/compras/items/{id_item}"
     qp = "?syncPareja=true" if sync_pareja else ""
     payload = {"cantidad": cantidad}
-    async with httpx.AsyncClient(timeout=AEROLINEAS_TIMEOUT, headers=_headers_for(user_id)) as client:
+    async with httpx.AsyncClient(
+        timeout=AEROLINEAS_TIMEOUT,
+        headers=_headers_for(user_id),
+    ) as client:
         r = await client.put(url + qp, json=payload)
         r.raise_for_status()
 
-async def remove_item(user_id: str, id_item: int, sync_pareja: bool = False) -> None:
+
+async def remove_item(
+    user_id: str,
+    id_item: int,
+    sync_pareja: bool = False,
+) -> None:
     url = f"{AEROLINEAS_API_URL}/api/compras/items/{id_item}"
     qp = "?syncPareja=true" if sync_pareja else ""
-    async with httpx.AsyncClient(timeout=AEROLINEAS_TIMEOUT, headers=_headers_for(user_id)) as client:
+    async with httpx.AsyncClient(
+        timeout=AEROLINEAS_TIMEOUT,
+        headers=_headers_for(user_id),
+    ) as client:
         r = await client.delete(url + qp)
         r.raise_for_status()
 
-async def checkout(user_id: str, payment: Dict[str, Any], email: Optional[str], name: Optional[str]) -> Dict[str, Any]:
+
+async def checkout(
+    user_id: str,
+    payment: Dict[str, Any],
+    email: Optional[str],
+    name: Optional[str],
+) -> Dict[str, Any]:
     url = f"{AEROLINEAS_API_URL}/api/compras/checkout"
-    async with httpx.AsyncClient(timeout=AEROLINEAS_TIMEOUT, headers=_headers_for(user_id, email, name)) as client:
+    async with httpx.AsyncClient(
+        timeout=AEROLINEAS_TIMEOUT,
+        headers=_headers_for(user_id, email, name),
+    ) as client:
         r = await client.post(url, json=payment)
         r.raise_for_status()
         return r.json()
 
-async def get_reserva_detalle(user_id: str, id_reserva: int, email: Optional[str], name: Optional[str]) -> Dict[str, Any]:
+
+async def get_reserva_detalle(
+    user_id: str,
+    id_reserva: int,
+    email: Optional[str],
+    name: Optional[str],
+) -> Dict[str, Any]:
     url = f"{AEROLINEAS_API_URL}/api/compras/reservas/{id_reserva}"
-    async with httpx.AsyncClient(timeout=AEROLINEAS_TIMEOUT, headers=_headers_for(user_id, email, name)) as client:
+    async with httpx.AsyncClient(
+        timeout=AEROLINEAS_TIMEOUT,
+        headers=_headers_for(user_id, email, name),
+    ) as client:
         r = await client.get(url)
+        r.raise_for_status()
+        return r.json()
+
+
+async def cancelar_reserva(
+    user_id: str,
+    id_reserva: int,
+    email: Optional[str],
+    name: Optional[str],
+) -> Dict[str, Any]:
+    """
+    Pide a Aerolíneas cancelar la reserva indicada.
+    """
+    url = f"{AEROLINEAS_API_URL}/api/compras/reservas/{id_reserva}/cancelar"
+    async with httpx.AsyncClient(
+        timeout=AEROLINEAS_TIMEOUT,
+        headers=_headers_for(user_id, email, name),
+    ) as client:
+        r = await client.post(url)
         r.raise_for_status()
         return r.json()

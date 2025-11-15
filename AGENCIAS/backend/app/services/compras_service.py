@@ -6,8 +6,15 @@ import httpx
 import re
 
 from app.models.compras import (
-    AddItemReq, UpdateQtyReq, PaymentReq, CarritoResp, CarritoItem,
-    CheckoutResp, ReservaListItem, ReservaDetalle, ReservaItem,
+    AddItemReq,
+    UpdateQtyReq,
+    PaymentReq,
+    CarritoResp,
+    CarritoItem,
+    CheckoutResp,
+    ReservaListItem,
+    ReservaDetalle,
+    ReservaItem,
 )
 from app.repositories import compras_repository as repo
 from app.services.proveedores import aerolinea_client as aer
@@ -26,7 +33,10 @@ def _dec(v: Any) -> Decimal:
 def _apply_markup(precio_base: Decimal, markup_pct: Optional[float]) -> Decimal:
     if not markup_pct:
         return precio_base.quantize(Decimal("0.01"))
-    return (precio_base * (Decimal("1.0") + Decimal(str(markup_pct)) / Decimal("100"))).quantize(Decimal("0.01"))
+    return (
+        precio_base
+        * (Decimal("1.0") + Decimal(str(markup_pct)) / Decimal("100"))
+    ).quantize(Decimal("0.01"))
 
 
 async def _recalculate_totals(cart: Dict[str, Any]) -> None:
@@ -37,37 +47,42 @@ async def _recalculate_totals(cart: Dict[str, Any]) -> None:
     """
     total = Decimal("0.00")
     for it in cart.get("items", []):
-        precio_final = _dec(it.get("precioFinal") if it.get("precioFinal") is not None else it.get("precioBase"))
+        precio_final = _dec(
+            it.get("precioFinal") if it.get("precioFinal") is not None else it.get("precioBase")
+        )
         qty = int(it.get("cantidad", 1))
         sub = (precio_final * qty).quantize(Decimal("0.01"))
         it["subtotal"] = float(sub)
         total += sub
     cart["total"] = float(total)
 
+
 async def get_cart(user: Dict[str, Any]) -> CarritoResp:
     c = await repo.get_cart(user["id"])
     await _recalculate_totals(c)
 
     items = [
-        CarritoItem(**{
-            "idItem": it.get("idItem"),
-            "proveedor": it.get("proveedor", "AEROLINEAS"),
-            "idVuelo": it.get("idVuelo"),
-            "codigoVuelo": it.get("codigoVuelo"),
-            "fechaSalida": it.get("fechaSalida"),
-            "fechaLlegada": it.get("fechaLlegada"),
-            "idClase": it.get("idClase"),
-            "clase": it.get("clase"),
-            "cantidad": it.get("cantidad", 1),
-            "precioBase": _dec(it.get("precioBase")),
-            "precioFinal": _dec(it.get("precioFinal")),
-            "subtotal": _dec(it.get("subtotal")),
-            "ciudadOrigen": it.get("ciudadOrigen"),
-            "paisOrigen": it.get("paisOrigen"),
-            "ciudadDestino": it.get("ciudadDestino"),
-            "paisDestino": it.get("paisDestino"),
-            "parejaDe": it.get("parejaDe"),
-        })
+        CarritoItem(
+            **{
+                "idItem": it.get("idItem"),
+                "proveedor": it.get("proveedor", "AEROLINEAS"),
+                "idVuelo": it.get("idVuelo"),
+                "codigoVuelo": it.get("codigoVuelo"),
+                "fechaSalida": it.get("fechaSalida"),
+                "fechaLlegada": it.get("fechaLlegada"),
+                "idClase": it.get("idClase"),
+                "clase": it.get("clase"),
+                "cantidad": it.get("cantidad", 1),
+                "precioBase": _dec(it.get("precioBase")),
+                "precioFinal": _dec(it.get("precioFinal")),
+                "subtotal": _dec(it.get("subtotal")),
+                "ciudadOrigen": it.get("ciudadOrigen"),
+                "paisOrigen": it.get("paisOrigen"),
+                "ciudadDestino": it.get("ciudadDestino"),
+                "paisDestino": it.get("paisDestino"),
+                "parejaDe": it.get("parejaDe"),
+            }
+        )
         for it in c.get("items", [])
     ]
 
@@ -76,21 +91,34 @@ async def get_cart(user: Dict[str, Any]) -> CarritoResp:
         idUsuario=c["idUsuario"],
         fechaCreacion=c.get("fechaCreacion"),
         total=_dec(c.get("total")),
-        items=items
+        items=items,
     )
 
 
-async def add_or_increment_item(user: Dict[str, Any], req: AddItemReq, incluir_pareja: bool) -> None:
+async def add_or_increment_item(
+    user: Dict[str, Any],
+    req: AddItemReq,
+    incluir_pareja: bool,
+) -> None:
     cart = await repo.get_cart(user["id"])
 
     proveedor_id = "AEROLINEAS"
-    prov = await repo.get_proveedor(proveedor_id) or {"_id": "AEROLINEAS", "markup": {"porcentaje": 0}}
+    prov = await repo.get_proveedor(proveedor_id) or {
+        "_id": "AEROLINEAS",
+        "markup": {"porcentaje": 0},
+    }
     markup_pct = (prov.get("markup") or {}).get("porcentaje") or 0
 
-    item = next((x for x in cart["items"]
-                 if x.get("proveedor") == proveedor_id
-                 and int(x.get("idVuelo")) == int(req.idVuelo)
-                 and int(x.get("idClase")) == int(req.idClase)), None)
+    item = next(
+        (
+            x
+            for x in cart["items"]
+            if x.get("proveedor") == proveedor_id
+            and int(x.get("idVuelo")) == int(req.idVuelo)
+            and int(x.get("idClase")) == int(req.idClase)
+        ),
+        None,
+    )
 
     if item:
         item["cantidad"] = int(item.get("cantidad", 1)) + max(1, req.cantidad)
@@ -122,7 +150,11 @@ async def add_or_increment_item(user: Dict[str, Any], req: AddItemReq, incluir_p
                     break
 
         precio_base_dec = _dec(precio_base) if precio_base is not None else Decimal("0.00")
-        precio_final_dec = _apply_markup(precio_base_dec, markup_pct) if precio_base is not None else Decimal("0.00")
+        precio_final_dec = (
+            _apply_markup(precio_base_dec, markup_pct)
+            if precio_base is not None
+            else Decimal("0.00")
+        )
 
         item = {
             "idItem": str(uuid4()),
@@ -149,7 +181,12 @@ async def add_or_increment_item(user: Dict[str, Any], req: AddItemReq, incluir_p
     await repo.save_cart(cart)
 
 
-async def update_quantity(user: Dict[str, Any], id_item: str, cantidad: int, sync_pareja: bool) -> None:
+async def update_quantity(
+    user: Dict[str, Any],
+    id_item: str,
+    cantidad: int,
+    sync_pareja: bool,
+) -> None:
     cart = await repo.get_cart(user["id"])
     item = next((x for x in cart["items"] if x.get("idItem") == id_item), None)
     if not item:
@@ -160,7 +197,11 @@ async def update_quantity(user: Dict[str, Any], id_item: str, cantidad: int, syn
     await repo.save_cart(cart)
 
 
-async def remove_item(user: Dict[str, Any], id_item: str, sync_pareja: bool) -> None:
+async def remove_item(
+    user: Dict[str, Any],
+    id_item: str,
+    sync_pareja: bool,
+) -> None:
     cart = await repo.get_cart(user["id"])
     idx = next((i for i, x in enumerate(cart["items"]) if x.get("idItem") == id_item), None)
     if idx is None:
@@ -169,6 +210,7 @@ async def remove_item(user: Dict[str, Any], id_item: str, sync_pareja: bool) -> 
 
     await _recalculate_totals(cart)
     await repo.save_cart(cart)
+
 
 async def checkout(user: Dict[str, Any], payment: PaymentReq) -> CheckoutResp:
     """
@@ -193,14 +235,14 @@ async def checkout(user: Dict[str, Any], payment: PaymentReq) -> CheckoutResp:
                 id_vuelo=int(it["idVuelo"]),
                 id_clase=int(it["idClase"]),
                 cantidad=int(it.get("cantidad", 1)),
-                incluir_pareja=bool(it.get("parejaDe"))
+                incluir_pareja=bool(it.get("parejaDe")),
             )
 
         checkout_resp = await aer.checkout(
             user["id"],
             payment.dict(),
             user.get("email"),
-            user.get("nombres") or user.get("name")
+            user.get("nombres") or user.get("name"),
         )
         aero_id_reserva = str(checkout_resp.get("idReserva"))
 
@@ -208,7 +250,7 @@ async def checkout(user: Dict[str, Any], payment: PaymentReq) -> CheckoutResp:
             user["id"],
             int(aero_id_reserva),
             user.get("email"),
-            user.get("nombres") or user.get("name")
+            user.get("nombres") or user.get("name"),
         )
     except httpx.HTTPStatusError as e:
         detail = (e.response.text or "").strip() or f"Error del proveedor Aerolíneas ({e.response.status_code})"
@@ -218,17 +260,19 @@ async def checkout(user: Dict[str, Any], payment: PaymentReq) -> CheckoutResp:
 
     total = _dec(det.get("total"))
 
-    compra_doc = {
+    compra_doc: Dict[str, Any] = {
         "idUsuario": user["id"],
         "tipo": "vuelo",
-        "idEstado": 1,
+        "idEstado": 1,  
         "total": float(total),
         "codigo": det.get("codigo"),
-        "proveedores": [{
-            "id": "AEROLINEAS",
-            "idReservaProveedor": aero_id_reserva,
-            "codigo": det.get("codigo")
-        }],
+        "proveedores": [
+            {
+                "id": "AEROLINEAS",
+                "idReservaProveedor": aero_id_reserva,
+                "codigo": det.get("codigo"),
+            }
+        ],
         "detalle_vuelo": det,
     }
     saved = await repo.insert_compra(compra_doc)
@@ -252,7 +296,7 @@ async def checkout(user: Dict[str, Any], payment: PaymentReq) -> CheckoutResp:
                 to=user["email"],
                 subject=f"Compra confirmada #{saved['id']}",
                 html=html,
-                attachments=[("boleto.pdf", pdf_bytes, "application/pdf")]
+                attachments=[("boleto.pdf", pdf_bytes, "application/pdf")],
             )
         except Exception:
             pass
@@ -263,14 +307,16 @@ async def list_compras(user: Dict[str, Any]) -> List[ReservaListItem]:
     rows = await repo.list_compras_by_user(user["id"])
     out: List[ReservaListItem] = []
     for r in rows:
-        out.append(ReservaListItem(
-            idReserva=r["id"],
-            idUsuario=r["idUsuario"],
-            idEstado=int(r.get("idEstado", 1)),
-            total=_dec(r.get("total")),
-            creadaEn=r.get("creadaEn"),
-            codigo=r.get("codigo")
-        ))
+        out.append(
+            ReservaListItem(
+                idReserva=r["id"],
+                idUsuario=r["idUsuario"],
+                idEstado=int(r.get("idEstado", 1)),
+                total=_dec(r.get("total")),
+                creadaEn=r.get("creadaEn"),
+                codigo=r.get("codigo"),
+            )
+        )
     return out
 
 
@@ -279,28 +325,47 @@ async def get_compra_detalle(user: Dict[str, Any], compra_id: str) -> ReservaDet
     if not det:
         raise ValueError("Compra no encontrada")
 
+    proveedores = det.get("proveedores") or []
+    aer_prov = next((p for p in proveedores if p.get("id") == "AEROLINEAS"), None)
+    if aer_prov and aer_prov.get("idReservaProveedor"):
+        try:
+            remote = await aer.get_reserva_detalle(
+                user["id"],
+                int(aer_prov["idReservaProveedor"]),
+                user.get("email"),
+                user.get("nombres") or user.get("name"),
+            )
+            remote_estado = remote.get("idEstado")
+            if remote_estado is not None and int(remote_estado) != int(det.get("idEstado", 1)):
+                det["idEstado"] = int(remote_estado)
+                await repo.update_estado_compra(compra_id, int(remote_estado))
+        except Exception:
+            pass
+
     items: List[ReservaItem] = []
     if det.get("detalle_vuelo"):
         dv = det["detalle_vuelo"]
         for it in dv.get("items", []):
-            items.append(ReservaItem(
-                idItem=str(it.get("idItem")),
-                proveedor="AEROLINEAS",
-                idVuelo=int(it.get("idVuelo")),
-                codigoVuelo=it.get("codigoVuelo"),
-                fechaSalida=it.get("fechaSalida"),
-                fechaLlegada=it.get("fechaLlegada"),
-                idClase=int(it.get("idClase")),
-                clase=it.get("clase"),
-                cantidad=int(it.get("cantidad", 1)),
-                precioUnitario=_dec(it.get("precioUnitario")),
-                subtotal=_dec(it.get("subtotal")),
-                ciudadOrigen=it.get("ciudadOrigen"),
-                paisOrigen=it.get("paisOrigen"),
-                ciudadDestino=it.get("ciudadDestino"),
-                paisDestino=it.get("paisDestino"),
-                regresoCodigo=it.get("regresoCodigo")
-            ))
+            items.append(
+                ReservaItem(
+                    idItem=str(it.get("idItem")),
+                    proveedor="AEROLINEAS",
+                    idVuelo=int(it.get("idVuelo")),
+                    codigoVuelo=it.get("codigoVuelo"),
+                    fechaSalida=it.get("fechaSalida"),
+                    fechaLlegada=it.get("fechaLlegada"),
+                    idClase=int(it.get("idClase")),
+                    clase=it.get("clase"),
+                    cantidad=int(it.get("cantidad", 1)),
+                    precioUnitario=_dec(it.get("precioUnitario")),
+                    subtotal=_dec(it.get("subtotal")),
+                    ciudadOrigen=it.get("ciudadOrigen"),
+                    paisOrigen=it.get("paisOrigen"),
+                    ciudadDestino=it.get("ciudadDestino"),
+                    paisDestino=it.get("paisDestino"),
+                    regresoCodigo=it.get("regresoCodigo"),
+                )
+            )
 
     return ReservaDetalle(
         idReserva=det["id"],
@@ -311,20 +376,123 @@ async def get_compra_detalle(user: Dict[str, Any], compra_id: str) -> ReservaDet
         codigo=det.get("codigo"),
         items=items,
         compradorNombre=None,
-        compradorEmail=None
+        compradorEmail=None,
     )
 
-async def cancelar_compra(user: Dict[str, Any], compra_id: str, is_admin: bool) -> bool:
+async def list_compras_admin() -> List[ReservaListItem]:
     """
-    Marca la compra como cancelada en Agencia (idEstado=2).
-    Si en el futuro quieres propagar al proveedor, aquí llamarías al endpoint de cancelación
-    de Aerolíneas y, si es exitoso, actualizas Mongo.
+    Lista todas las compras (para admins).
     """
+    rows = await repo.list_compras_admin()
+    out: List[ReservaListItem] = []
+    for r in rows:
+        out.append(
+            ReservaListItem(
+                idReserva=r["id"],
+                idUsuario=r["idUsuario"],
+                idEstado=int(r.get("idEstado", 1)),
+                total=_dec(r.get("total")),
+                creadaEn=r.get("creadaEn"),
+                codigo=r.get("codigo"),
+            )
+        )
+    return out
+
+
+async def get_compra_detalle_admin(compra_id: str) -> ReservaDetalle:
+    """
+    Obtiene detalle de una compra sin filtrar por usuario (solo uso admin).
+    No sincroniza con Aerolíneas para simplificar.
+    """
+    det = await repo.find_compra_detail_admin(compra_id)
+    if not det:
+        raise ValueError("Compra no encontrada")
+
+    items: List[ReservaItem] = []
+    if det.get("detalle_vuelo"):
+        dv = det["detalle_vuelo"]
+        for it in dv.get("items", []):
+            items.append(
+                ReservaItem(
+                    idItem=str(it.get("idItem")),
+                    proveedor="AEROLINEAS",
+                    idVuelo=int(it.get("idVuelo")),
+                    codigoVuelo=it.get("codigoVuelo"),
+                    fechaSalida=it.get("fechaSalida"),
+                    fechaLlegada=it.get("fechaLlegada"),
+                    idClase=int(it.get("idClase")),
+                    clase=it.get("clase"),
+                    cantidad=int(it.get("cantidad", 1)),
+                    precioUnitario=_dec(it.get("precioUnitario")),
+                    subtotal=_dec(it.get("subtotal")),
+                    ciudadOrigen=it.get("ciudadOrigen"),
+                    paisOrigen=it.get("paisOrigen"),
+                    ciudadDestino=it.get("ciudadDestino"),
+                    paisDestino=it.get("paisDestino"),
+                    regresoCodigo=it.get("regresoCodigo"),
+                )
+            )
+
+    return ReservaDetalle(
+        idReserva=det["id"],
+        idUsuario=det["idUsuario"],
+        idEstado=int(det.get("idEstado", 1)),
+        total=_dec(det.get("total")),
+        creadaEn=det.get("creadaEn"),
+        codigo=det.get("codigo"),
+        items=items,
+        compradorNombre=None,
+        compradorEmail=None,
+    )
+
+async def cancelar_compra(
+    user: Dict[str, Any],
+    compra_id: str,
+    is_admin: bool,
+) -> bool:
+    """
+    Cancela la compra en Aerolíneas y luego la marca como cancelada en la Agencia.
+
+    - Si is_admin = False:
+        Solo puede cancelar compras del propio usuario (idUsuario == user["id"]).
+    - Si is_admin = True:
+        Puede cancelar cualquier compra (usa find_compra_detail_admin en el repo).
+    """
+    if is_admin:
+        det = await repo.find_compra_detail_admin(compra_id)
+    else:
+        det = await repo.find_compra_detail(user["id"], compra_id)
+
+    if not det:
+        raise ValueError("Compra no encontrada")
+
+    estado_actual = int(det.get("idEstado", 1))
+    if estado_actual != 1:
+        raise ValueError("Solo se pueden cancelar compras activas.")
+
+    proveedores = det.get("proveedores") or []
+    aer_prov = next((p for p in proveedores if p.get("id") == "AEROLINEAS"), None)
+
+    if aer_prov and aer_prov.get("idReservaProveedor"):
+        try:
+            await aer.cancelar_reserva(
+                user_id=user["id"],
+                id_reserva=int(aer_prov["idReservaProveedor"]),
+                email=user.get("email"),
+                name=user.get("nombres") or user.get("name"),
+            )
+        except httpx.HTTPStatusError as e:
+            msg = (e.response.text or "").strip() or f"Error al cancelar en Aerolíneas ({e.response.status_code})"
+            raise ValueError(msg)
+        except httpx.HTTPError as e:
+            raise ValueError(f"No se pudo contactar a Aerolíneas para cancelar: {str(e)}")
+
     await repo.update_estado_compra(compra_id, 2)
     return True
 
+
 def _safe_filename(s: str) -> str:
-    return re.sub(r'[^A-Za-z0-9._-]', '_', s or 'boleto')
+    return re.sub(r"[^A-Za-z0-9._-]", "_", s or "boleto")
 
 
 async def get_compra_pdf(user: Dict[str, Any], compra_id: str) -> Tuple[bytes, str]:
