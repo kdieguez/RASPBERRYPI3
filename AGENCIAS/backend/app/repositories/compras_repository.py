@@ -28,13 +28,26 @@ async def get_proveedor(proveedor_id: str) -> Optional[Dict[str, Any]]:
     doc = await d[COLL_PROV].find_one({"_id": proveedor_id})
     return _id_str(doc)
 
+async def list_proveedores(habilitado_only: bool = False) -> List[Dict[str, Any]]:
+    d = get_db()
+    query = {"habilitado": True} if habilitado_only else {}
+    cur = d[COLL_PROV].find(query).sort([("nombre", 1)])
+    out: List[Dict[str, Any]] = []
+    async for x in cur:
+        out.append(_id_str(x))
+    return out
 
 async def upsert_proveedor(doc: Dict[str, Any]) -> None:
     d = get_db()
     _id = doc.get("_id")
     if not _id:
-        raise ValueError("Proveedor necesita _id (e.g., 'AEROLINEAS')")
+        raise ValueError("Proveedor necesita _id (e.g., 'AEROLINEA_1')")
     await d[COLL_PROV].update_one({"_id": _id}, {"$set": doc}, upsert=True)
+
+async def delete_proveedor(proveedor_id: str) -> bool:
+    d = get_db()
+    res = await d[COLL_PROV].delete_one({"_id": proveedor_id})
+    return res.deleted_count > 0
 
 
 # -------- Carritos -------------
