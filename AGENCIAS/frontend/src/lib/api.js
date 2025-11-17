@@ -97,10 +97,10 @@ export const ComprasAPI = {
   // Cliente normal
   getCart: () => request('/compras/carrito'),
 
-  addItem: ({ idVuelo, idClase, cantidad = 1, pair = false }) =>
+  addItem: ({ idVuelo, idClase, cantidad = 1, pair = false, proveedor }) =>
     request(`/compras/items?pair=${pair ? 'true' : 'false'}`, {
       method: 'POST',
-      body: { idVuelo, idClase, cantidad },
+      body: { idVuelo, idClase, cantidad, ...(proveedor ? { proveedor } : {}) },
     }),
 
   updateQty: (idItem, cantidad, syncPareja = false) =>

@@ -70,7 +70,8 @@
       {:else if isVuelosCatalog}
         <Catalog />
       {:else if isVuelosDetail}
-        <Detail />
+        {@const matchResult = match("/vuelos/:id", current)}
+        <Detail id={matchResult.params.id} />
 
       {:else if isCart}
         <Cart />
