@@ -528,6 +528,113 @@ public class ComprasDAO {
     }
   }
 
+  public long checkoutConClienteFinal(long userIdWebService, long userIdClienteFinal) throws Exception {
+    long cartIdWebService = ensureCartForUser(userIdWebService);
+    try (Connection cn = getConn()) {
+      String carritoItemTable = DB.table("CARRITO_ITEM");
+      
+      
+      int itemCount = 0;
+      try (PreparedStatement ps = cn.prepareStatement(
+          "SELECT COUNT(*) FROM " + carritoItemTable + " WHERE ID_CARRITO = ?")) {
+        ps.setLong(1, cartIdWebService);
+        try (ResultSet rs = ps.executeQuery()) {
+          if (rs.next()) {
+            itemCount = rs.getInt(1);
+            if (itemCount == 0) {
+              throw new IllegalStateException("El carrito está vacío o ya fue procesado.");
+            }
+          }
+        }
+      }
+      
+      
+      long cartIdClienteFinal = crearCarritoClienteFinal(cn, cartIdWebService, userIdClienteFinal);
+      System.out.println("[Checkout] Carrito creado para cliente final " + userIdClienteFinal + " con " + itemCount + " items");
+      
+      
+      long idGenerado;
+      String schema = DB.getSchema();
+      try (CallableStatement cs = cn.prepareCall("{ call " + schema + ".PR_CHECKOUT_CARRITO(?,?,?) }")) {
+        cs.setLong(1, userIdClienteFinal);
+        cs.setLong(2, cartIdClienteFinal);
+        cs.registerOutParameter(3, java.sql.Types.NUMERIC);
+        cs.execute();
+        idGenerado = cs.getLong(3);
+      }
+      return idGenerado;
+    }
+  }
+
+  private long crearCarritoClienteFinal(Connection cn, long cartIdWebService, long userIdClienteFinal) throws Exception {
+    String carritoTable = DB.table("CARRITO");
+    String carritoItemTable = DB.table("CARRITO_ITEM");
+    
+    
+    long cartIdClienteFinal;
+    try (PreparedStatement ps = cn.prepareStatement(
+        "SELECT ID_CARRITO FROM " + carritoTable + " WHERE ID_USUARIO = ?")) {
+      ps.setLong(1, userIdClienteFinal);
+      try (ResultSet rs = ps.executeQuery()) {
+        if (rs.next()) {
+          cartIdClienteFinal = rs.getLong(1);
+          
+          try (PreparedStatement del = cn.prepareStatement(
+              "DELETE FROM " + carritoItemTable + " WHERE ID_CARRITO = ?")) {
+            del.setLong(1, cartIdClienteFinal);
+            del.executeUpdate();
+          }
+        } else {
+          
+          try (PreparedStatement ins = cn.prepareStatement(
+              "INSERT INTO " + carritoTable + " (ID_USUARIO) VALUES (?)")) {
+            ins.setLong(1, userIdClienteFinal);
+            ins.executeUpdate();
+          }
+          
+          try (PreparedStatement sel = cn.prepareStatement(
+              "SELECT ID_CARRITO FROM " + carritoTable + " WHERE ID_USUARIO = ?")) {
+            sel.setLong(1, userIdClienteFinal);
+            try (ResultSet rs2 = sel.executeQuery()) {
+              if (rs2.next()) {
+                cartIdClienteFinal = rs2.getLong(1);
+              } else {
+                throw new SQLException("No se pudo obtener el ID del carrito creado para el cliente final");
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    try (PreparedStatement ps = cn.prepareStatement(
+        "MERGE INTO " + carritoItemTable + " t " +
+        "USING (SELECT ? idc, ID_VUELO idv, ID_CLASE idcl, CANTIDAD cant, PRECIO_UNITARIO precio " +
+        "       FROM " + carritoItemTable + " WHERE ID_CARRITO = ?) s " +
+        "ON (t.ID_CARRITO = s.idc AND t.ID_VUELO = s.idv AND t.ID_CLASE = s.idcl) " +
+        "WHEN MATCHED THEN UPDATE SET t.CANTIDAD = s.cant, t.PRECIO_UNITARIO = s.precio " +
+        "WHEN NOT MATCHED THEN INSERT (ID_CARRITO, ID_VUELO, ID_CLASE, CANTIDAD, PRECIO_UNITARIO) " +
+        "VALUES (s.idc, s.idv, s.idcl, s.cant, s.precio)")) {
+      ps.setLong(1, cartIdClienteFinal);
+      ps.setLong(2, cartIdWebService);
+      int itemsCopiados = ps.executeUpdate();
+      System.out.println("[Checkout] " + itemsCopiados + " items copiados/actualizados en el carrito del cliente final");
+    }
+    
+    return cartIdClienteFinal;
+  }
+
+  public void guardarReservaWebService(long idReserva, long idUsuarioWebService) throws Exception {
+    String tabla = DB.table("RESERVA_WEBSERVICE");
+    String sql = "INSERT INTO " + tabla + " (ID_RESERVA, ID_USUARIO_WEBSERVICE) VALUES (?, ?)";
+    try (Connection cn = getConn();
+         PreparedStatement ps = cn.prepareStatement(sql)) {
+      ps.setLong(1, idReserva);
+      ps.setLong(2, idUsuarioWebService);
+      ps.executeUpdate();
+    }
+  }
+
   public List<ReservaListItem> listReservasByUser(long userId) throws Exception {
     var out = new ArrayList<ReservaListItem>();
     String reservaTable = DB.table("RESERVA");

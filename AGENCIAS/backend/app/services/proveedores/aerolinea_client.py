@@ -201,12 +201,29 @@ async def checkout(
     payment: Dict[str, Any],
     email: Optional[str],
     name: Optional[str],
-    proveedor_id: Optional[str] = None
+    proveedor_id: Optional[str] = None,
+    cliente_final: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Realiza el checkout en la aerolínea especificada.
     Si no se especifica proveedor_id, usa el proveedor por defecto o la URL legacy.
+    
+    Args:
+        user_id: ID del usuario web service (agencia)
+        payment: Datos de pago
+        email: Email del usuario web service (legacy)
+        name: Nombre del usuario web service (legacy)
+        proveedor_id: ID del proveedor (aerolínea)
+        cliente_final: Datos del cliente final (opcional) con email, nombres, apellidos
     """
+    payment_data = payment.copy() if payment else {}
+    if cliente_final:
+        payment_data["clienteFinal"] = {
+            "email": cliente_final.get("email"),
+            "nombres": cliente_final.get("nombres"),
+            "apellidos": cliente_final.get("apellidos"),
+        }
+    
     r = await _request(
         "POST",
         "/api/compras/checkout",
@@ -214,7 +231,7 @@ async def checkout(
         email=email,
         name=name,
         proveedor_id=proveedor_id,
-        json=payment,
+        json=payment_data,
     )
     return r.json()
 

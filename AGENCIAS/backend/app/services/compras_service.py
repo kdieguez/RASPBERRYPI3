@@ -27,41 +27,66 @@ def _dec(v: Any) -> Decimal:
         return Decimal("0.00")
 
 async def get_cart(user: Dict[str, Any]) -> CarritoResp:
-    # Usar proveedor por defecto (se resuelve automáticamente en aer.get_cart)
-    raw = await aer.get_cart(str(user["id"]))
-
-    items: List[CarritoItem] = []
-    for it in raw.get("items", []):
-        # Extraer proveedor del item si está disponible, sino usar "AEROLINEAS" por defecto
-        proveedor = it.get("proveedor") or "AEROLINEAS"
-        items.append(
-            CarritoItem(
-                idItem=str(it.get("idItem")),
-                proveedor=proveedor,
-                idVuelo=int(it.get("idVuelo")),
-                codigoVuelo=it.get("codigoVuelo"),
-                fechaSalida=it.get("fechaSalida"),
-                fechaLlegada=it.get("fechaLlegada"),
-                idClase=int(it.get("idClase")),
-                clase=it.get("clase"),
-                cantidad=int(it.get("cantidad", 1)),
-                precioBase=_dec(it.get("precioBase") or it.get("precioUnitario")),
-                precioFinal=_dec(it.get("precioFinal") or it.get("precioUnitario")),
-                subtotal=_dec(it.get("subtotal")),
-                ciudadOrigen=it.get("ciudadOrigen"),
-                paisOrigen=it.get("paisOrigen"),
-                ciudadDestino=it.get("ciudadDestino"),
-                paisDestino=it.get("paisDestino"),
-                parejaDe=it.get("parejaDe"),
-            )
-        )
+    """
+    Obtiene el carrito del usuario consultando TODOS los proveedores habilitados
+    y combinando los resultados. Cada item se etiqueta con su proveedor correspondiente.
+    """
+    from app.repositories.compras_repository import list_proveedores
+    
+    all_items: List[CarritoItem] = []
+    total = Decimal("0.00")
+    id_carrito = None
+    fecha_creacion = None
+    
+    try:
+        proveedores = await list_proveedores(habilitado_only=True)
+        for prov in proveedores:
+            proveedor_id = prov.get("_id") or prov.get("id")
+            if not proveedor_id:
+                continue
+            
+            try:
+                raw = await aer.get_cart(str(user["id"]), proveedor_id=proveedor_id)    
+            
+                if not id_carrito and raw.get("idCarrito") or raw.get("id"):
+                    id_carrito = str(raw.get("idCarrito") or raw.get("id"))
+                if not fecha_creacion and raw.get("fechaCreacion"):
+                    fecha_creacion = raw.get("fechaCreacion")
+                
+                for it in raw.get("items", []):
+                    all_items.append(
+                        CarritoItem(
+                            idItem=str(it.get("idItem")),
+                            proveedor=proveedor_id,
+                            idVuelo=int(it.get("idVuelo")),
+                            codigoVuelo=it.get("codigoVuelo"),
+                            fechaSalida=it.get("fechaSalida"),
+                            fechaLlegada=it.get("fechaLlegada"),
+                            idClase=int(it.get("idClase")),
+                            clase=it.get("clase"),
+                            cantidad=int(it.get("cantidad", 1)),
+                            precioBase=_dec(it.get("precioBase") or it.get("precioUnitario")),
+                            precioFinal=_dec(it.get("precioFinal") or it.get("precioUnitario")),
+                            subtotal=_dec(it.get("subtotal")),
+                            ciudadOrigen=it.get("ciudadOrigen"),
+                            paisOrigen=it.get("paisOrigen"),
+                            ciudadDestino=it.get("ciudadDestino"),
+                            paisDestino=it.get("paisDestino"),
+                            parejaDe=it.get("parejaDe"),
+                        )
+                    )
+                    total += _dec(it.get("subtotal") or it.get("precioFinal") or it.get("precioUnitario") or 0)
+            except Exception:
+                continue
+    except Exception:
+        pass
 
     return CarritoResp(
-        idCarrito=str(raw.get("idCarrito") or raw.get("id")),
-        idUsuario=str(raw.get("idUsuario") or user["id"]),
-        fechaCreacion=raw.get("fechaCreacion"),
-        total=_dec(raw.get("total")),
-        items=items,
+        idCarrito=id_carrito or str(user["id"]),
+        idUsuario=str(user["id"]),
+        fechaCreacion=fecha_creacion,
+        total=total,
+        items=all_items,
     )
 
 
@@ -70,12 +95,14 @@ async def add_or_increment_item(
     req: AddItemReq,
     incluir_pareja: bool,
 ) -> None:
+    proveedor_id = req.proveedor if req.proveedor else None
     await aer.add_item(
         user_id=str(user["id"]),
         id_vuelo=int(req.idVuelo),
         id_clase=int(req.idClase),
         cantidad=int(req.cantidad),
         incluir_pareja=incluir_pareja,
+        proveedor_id=proveedor_id,
     )
 
 
@@ -84,12 +111,26 @@ async def update_quantity(
     id_item: str,
     cantidad: int,
     sync_pareja: bool,
+    proveedor_id: Optional[str] = None,
 ) -> None:
+    """
+    Actualiza la cantidad de un item del carrito.
+    Si no se proporciona proveedor_id, busca el item en todos los proveedores.
+    """
+    if not proveedor_id:
+        cart = await get_cart(user)
+        item = next((it for it in cart.items if it.idItem == id_item), None)
+        if item and item.proveedor:
+            proveedor_id = item.proveedor
+        else:
+            raise ValueError(f"Item {id_item} no encontrado en el carrito")
+    
     await aer.update_item(
         user_id=str(user["id"]),
         id_item=int(id_item),
         cantidad=int(cantidad),
         sync_pareja=sync_pareja,
+        proveedor_id=proveedor_id,
     )
 
 
@@ -97,95 +138,181 @@ async def remove_item(
     user: Dict[str, Any],
     id_item: str,
     sync_pareja: bool,
+    proveedor_id: Optional[str] = None,
 ) -> None:
+    """
+    Elimina un item del carrito.
+    Si no se proporciona proveedor_id, busca el item en todos los proveedores.
+    """
+    if not proveedor_id:
+        cart = await get_cart(user)
+        item = next((it for it in cart.items if it.idItem == id_item), None)
+        if item and item.proveedor:
+            proveedor_id = item.proveedor
+        else:
+            raise ValueError(f"Item {id_item} no encontrado en el carrito")
+    
     await aer.remove_item(
         user_id=str(user["id"]),
         id_item=int(id_item),
         sync_pareja=sync_pareja,
+        proveedor_id=proveedor_id,
     )
 
 async def checkout(user: Dict[str, Any], payment: PaymentReq) -> CheckoutResp:
-    carrito = await aer.get_cart(str(user["id"]))
-    if not carrito.get("items"):
+    """
+    Realiza el checkout. El carrito puede tener items de múltiples proveedores.
+    Se procesa cada proveedor por separado y se combinan los resultados en una sola compra.
+    """
+    cart = await get_cart(user)
+    if not cart.items:
         raise ValueError("El carrito está vacío")
 
-    vuelos_items = carrito.get("items") or []
-    if not vuelos_items:
-        raise ValueError("No hay items de vuelo en el carrito")
+    items_por_proveedor: Dict[str, List[CarritoItem]] = {}
+    for item in cart.items:
+        if not item.proveedor:
+            raise ValueError(f"El item {item.idItem} no tiene proveedor asignado")
+        if item.proveedor not in items_por_proveedor:
+            items_por_proveedor[item.proveedor] = []
+        items_por_proveedor[item.proveedor].append(item)
 
-    # Obtener proveedor_id del primer item del carrito si está disponible
-    # Si no, se usará el proveedor por defecto en aer.checkout
-    proveedor_id = None
-    primer_item = vuelos_items[0]
-    if primer_item.get("proveedor"):
-        proveedor_id = primer_item["proveedor"]
+    if not items_por_proveedor:
+        raise ValueError("No hay items válidos en el carrito")
 
-    try:
-        checkout_resp = await aer.checkout(
-            user_id=str(user["id"]),
-            payment=payment.dict(),
-            email=user.get("email"),
-            name=user.get("nombres") or user.get("name"),
-            proveedor_id=proveedor_id,
-        )
-        aero_id_reserva = str(
-            checkout_resp.get("idReserva") or checkout_resp.get("id")
-        )
+    proveedores_info: List[Dict[str, Any]] = []
+    total_general = Decimal("0.00")
+    detalles_vuelos: List[Dict[str, Any]] = []
+    pdfs_adjuntos: List[Tuple[str, bytes, str]] = []
+    codigos_reserva: List[str] = []
 
-        det = await aer.get_reserva_detalle(
-            user_id=str(user["id"]),
-            id_reserva=int(aero_id_reserva),
-            email=user.get("email"),
-            name=user.get("nombres") or user.get("name"),
-            proveedor_id=proveedor_id,
-        )
-    except RuntimeError as e:
-        raise ValueError(str(e))
+    for proveedor_id, items in items_por_proveedor.items():
+        try:
+            carrito_raw = await aer.get_cart(str(user["id"]), proveedor_id=proveedor_id)
+            if not carrito_raw.get("items"):
+                raise ValueError(f"El carrito del proveedor {proveedor_id} está vacío")
 
-    total = _dec(det.get("total"))
+            cliente_final = {
+                "email": user.get("email"),
+                "nombres": user.get("nombres") or user.get("name") or "",
+                "apellidos": user.get("apellidos") or "",
+            }
+            
+            checkout_resp = await aer.checkout(
+                user_id=str(user["id"]),
+                payment=payment.dict(),
+                email=user.get("email"),
+                name=user.get("nombres") or user.get("name"),
+                proveedor_id=proveedor_id,
+                cliente_final=cliente_final,
+            )
+            aero_id_reserva = str(
+                checkout_resp.get("idReserva") or checkout_resp.get("id")
+            )
 
-    # Usar el proveedor_id obtenido o "AEROLINEAS" por defecto
-    proveedor_id_final = proveedor_id or "AEROLINEAS"
+            try:
+                det = await aer.get_reserva_detalle(
+                    user_id=str(user["id"]), 
+                    id_reserva=int(aero_id_reserva),
+                    email=user.get("email"),
+                    name=user.get("nombres") or user.get("name"),
+                    proveedor_id=proveedor_id,
+                )
+            except Exception as det_error:
+                print(f"[Checkout] Advertencia: No se pudo obtener detalle de reserva {aero_id_reserva}: {det_error}")
+                det = {
+                    "id": int(aero_id_reserva),
+                    "idReserva": int(aero_id_reserva),
+                    "codigo": f"RES-{aero_id_reserva}",
+                    "total": 0.0,
+                    "idEstado": 1,
+                    "items": [],
+                }
+
+            total_proveedor = _dec(det.get("total"))
+            total_general += total_proveedor
+
+            nombre_proveedor = proveedor_id
+            try:
+                from app.repositories.compras_repository import get_proveedor
+                prov_info = await get_proveedor(proveedor_id)
+                if prov_info:
+                    nombre_proveedor = prov_info.get("nombre") or prov_info.get("name") or proveedor_id
+            except Exception:
+                pass
+
+            proveedores_info.append({
+                "id": proveedor_id,
+                "nombre": nombre_proveedor,
+                "idReservaProveedor": aero_id_reserva,
+                "codigo": det.get("codigo"),
+                "total": float(total_proveedor),
+            })
+
+            detalles_vuelos.append(det)
+            codigos_reserva.append(aero_id_reserva)
+
+        except Exception as e:
+            raise ValueError(f"Error procesando checkout del proveedor {proveedor_id}: {str(e)}")
 
     compra_doc: Dict[str, Any] = {
         "idUsuario": user["id"],
         "tipo": "vuelo",
-        "idEstado": int(det.get("idEstado", 1)),
-        "total": float(total),
-        "codigo": det.get("codigo"),
-        "proveedores": [
-            {
-                "id": proveedor_id_final,
-                "idReservaProveedor": aero_id_reserva,
-                "codigo": det.get("codigo"),
-            }
-        ],
-        "detalle_vuelo": det,
+        "idEstado": int(detalles_vuelos[0].get("idEstado", 1)) if detalles_vuelos else 1,
+        "total": float(total_general),
+        "codigo": "-".join(codigos_reserva) if len(codigos_reserva) > 1 else (codigos_reserva[0] if codigos_reserva else None),
+        "proveedores": proveedores_info,
+        "detalle_vuelo": detalles_vuelos[0] if len(detalles_vuelos) == 1 else None,
+        "detalles_vuelos": detalles_vuelos if len(detalles_vuelos) > 1 else None,
+        "creadaEn": None, 
     }
     saved = await repo.insert_compra(compra_doc)
 
-    # 5. PDF + correo
-    pdf_bytes = await build_ticket_pdf(det)
+    pdf_bytes = None
+    try:
+        compra_completa = await repo.find_compra_detail(user["id"], saved["id"])
+        if compra_completa:
+            print(f"[Checkout] Generando PDF para compra {saved['id']}")
+            print(f"[Checkout] Datos compra: id={compra_completa.get('id')}, codigo={compra_completa.get('codigo')}, total={compra_completa.get('total')}")
+            pdf_bytes = await build_ticket_pdf(compra_completa)
+            print(f"[Checkout] PDF generado: {len(pdf_bytes)} bytes")
+            if not pdf_bytes or len(pdf_bytes) < 100:
+                print(f"[Checkout] ERROR: PDF generado está vacío o muy pequeño")
+                pdf_bytes = None
+        else:
+            print(f"[Checkout] ERROR: No se encontró la compra {saved['id']} en MongoDB")
+    except Exception as e:
+        import traceback
+        print(f"[Checkout] ERROR generando PDF desde MongoDB: {e}")
+        print(traceback.format_exc())
+        pdf_bytes = None
+
     if user.get("email"):
+        codigos_str = ", ".join(codigos_reserva)
         html = f"""
         <div style="font-family:Inter,Arial,sans-serif">
           <h2 style="color:#E62727;margin:0">
-            Compra confirmada #{saved['id']} · Reserva {aero_id_reserva}
+            Compra confirmada #{saved['id']} · Reservas: {codigos_str}
           </h2>
-          <p>¡Gracias por tu compra! Adjuntamos tu boleto en PDF.</p>
-          <p><strong>Total:</strong> {total}</p>
-          <p style="color:#1E93AB">Aerolíneas · Agencia</p>
+          <p>¡Gracias por tu compra! Se han procesado {len(proveedores_info)} reserva(s) de diferentes aerolíneas.</p>
+          <p><strong>Total:</strong> Q {total_general:,.2f}</p>
+          <p><strong>Aerolíneas:</strong> {', '.join([p.get('nombre', p.get('id', 'N/A')) for p in proveedores_info])}</p>
+          <p style="color:#1E93AB">Agencia de Viajes</p>
         </div>
         """
         try:
+            attachments = []
+            if pdf_bytes:
+                nombre_archivo = f"boleto_agencia_{saved['id']}.pdf"
+                attachments.append((nombre_archivo, pdf_bytes, "application/pdf"))
+            
             await send_email(
                 to=user["email"],
-                subject=f"Compra confirmada #{saved['id']} · Reserva {aero_id_reserva}",
+                subject=f"Compra confirmada #{saved['id']} · {len(proveedores_info)} reserva(s)",
                 html=html,
-                attachments=[("boleto.pdf", pdf_bytes, "application/pdf")],
+                attachments=attachments if attachments else None,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Error enviando email: {e}")
 
     return CheckoutResp(idReserva=saved["id"])
 
@@ -221,9 +348,10 @@ async def get_compra_detalle(user: Dict[str, Any], compra_id: str) -> ReservaDet
         raise ValueError("Compra no encontrada")
 
     proveedores = det.get("proveedores") or []
-    # Buscar cualquier proveedor (no solo "AEROLINEAS")
-    aer_prov = proveedores[0] if proveedores else None
-    if aer_prov and aer_prov.get("idReservaProveedor"):
+    estados_proveedores = []
+    for aer_prov in proveedores:
+        if not aer_prov.get("idReservaProveedor"):
+            continue
         proveedor_id = aer_prov.get("id")
         try:
             remote = await aer.get_reserva_detalle(
@@ -234,15 +362,24 @@ async def get_compra_detalle(user: Dict[str, Any], compra_id: str) -> ReservaDet
                 proveedor_id=proveedor_id,
             )
             remote_estado = remote.get("idEstado")
-            if remote_estado is not None and int(remote_estado) != int(det.get("idEstado", 1)):
-                det["idEstado"] = int(remote_estado)
-                await repo.update_estado_compra(compra_id, int(remote_estado))
+            if remote_estado is not None:
+                estados_proveedores.append(int(remote_estado))
         except Exception:
             pass
+    
+    if estados_proveedores:
+        nuevo_estado = max(estados_proveedores)
+        if nuevo_estado != int(det.get("idEstado", 1)):
+            det["idEstado"] = nuevo_estado
+            await repo.update_estado_compra(compra_id, nuevo_estado)
 
     items: List[ReservaItem] = []
-    if det.get("detalle_vuelo"):
-        dv = det["detalle_vuelo"]
+    
+    detalles_vuelos = det.get("detalles_vuelos") or []
+    if not detalles_vuelos and det.get("detalle_vuelo"):
+        detalles_vuelos = [det["detalle_vuelo"]]
+    
+    for dv in detalles_vuelos:
         for it in dv.get("items", []):
             # Extraer proveedor del item si está disponible
             proveedor = it.get("proveedor") or "AEROLINEAS"
@@ -303,8 +440,12 @@ async def get_compra_detalle_admin(compra_id: str) -> ReservaDetalle:
         raise ValueError("Compra no encontrada")
 
     items: List[ReservaItem] = []
-    if det.get("detalle_vuelo"):
-        dv = det["detalle_vuelo"]
+    
+    detalles_vuelos = det.get("detalles_vuelos") or []
+    if not detalles_vuelos and det.get("detalle_vuelo"):
+        detalles_vuelos = [det["detalle_vuelo"]]
+    
+    for dv in detalles_vuelos:
         for it in dv.get("items", []):
             # Extraer proveedor del item si está disponible
             proveedor = it.get("proveedor") or "AEROLINEAS"
@@ -347,6 +488,10 @@ async def cancelar_compra(
     compra_id: str,
     is_admin: bool,
 ) -> bool:
+    """
+    Cancela una compra. Si la compra tiene múltiples proveedores (aerolíneas),
+    cancela la reserva en cada una de ellas.
+    """
     if is_admin:
         det = await repo.find_compra_detail_admin(compra_id)
     else:
@@ -360,21 +505,47 @@ async def cancelar_compra(
         raise ValueError("Solo se pueden cancelar compras activas.")
 
     proveedores = det.get("proveedores") or []
-    # Buscar cualquier proveedor (no solo "AEROLINEAS")
-    aer_prov = proveedores[0] if proveedores else None
+    if not proveedores:
+        raise ValueError("La compra no tiene proveedores asociados")
 
-    if aer_prov and aer_prov.get("idReservaProveedor"):
+    errores = []
+    cancelaciones_exitosas = 0
+    
+    for aer_prov in proveedores:
+        if not aer_prov.get("idReservaProveedor"):
+            continue
+        
         proveedor_id = aer_prov.get("id")
+        id_reserva_prov = aer_prov.get("idReservaProveedor")
+        
         try:
+            print(f"[Cancelar] Cancelando reserva {id_reserva_prov} en proveedor {proveedor_id}")
             await aer.cancelar_reserva(
                 user_id=str(user["id"]),
-                id_reserva=int(aer_prov["idReservaProveedor"]),
+                id_reserva=int(id_reserva_prov),
                 email=user.get("email"),
                 name=user.get("nombres") or user.get("name"),
                 proveedor_id=proveedor_id,
             )
+            cancelaciones_exitosas += 1
+            print(f"[Cancelar] Reserva {id_reserva_prov} cancelada exitosamente en {proveedor_id}")
         except RuntimeError as e:
-            raise ValueError(str(e))
+            error_msg = f"Error cancelando en {proveedor_id} (reserva {id_reserva_prov}): {str(e)}"
+            errores.append(error_msg)
+            print(f"[Cancelar] {error_msg}")
+        except Exception as e:
+            error_msg = f"Error inesperado cancelando en {proveedor_id} (reserva {id_reserva_prov}): {str(e)}"
+            errores.append(error_msg)
+            print(f"[Cancelar] {error_msg}")
+
+    if cancelaciones_exitosas == 0:
+        if errores:
+            raise ValueError(f"No se pudo cancelar ninguna reserva. Errores: {'; '.join(errores)}")
+        else:
+            raise ValueError("No se encontraron reservas para cancelar en los proveedores")
+
+    if errores and cancelaciones_exitosas > 0:
+        print(f"[Cancelar] Advertencia: Se cancelaron {cancelaciones_exitosas} de {len(proveedores)} reservas. Errores: {'; '.join(errores)}")
 
     await repo.update_estado_compra(compra_id, 2)
     return True
@@ -387,9 +558,7 @@ def _safe_filename(s: str) -> str:
 async def get_compra_pdf(user: Dict[str, Any], compra_id: str) -> Tuple[bytes, str]:
     """
     Devuelve (pdf_bytes, nombre_archivo_base) para la compra indicada del usuario.
-
-    - Si tenemos idReservaProveedor, intenta descargar el boleto real desde Aerolíneas.
-    - Si falla, usa el PDF simple generado localmente (build_ticket_pdf).
+    Genera el PDF desde MongoDB (datos de la agencia).
     """
     det = await repo.find_compra_detail(user["id"], compra_id)
     if not det:
@@ -397,23 +566,18 @@ async def get_compra_pdf(user: Dict[str, Any], compra_id: str) -> Tuple[bytes, s
 
     codigo = det.get("codigo") or compra_id
 
-    proveedores = det.get("proveedores") or []
-    # Buscar cualquier proveedor (no solo "AEROLINEAS")
-    aer_prov = proveedores[0] if proveedores else None
-
-    if aer_prov and aer_prov.get("idReservaProveedor"):
-        proveedor_id = aer_prov.get("id")
-        try:
-            pdf_bytes, fname_remote = await aer.get_boleto_pdf(
-                user_id=str(user["id"]),
-                id_reserva=int(aer_prov["idReservaProveedor"]),
-                email=user.get("email"),
-                name=user.get("nombres") or user.get("name"),
-                proveedor_id=proveedor_id,
-            )
-            return pdf_bytes, _safe_filename(fname_remote or f"boleto-{codigo}")
-        except Exception:
-            pass
-
-    pdf_bytes = await build_ticket_pdf(det)
-    return pdf_bytes, _safe_filename(f"boleto-{codigo}")
+    try:
+        print(f"[PDF] Generando PDF para compra {compra_id}")
+        print(f"[PDF] Datos: id={det.get('id')}, codigo={codigo}, total={det.get('total')}")
+        pdf_bytes = await build_ticket_pdf(det)
+        print(f"[PDF] PDF generado: {len(pdf_bytes)} bytes")
+        
+        if not pdf_bytes or len(pdf_bytes) < 100:
+            raise ValueError(f"PDF generado está vacío o corrupto ({len(pdf_bytes) if pdf_bytes else 0} bytes)")
+        
+        return pdf_bytes, _safe_filename(f"boleto-agencia-{codigo}")
+    except Exception as e:
+        import traceback
+        print(f"[PDF] ERROR generando PDF: {e}")
+        print(traceback.format_exc())
+        raise ValueError(f"Error generando PDF: {str(e)}")

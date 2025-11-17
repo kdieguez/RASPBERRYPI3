@@ -109,7 +109,7 @@ public class App {
       String reqHeaders = ctx.header("Access-Control-Request-Headers");
       String allowHeaders = (reqHeaders != null && !reqHeaders.isBlank())
           ? reqHeaders
-          : "Authorization, Content-Type, X-User-Id";
+          : "Authorization, Content-Type, X-User-Id, X-WebService-Email, X-WebService-Password";
       ctx.header("Access-Control-Allow-Headers", allowHeaders);
 
       ctx.header("Access-Control-Max-Age", "86400");
@@ -123,7 +123,7 @@ public class App {
       String reqHeaders = ctx.header("Access-Control-Request-Headers");
       String allowHeaders = (reqHeaders != null && !reqHeaders.isBlank())
           ? reqHeaders
-          : "Authorization, Content-Type, X-User-Id";
+          : "Authorization, Content-Type, X-User-Id, X-WebService-Email, X-WebService-Password";
       ctx.header("Access-Control-Allow-Headers", allowHeaders);
 
       ctx.header("Access-Control-Max-Age", "86400");
@@ -147,6 +147,7 @@ public class App {
     app.put("/api/perfil", ctx -> requireAuth(ctx, perfilCtrl::updatePerfil));
 
     app.get("/api/admin/usuarios",            ctx -> requireAdmin(ctx, adminUsr::list));
+    app.post("/api/admin/usuarios/create-ws", ctx -> requireAdmin(ctx, adminUsr::createWs));
     app.get("/api/admin/usuarios/{id}",       ctx -> requireAdmin(ctx, adminUsr::get));
     app.put("/api/admin/usuarios/{id}",       ctx -> requireAdmin(ctx, adminUsr::update));
 

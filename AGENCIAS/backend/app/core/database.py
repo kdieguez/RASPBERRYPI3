@@ -8,7 +8,7 @@ async def connect_to_mongo() -> None:
     global client, db
     client = AsyncIOMotorClient(
         MONGO_URI,
-        serverSelectionTimeoutMS=8001,
+        serverSelectionTimeoutMS=20000,  
         uuidRepresentation="standard",
     )
     # Fuerza handshake/validación de conexión

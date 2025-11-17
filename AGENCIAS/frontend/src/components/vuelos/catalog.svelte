@@ -1,7 +1,13 @@
 <script>
   import { onMount } from "svelte";
+  import { setProveedor, clearProveedor } from "@/lib/proveedorStore";
+  import { navigate } from "@/lib/router";
 
-  const API = "http://127.0.0.1:8001/api/v1/vuelos";
+  const API = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8001") + "/api/v1/vuelos";
+  
+  // Limpiar el proveedor guardado cuando se entra al catálogo
+  // (ya que el usuario puede estar buscando vuelos de diferentes proveedores)
+  clearProveedor();
 
   let origin = "";
   let destination = "";
@@ -58,6 +64,11 @@
       if (date) q.set("date", date);
       if (pax) q.set("pax", String(pax));
       items = await getJSON(`${API}?${q.toString()}`);
+      // Debug: verificar que los items tengan nombreProveedor
+      if (items && items.length > 0) {
+        console.log("[Catalog] Primer vuelo:", items[0]);
+        console.log("[Catalog] nombreProveedor:", items[0].nombreProveedor, "proveedor:", items[0].proveedor);
+      }
     } catch (e) {
       error = e.message || "Error al buscar vuelos";
       items = [];
@@ -71,8 +82,17 @@
     return `Q ${Number(n).toLocaleString("es-GT", { maximumFractionDigits: 2 })}`;
   }
 
-  function viewDetail(id) {
-    location.hash = `#/vuelos/${id}`;
+  function viewDetail(id, proveedor) {
+    console.log("[Catalog] viewDetail - ID:", id, "Proveedor:", proveedor);
+    
+    // Guardar el proveedor en el store ANTES de navegar (esto es lo más importante)
+    if (proveedor) {
+      setProveedor(proveedor);
+      console.log("[Catalog] Proveedor guardado en store:", proveedor);
+    }
+    
+    // Navegar usando el router de Svelte (el proveedor ya está en el store)
+    navigate(`/vuelos/${id}`);
   }
 </script>
 
@@ -112,13 +132,13 @@
         <div class="price">Desde {fmtMoney(it.precioDesde)}</div>
         <div class="title">{it.origen} → {it.destino}</div>
         <div class="meta">
-          <span>Proveedor: {it.proveedor}</span>
+          <span>Proveedor: {it.nombreProveedor || it.proveedor || 'N/A'}</span>
           {#if it.tieneEscala}
             <span class="pill">Con escala</span>
           {/if}
         </div>
         <div class="actions">
-          <button class="btn primary" on:click={() => viewDetail(it.idVuelo)}>Ver detalle</button>
+          <button class="btn primary" on:click={() => viewDetail(it.idVuelo, it.proveedor)}>Ver detalle</button>
         </div>
       </div>
     {/each}

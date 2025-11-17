@@ -1,6 +1,6 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from typing import List
+from typing import List, Optional
 
 from app.core.auth_deps import get_current_user, require_roles
 from app.models.compras import (
@@ -41,10 +41,11 @@ async def update_item(
     id_item: str,
     req: UpdateQtyReq,
     syncPareja: bool = Query(False),
+    proveedor: Optional[str] = Query(None, description="ID del proveedor (aerolínea) del item"),
     user=Depends(get_current_user),
 ):
     try:
-        await svc.update_quantity(user, id_item, req.cantidad, sync_pareja=syncPareja)
+        await svc.update_quantity(user, id_item, req.cantidad, sync_pareja=syncPareja, proveedor_id=proveedor)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -53,10 +54,11 @@ async def update_item(
 async def delete_item(
     id_item: str,
     syncPareja: bool = Query(False),
+    proveedor: Optional[str] = Query(None, description="ID del proveedor (aerolínea) del item"),
     user=Depends(get_current_user),
 ):
     try:
-        await svc.remove_item(user, id_item, sync_pareja=syncPareja)
+        await svc.remove_item(user, id_item, sync_pareja=syncPareja, proveedor_id=proveedor)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

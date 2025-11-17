@@ -21,11 +21,14 @@ def _proveedor_to_out(doc: dict, incluir_password: bool = False) -> ProveedorOut
     # No exponer password por defecto
     if not incluir_password and "password" in doc:
         doc = {**doc, "password": None}
+    # Usar 'email' si está disponible, sino 'usuarioEmpresarial' (compatibilidad)
+    email = doc.get("email") or doc.get("usuarioEmpresarial")
     return ProveedorOut(
         id=doc.get("_id") or doc.get("id"),
         nombre=doc.get("nombre", ""),
         apiUrl=doc.get("apiUrl", ""),
-        usuarioEmpresarial=doc.get("usuarioEmpresarial"),
+        email=email,
+        usuarioEmpresarial=doc.get("usuarioEmpresarial"),  # Mantener para compatibilidad
         password=doc.get("password") if incluir_password else None,
         timeout=doc.get("timeout", 20.0),
         markup=doc.get("markup", {"porcentaje": 0}),
@@ -89,12 +92,14 @@ async def crear_proveedor(
             )
         
         now = datetime.now(timezone.utc).isoformat()
+        email_val = payload.email or payload.usuarioEmpresarial
         doc = {
             "_id": payload.id,  # MongoDB usa _id, pero el modelo usa id
             "nombre": payload.nombre,
             "apiUrl": payload.apiUrl.rstrip("/"),
-            "usuarioEmpresarial": payload.usuarioEmpresarial,
-            "password": payload.password,  # TODO: Hashear o encriptar
+            "email": email_val,  
+            "usuarioEmpresarial": email_val,  
+            "password": payload.password,
             "timeout": payload.timeout,
             "markup": payload.markup,
             "habilitado": payload.habilitado,
@@ -141,7 +146,11 @@ async def actualizar_proveedor(
             update_data["nombre"] = payload.nombre
         if payload.apiUrl is not None:
             update_data["apiUrl"] = payload.apiUrl.rstrip("/")
-        if payload.usuarioEmpresarial is not None:
+        if payload.email is not None:
+            update_data["email"] = payload.email
+            update_data["usuarioEmpresarial"] = payload.email 
+        elif payload.usuarioEmpresarial is not None:
+            update_data["email"] = payload.usuarioEmpresarial
             update_data["usuarioEmpresarial"] = payload.usuarioEmpresarial
         if payload.password is not None:
             update_data["password"] = payload.password  # TODO: Hashear o encriptar

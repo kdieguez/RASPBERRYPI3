@@ -12,6 +12,8 @@ export default function AdminNav() {
       <NavLink to="/admin/vuelos/nuevo" className={link}>Crear vuelo</NavLink>
       <NavLink to="/admin/info"         className={link}>Informativas</NavLink>
       <NavLink to="/admin/contenido-home" className={link}>Contenido Home</NavLink>
+      <NavLink to="/admin/agencias" className={link}>Agencias</NavLink>
+      
     </div>
   );
 }

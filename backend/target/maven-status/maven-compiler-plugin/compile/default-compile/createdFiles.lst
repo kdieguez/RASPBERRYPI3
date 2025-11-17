@@ -29,6 +29,7 @@ com\aerolineas\util\EstadosVuelo.class
 com\aerolineas\dto\CompraDTO$TopDestino.class
 com\aerolineas\util\PdfBoleto.class
 com\aerolineas\controller\VueloController$LinkReq.class
+com\aerolineas\middleware\WebServiceAuth.class
 com\aerolineas\util\JwtUtil.class
 com\aerolineas\controller\ConfigController.class
 com\aerolineas\controller\RatingController.class
@@ -36,6 +37,7 @@ com\aerolineas\dto\CompraDTO$EstadoReserva.class
 com\aerolineas\dto\UsuarioAdminDTOs$UpdateAdmin.class
 com\aerolineas\dao\RatingDAO$Resumen.class
 com\aerolineas\dto\CompraDTO$UpdateQtyReq.class
+com\aerolineas\dto\CompraDTO$PaymentReq$ClienteFinal.class
 com\aerolineas\dto\RatingDTO.class
 com\aerolineas\dao\ConfigDAO.class
 com\aerolineas\util\CaptchaUtil.class

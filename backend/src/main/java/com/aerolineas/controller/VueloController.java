@@ -4,8 +4,10 @@ import com.aerolineas.dao.VueloDAO;
 import com.aerolineas.dto.VueloDTO;
 import com.aerolineas.http.JsonErrorHandler;
 import com.aerolineas.middleware.Auth;
+import com.aerolineas.middleware.WebServiceAuth;
 import com.aerolineas.service.NotificacionesService;
 import io.javalin.Javalin;
+import io.javalin.http.Context;
 
 import java.sql.SQLException;
 import java.util.Map;
@@ -19,13 +21,29 @@ public class VueloController {
   static record RoundtripReq(VueloDTO.Create ida, VueloDTO.Create regreso) {}
   static record LinkReq(Long idIda, Long idRegreso) {}
 
+  private void validateOptionalWebService(Context ctx) throws Exception {
+    String wsEmail = ctx.header("X-WebService-Email");
+    String wsPassword = ctx.header("X-WebService-Password");
+    
+    if (wsEmail != null && !wsEmail.isBlank() && wsPassword != null && !wsPassword.isBlank()) {
+      WebServiceAuth.validate().handle(ctx);
+    }
+  }
+
   public void routes(Javalin app) {
 
-    app.get("/api/public/vuelos", ctx -> ctx.json(dao.listarVuelosPublic()));
-    app.get("/api/v1/vuelos",     ctx -> ctx.json(dao.listarVuelosPublic()));
+    app.get("/api/public/vuelos", ctx -> {
+      validateOptionalWebService(ctx);
+      ctx.json(dao.listarVuelosPublic());
+    });
+    app.get("/api/v1/vuelos", ctx -> {
+      validateOptionalWebService(ctx);
+      ctx.json(dao.listarVuelosPublic());
+    });
 
     // Endpoints públicos para vuelos con escala
     app.get("/api/public/vuelos/con-escala", ctx -> {
+      validateOptionalWebService(ctx);
       try {
         ctx.json(dao.listarVuelosConEscalaPublic());
       } catch (Exception e) {
@@ -35,6 +53,7 @@ public class VueloController {
     });
 
     app.get("/api/v1/vuelos/con-escala", ctx -> {
+      validateOptionalWebService(ctx);
       try {
         ctx.json(dao.listarVuelosConEscalaPublic());
       } catch (Exception e) {
@@ -44,6 +63,7 @@ public class VueloController {
     });
 
     app.get("/api/public/vuelos/con-escala/{id}", ctx -> {
+      validateOptionalWebService(ctx);
       long id = ctx.pathParamAsClass("id", Long.class).get();
       try {
         var vuelo = dao.obtenerVueloConEscalaPublic(id);
@@ -59,6 +79,7 @@ public class VueloController {
     });
 
     app.get("/api/v1/vuelos/con-escala/{id}", ctx -> {
+      validateOptionalWebService(ctx);
       long id = ctx.pathParamAsClass("id", Long.class).get();
       try {
         var vuelo = dao.obtenerVueloConEscalaPublic(id);
@@ -74,6 +95,7 @@ public class VueloController {
     });
 
     app.get("/api/v1/vuelos/{id}", ctx -> {
+      validateOptionalWebService(ctx);
       long id = ctx.pathParamAsClass("id", Long.class).get();
       var v = dao.obtenerVueloPublic(id);
       if (v == null) {
@@ -84,6 +106,7 @@ public class VueloController {
     });
 
     app.get("/api/public/vuelos/{id}", ctx -> {
+      validateOptionalWebService(ctx);
       long idV = ctx.pathParamAsClass("id", Long.class).get();
       var v = dao.obtenerVueloPublic(idV);
       if (v == null) { ctx.status(404).json(Map.of("error", "Vuelo no encontrado")); return; }

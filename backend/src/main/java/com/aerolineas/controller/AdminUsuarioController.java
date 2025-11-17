@@ -10,6 +10,40 @@ import java.util.Map;
 public class AdminUsuarioController {
   private final UsuarioDAO usuarios = new UsuarioDAO();
 
+  public void createWs(Context ctx) throws Exception {
+    var body = ctx.bodyValidator(Map.class)
+        .check(b -> b.get("email") != null && String.valueOf(b.get("email")).contains("@"), "email inválido")
+        .check(b -> b.get("password") != null && String.valueOf(b.get("password")).length() >= 8, "password mínimo 8")
+        .check(b -> b.get("nombres") != null && !String.valueOf(b.get("nombres")).isBlank(), "nombres requeridos")
+        .check(b -> b.get("apellidos") != null && !String.valueOf(b.get("apellidos")).isBlank(), "apellidos requeridos")
+        .get();
+
+    String email = String.valueOf(body.get("email")).trim().toLowerCase();
+    String pass  = String.valueOf(body.get("password"));
+    String nombres = String.valueOf(body.get("nombres")).trim();
+    String apellidos = String.valueOf(body.get("apellidos")).trim();
+
+    if (usuarios.findByEmail(email) != null) {
+      ctx.status(409).json(Map.of("error", "email ya registrado"));
+      return;
+    }
+
+    String hash = com.aerolineas.util.PasswordUtil.hash(pass);
+    int idRol = 2;
+    try {
+      Object raw = body.get("idRol");
+      if (raw != null) idRol = Integer.parseInt(String.valueOf(raw));
+    } catch (Exception ignored) {}
+    var u = usuarios.createWithRole(email, hash, nombres, apellidos, idRol);
+    ctx.status(201).json(Map.of(
+        "idUsuario", u.getIdUsuario(),
+        "email", u.getEmail(),
+        "nombres", u.getNombres(),
+        "apellidos", u.getApellidos(),
+        "idRol", u.getIdRol()
+    ));
+  }
+
   public void list(Context ctx) throws Exception {
     String q = ctx.queryParam("q");
     int offset = parseInt(ctx.queryParam("offset"), 0);

@@ -58,9 +58,12 @@ async def destinations(origin: str):
         raise HTTPException(status_code=502, detail=f"Error al consultar Aerolíneas: {str(e)}")
 
 @router.get("/{id_vuelo}", response_model=Dict[str, Any])
-async def detalle(id_vuelo: int):
+async def detalle(
+    id_vuelo: int,
+    proveedor: Optional[str] = Query(None, description="ID del proveedor (aerolínea) del vuelo")
+):
     try:
-        v = await svc.detail(id_vuelo)
+        v = await svc.detail(id_vuelo, proveedor_id=proveedor)
     except httpx.TimeoutException:
         raise HTTPException(status_code=502, detail="Aerolíneas no responde (timeout).")
     except httpx.HTTPError as e:

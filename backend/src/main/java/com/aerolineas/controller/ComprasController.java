@@ -22,12 +22,47 @@ import java.sql.Timestamp;
 
 import com.aerolineas.util.Mailer;
 import com.aerolineas.util.PdfBoleto;
+import com.aerolineas.middleware.Auth;
+import com.aerolineas.middleware.WebServiceAuth;
+import com.aerolineas.dao.UsuarioDAO;
+import com.aerolineas.model.Usuario;
+import com.aerolineas.util.PasswordUtil;
 
 public class ComprasController {
 
   private final ComprasDAO dao = new ComprasDAO();
+  private final UsuarioDAO usuarioDAO = new UsuarioDAO();
+
+  private void authenticate(Context ctx) {
+    try {
+      Auth.jwt().handle(ctx);
+      if (ctx.attribute("claims") != null) {
+        return; 
+      }
+    } catch (Exception e) {
+      String wsEmail = ctx.header("X-WebService-Email");
+      String wsPassword = ctx.header("X-WebService-Password");
+      
+      if (wsEmail != null && !wsEmail.isBlank() && wsPassword != null && !wsPassword.isBlank()) {
+        try {
+          WebServiceAuth.validate().handle(ctx);
+          if (ctx.attribute("claims") != null) {
+            return; 
+          }
+        } catch (Exception wsEx) {
+
+          throw new IllegalStateException("Autenticación requerida: " + wsEx.getMessage());
+        }
+      } else {
+
+        throw new IllegalStateException("Autenticación requerida (JWT o credenciales WebService)");
+      }
+    }
+  }
 
   private long getUserId(Context ctx) {
+    authenticate(ctx);
+    
     @SuppressWarnings("unchecked")
     Map<String, Object> claims = ctx.attribute("claims");
     if (claims != null) {
@@ -170,7 +205,70 @@ public class ComprasController {
         if (resumen.items == null || resumen.items.isEmpty())
           throw new IllegalArgumentException("El carrito está vacío.");
 
-        long idReserva = dao.checkout(userId); 
+        
+        @SuppressWarnings("unchecked")
+        Map<String, Object> claims = ctx.attribute("claims");
+        boolean esWebService = false;
+        long idUsuarioWebService = userId;
+        if (claims != null) {
+          Object rol = claims.get("rol");
+          try { 
+            int idRol = Integer.parseInt(String.valueOf(rol));
+            esWebService = (idRol == 2); 
+            if (esWebService) {
+              idUsuarioWebService = userId; 
+            }
+          } catch (Exception ignore) {}
+        }
+
+        Long userIdClienteFinal = null;
+        
+        
+        if (esWebService && req.clienteFinal != null && req.clienteFinal.email != null && !req.clienteFinal.email.isBlank()) {
+          String emailCliente = req.clienteFinal.email.trim().toLowerCase();
+          String nombresCliente = req.clienteFinal.nombres != null ? req.clienteFinal.nombres.trim() : "";
+          String apellidosCliente = req.clienteFinal.apellidos != null ? req.clienteFinal.apellidos.trim() : "";
+          
+          
+          Usuario usuarioCliente = usuarioDAO.findByEmail(emailCliente);
+          
+          if (usuarioCliente != null) {
+            
+            userIdClienteFinal = usuarioCliente.getIdUsuario();
+            System.out.println("[Checkout] Usuario encontrado: " + emailCliente + " (ID: " + userIdClienteFinal + ")");
+          } else {
+            
+            String passHash = PasswordUtil.hash("agencia123");
+            if (nombresCliente.isBlank()) nombresCliente = emailCliente.split("@")[0];
+            if (apellidosCliente.isBlank()) apellidosCliente = "";
+            
+            usuarioCliente = usuarioDAO.createWithRole(emailCliente, passHash, nombresCliente, apellidosCliente, 3);
+            userIdClienteFinal = usuarioCliente.getIdUsuario();
+            System.out.println("[Checkout] Usuario creado: " + emailCliente + " (ID: " + userIdClienteFinal + ", Rol: 3)");
+          }
+        }
+
+        
+        long idReserva;
+        if (esWebService && userIdClienteFinal != null && userIdClienteFinal != userId) {
+          
+          idReserva = dao.checkoutConClienteFinal(userId, userIdClienteFinal);
+        } else {
+          
+          idReserva = dao.checkout(userId);
+        }
+        
+        
+        if (esWebService) {
+          try {
+            dao.guardarReservaWebService(idReserva, idUsuarioWebService);
+            System.out.println("[Checkout] Relación web service-reserva guardada: reserva=" + idReserva + ", ws=" + idUsuarioWebService);
+          } catch (Exception e) {
+            System.err.println("[Checkout] Error guardando relación web service: " + e.getMessage());
+            
+          }
+        }
+        
         ctx.json(new CheckoutResp(idReserva));
 
         try { sendEmail(ctx, resumen, idReserva); } catch (Exception ignore) {}
@@ -193,7 +291,20 @@ public class ComprasController {
       try {
         long userId = getUserId(ctx);
         long id = Long.parseLong(ctx.pathParam("id"));
-        var det = dao.getReservaDetalle(userId, id);
+        
+        
+        @SuppressWarnings("unchecked")
+        Map<String, Object> claims = ctx.attribute("claims");
+        boolean esWebService = false;
+        if (claims != null) {
+          Object rol = claims.get("rol");
+          try { 
+            int idRol = Integer.parseInt(String.valueOf(rol));
+            esWebService = (idRol == 2); 
+          } catch (Exception ignore) {}
+        }
+    
+        var det = esWebService ? dao.getReservaDetalleAdmin(id) : dao.getReservaDetalle(userId, id);
         ctx.json(det);
       } catch (Exception e) {
         ctx.status(400).json(Map.of("error", e.getMessage()));

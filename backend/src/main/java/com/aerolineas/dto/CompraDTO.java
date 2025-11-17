@@ -19,6 +19,8 @@ public class CompraDTO {
   public static class PaymentReq {
     public Tarjeta tarjeta;
     public Facturacion facturacion;
+    // Datos del usuario final (opcional, para compras desde agencias)
+    public ClienteFinal clienteFinal;
 
     public static class Tarjeta {
       public String nombre;
@@ -32,6 +34,11 @@ public class CompraDTO {
       public String ciudad;
       public String pais;
       public String zip;
+    }
+    public static class ClienteFinal {
+      public String email;
+      public String nombres;
+      public String apellidos;
     }
   }
 

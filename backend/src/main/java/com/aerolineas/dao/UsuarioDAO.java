@@ -69,6 +69,24 @@ public class UsuarioDAO {
     }
   }
 
+  public Usuario createWithRole(String email, String passHash, String nombres, String apellidos, int idRol) {
+    String usuarioTable = DB.table("USUARIO");
+    final String insert = "INSERT INTO " + usuarioTable + " (EMAIL, CONTRASENA, NOMBRES, APELLIDOS, HABILITADO, ID_ROL) VALUES (?, ?, ?, ?, 1, ?)";
+    try (Connection conn = DB.getConnection();
+         PreparedStatement ps = conn.prepareStatement(insert)) {
+      applyTimeout(ps);
+      ps.setString(1, email);
+      ps.setString(2, passHash);
+      ps.setString(3, nombres);
+      ps.setString(4, apellidos);
+      ps.setInt(5, idRol);
+      ps.executeUpdate();
+      return findByEmail(email);
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public Usuario findById(long id) throws Exception {
     String usuarioTable = DB.table("USUARIO");
     String sql = "SELECT ID_USUARIO, EMAIL, CONTRASENA, NOMBRES, APELLIDOS, HABILITADO, ID_ROL FROM " + usuarioTable + " WHERE ID_USUARIO = ?";

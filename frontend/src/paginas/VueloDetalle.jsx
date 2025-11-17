@@ -167,7 +167,11 @@ export default function VueloDetalle() {
         
         let vueloConEscala = null;
         try {
-          const { data } = await vuelosConEscalaApi.getAdmin(id);
+          const u = getUser();
+          const isAdmin = !!u && Number(u.idRol) === 1;
+          const { data } = isAdmin
+            ? await vuelosConEscalaApi.getAdmin(id)
+            : await vuelosConEscalaApi.getPublic(id);
           vueloConEscala = data;
         } catch {
         }

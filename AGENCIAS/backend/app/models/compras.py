@@ -28,6 +28,7 @@ class AddItemReq(BaseModel):
     idVuelo: int = Field(..., ge=1)
     idClase: int = Field(..., ge=1)
     cantidad: int = Field(1, ge=1)
+    proveedor: Optional[str] = Field(None, description="ID del proveedor (aerolínea) del vuelo")
 
 
 class UpdateQtyReq(BaseModel):

@@ -324,7 +324,7 @@ export default function Header() {
                 >
                   Páginas informativas
                 </Link>
-                {/* NUEVO: Contenido del Home (tips + noticias) */}
+                
                 <Link
                   to="/admin/contenido-home"
                   className="hdr__drop-item"
@@ -333,6 +333,8 @@ export default function Header() {
                 >
                   Contenido Home
                 </Link>
+
+                <Link to="/admin/agencias" className="hdr__drop-item" role="menuitem" onClick={closeMenus}>Agencias</Link>
               </div>
             </div>
           )}

@@ -28,6 +28,8 @@ import Home from "./paginas/Home";
 import PaginaInformativa from "./paginas/PaginaInformativa";
 import PaginasInfoAdmin from "./paginas/admin/PaginasInfoAdmin";
 import ContenidoHomeAdmin from "./paginas/admin/ContenidoHomeAdmin";
+import AgenciasAdminList from "./paginas/admin/AgenciasList";
+import AgenciaAdminEdit from "./paginas/admin/AgenciaEdit";
 
 export default function App() {
   return (
@@ -53,6 +55,8 @@ export default function App() {
           <Route path="/info/:slug" element={<PaginaInformativa />} />
 
           <Route element={<ProtectedRoute allowRoles={[1]} />}>
+            <Route path="/admin/agencias" element={<AgenciasAdminList />} />
+            <Route path="/admin/agencias/:id" element={<AgenciaAdminEdit />} />
             <Route path="/admin/vuelos/nuevo" element={<VueloNuevo />} />
             <Route path="/admin/usuarios" element={<UsuariosList />} />
             <Route path="/admin/usuarios/:id" element={<UsuarioEdit />} />
