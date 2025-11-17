@@ -65,16 +65,16 @@ export function qs(obj = {}) {
 
 export const AuthAPI = {
   register: (data) => request('/api/v1/auth/register', { method: 'POST', body: data }),
-  login: (data) => request('/api/v1/auth/login', { method: 'POST', body: data }),
-  me: () => request('/api/v1/auth/me'),
+  login:  (data) => request('/api/v1/auth/login',    { method: 'POST', body: data }),
+  me:     ()     => request('/api/v1/auth/me'),
 };
 
 export const UsersAPI = {
-  list: (params) => request('/api/v1/users' + qs(params)),
-  get: (id) => request(`/api/v1/users/${id}`),
-  create: (body) => request('/api/v1/users', { method: 'POST', body }),
+  list:   (params)   => request('/api/v1/users' + qs(params)),
+  get:    (id)       => request(`/api/v1/users/${id}`),
+  create: (body)     => request('/api/v1/users', { method: 'POST', body }),
   update: (id, body) => request(`/api/v1/users/${id}`, { method: 'PATCH', body }),
-  remove: (id) => request(`/api/v1/users/${id}`, { method: 'DELETE' }),
+  remove: (id)       => request(`/api/v1/users/${id}`, { method: 'DELETE' }),
 };
 
 /** @typedef {{origin?: string, destination?: string, date?: string, pax?: number}} SearchParams */
@@ -88,9 +88,9 @@ export const VuelosAPI = {
     if (res && Array.isArray(res.results)) return res.results;
     return [];
   },
-  detail: (id, pax = 1) => request(`/vuelos/${id}` + qs({ pax })),
-  origins: () => request('/vuelos/origins'),
-  destinations: (origin) => request('/vuelos/destinations' + qs({ origin })),
+  detail:       (id, pax = 1) => request(`/vuelos/${id}` + qs({ pax })),
+  origins:      ()            => request('/vuelos/origins'),
+  destinations: (origin)      => request('/vuelos/destinations' + qs({ origin })),
 };
 
 export const ComprasAPI = {
@@ -117,9 +117,8 @@ export const ComprasAPI = {
   checkout: (payment) =>
     request('/compras/checkout', { method: 'POST', body: payment }),
 
-  list: () => request('/compras/reservas'),
-
-  detail: (id) => request(`/compras/reservas/${id}`),
+  list:   ()    => request('/compras/reservas'),
+  detail: (id)  => request(`/compras/reservas/${id}`),
 
   cancel: (id) =>
     request(`/compras/reservas/${id}/cancelar`, {
@@ -145,13 +144,62 @@ export const ComprasAPI = {
     return await res.blob();
   },
 
-  listAdmin: () => request('/compras/admin/reservas'),
-
+  listAdmin:   ()   => request('/compras/admin/reservas'),
   detailAdmin: (id) => request(`/compras/admin/reservas/${id}`),
 
   cancelAdmin: (id) =>
     request(`/compras/admin/reservas/${id}/cancelar`, {
       method: 'POST',
+    }),
+};
+
+export const PaginasAPI = {
+  // Público
+  getPublic: (slug) =>
+    request(`/api/public/paginas/${encodeURIComponent(slug)}`),
+
+  // Listados y detalle (admin)
+  listAdmin: (params) =>
+    request('/api/admin/paginas' + qs(params || {})),
+
+  getAdmin: (slug) =>
+    request(`/api/admin/paginas/${encodeURIComponent(slug)}`),
+
+  // Crear nueva página informativa
+  create: (body) =>
+    request('/api/admin/paginas', {
+      method: 'POST',
+      body,
+    }),
+
+  createAdmin: (body) =>
+    request('/api/admin/paginas', {
+      method: 'POST',
+      body,
+    }),
+
+  // Actualizar página existente
+  update: (slug, body) =>
+    request(`/api/admin/paginas/${encodeURIComponent(slug)}`, {
+      method: 'PUT',
+      body,
+    }),
+
+  updateAdmin: (slug, body) =>
+    request(`/api/admin/paginas/${encodeURIComponent(slug)}`, {
+      method: 'PUT',
+      body,
+    }),
+
+  // Eliminar página
+  remove: (slug) =>
+    request(`/api/admin/paginas/${encodeURIComponent(slug)}`, {
+      method: 'DELETE',
+    }),
+
+  removeAdmin: (slug) =>
+    request(`/api/admin/paginas/${encodeURIComponent(slug)}`, {
+      method: 'DELETE',
     }),
 };
 
