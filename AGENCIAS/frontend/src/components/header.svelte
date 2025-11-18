@@ -18,6 +18,8 @@
 
   let proveedores = [];
 
+  let showProfileMenu = false;
+
   onMount(async () => {
     try {
       ui = await fetchUI();
@@ -51,6 +53,32 @@
     const url = "/vuelos" + (qs ? `?${qs}` : "");
 
     navigate(url);
+  }
+
+  function toggleProfileMenu() {
+    if (!$isLoggedIn) return;
+    showProfileMenu = !showProfileMenu;
+  }
+
+  function goPerfil() {
+    showProfileMenu = false;
+    navigate("/perfil");
+  }
+
+  function goReservas() {
+    showProfileMenu = false;
+    navigate("/reservas");
+  }
+
+  function doLogout() {
+    showProfileMenu = false;
+    logout();
+  }
+
+  function initials(u) {
+    if (!u) return "U";
+    const name = (u.nombres || u.email || "U").toString().trim();
+    return name.charAt(0).toUpperCase();
   }
 </script>
 
@@ -226,12 +254,40 @@
         {/if}
 
         {#if $isLoggedIn}
-          <span class="user-label">
-            Hola, {$user?.nombres || $user?.email}
-          </span>
-          <button type="button" class="btn danger" on:click={logout}>
-            Salir
-          </button>
+          <div class="profile-wrapper">
+            <button
+              type="button"
+              class="profile-icon"
+              on:click={toggleProfileMenu}
+              aria-label="Menú de usuario"
+            >
+              <span>{initials($user)}</span>
+            </button>
+
+            {#if showProfileMenu}
+              <div class="profile-menu">
+                <div class="profile-menu-header">
+                  <div class="profile-name">
+                    {$user?.nombres || $user?.email}
+                  </div>
+                  {#if $user?.email}
+                    <div class="profile-email">{$user.email}</div>
+                  {/if}
+                </div>
+
+                <button type="button" on:click={goPerfil}>
+                  Editar perfil
+                </button>
+                <button type="button" on:click={goReservas}>
+                  Mis reservaciones
+                </button>
+                <hr />
+                <button type="button" on:click={doLogout}>
+                  Cerrar sesión
+                </button>
+              </div>
+            {/if}
+          </div>
         {:else}
           <a
             class="btn {current === 'register' ? 'primary' : 'ghost'}"
@@ -363,16 +419,6 @@
     background: #277b29;
     color: #fff;
   }
-  .btn.danger {
-    background: #2a0b0b;
-    color: #ffd6d6;
-    border-color: #2a0b0b;
-  }
-
-  .user-label {
-    opacity: 0.9;
-    font-size: 0.88rem;
-  }
 
   .admin-menu {
     position: relative;
@@ -412,6 +458,75 @@
   .admin-menu-items a.active {
     background: #d1fae5;
     font-weight: 600;
+  }
+
+  .profile-wrapper {
+    position: relative;
+  }
+
+  .profile-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    border: none;
+    background: #1E93AB;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .profile-icon span {
+    font-size: 0.95rem;
+  }
+
+  .profile-menu {
+    position: absolute;
+    right: 0;
+    top: 120%;
+    background: #ffffff;
+    color: #111827;
+    border-radius: 10px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    padding: 0.5rem 0.75rem;
+    min-width: 220px;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .profile-menu-header {
+    padding-bottom: 0.4rem;
+    margin-bottom: 0.4rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .profile-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .profile-email {
+    font-size: 0.8rem;
+    color: #6b7280;
+  }
+
+  .profile-menu button {
+    background: transparent;
+    border: none;
+    text-align: left;
+    padding: 0.25rem 0.2rem;
+    font-size: 0.86rem;
+    cursor: pointer;
+    border-radius: 6px;
+  }
+
+  .profile-menu button:hover {
+    background: #f3f4f6;
   }
 
   @media (max-width: 768px) {

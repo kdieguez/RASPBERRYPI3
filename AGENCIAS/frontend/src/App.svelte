@@ -23,6 +23,8 @@
   import CancelacionCompras from "@/components/compras/cancelacionCompras.svelte";
   import AerolineasAfiliadas from "@/components/aerolineasAfiliadas.svelte";
 
+  import Perfil from "@/components/perfil.svelte";       
+
   import { isLoggedIn } from "@/lib/auth";
   import { path, navigate, match, link } from "@/lib/router";
 
@@ -53,6 +55,8 @@
     if (p === "/admin/paginas/cancelacion-compras") return "admin-paginas";
     if (p === "/admin/proveedores") return "admin-proveedores";
 
+    if (p === "/perfil") return "perfil";
+
     return "";
   }
 
@@ -72,6 +76,8 @@
 
   $: isAdminPagCancelacion = match("/admin/paginas/cancelacion-compras", current).ok;
   $: isAdminProveedores    = match("/admin/proveedores", current).ok;
+
+  $: isPerfil              = match("/perfil", current).ok;  
 </script>
 
 <div class="app-layout">
@@ -113,6 +119,9 @@
 
       {:else if isAdminProveedores}
         <ProveedoresAdmin />
+
+      {:else if isPerfil}                 
+        <Perfil />
 
       {:else if current === '/admin/users'}
         <AdminUsers />

@@ -19,6 +19,7 @@ from app.routers.proveedores import router as proveedores_router
 from app.routers import paginas_informativas
 from app.routers import proveedores_publicos
 from app.routers import proveedores_admin
+from app.routers import perfil 
 
 
 @asynccontextmanager
@@ -85,3 +86,4 @@ app.include_router(proveedores_router)
 app.include_router(paginas_informativas.router)
 app.include_router(proveedores_publicos.router)
 app.include_router(proveedores_admin.router)
+app.include_router(perfil.router)
