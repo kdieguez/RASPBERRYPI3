@@ -2,17 +2,32 @@
   import { onMount } from "svelte";
   import { isLoggedIn, user, logout } from "@/lib/auth";
   import { fetchUI } from "@/lib/portalApi";
+  import { ProveedoresAPI } from "@/lib/api";
   import { navigate, link } from "@/lib/router";
 
   export let current = "home";
 
   let ui = { header: {} };
+
   let q = "";
+  let priceMin = "";
+  let priceMax = "";
+  let proveedor = "";
+  let tipoVuelo = "";  
+  let ratingMin = "";  
+
+  let proveedores = [];
 
   onMount(async () => {
     try {
       ui = await fetchUI();
     } catch {}
+
+    try {
+      proveedores = await ProveedoresAPI.listPublic();
+    } catch (e) {
+      console.error("No se pudieron cargar proveedores", e);
+    }
   });
 
   $: isStaff = ["admin", "empleado"].includes(
@@ -22,7 +37,20 @@
 
   function goSearch(e) {
     e.preventDefault();
-    navigate(`/vuelos?q=${encodeURIComponent(q)}`);
+
+    const params = new URLSearchParams();
+
+    if (q && q.trim()) params.set("q", q.trim());
+    if (priceMin) params.set("priceMin", String(priceMin));
+    if (priceMax) params.set("priceMax", String(priceMax));
+    if (proveedor) params.set("proveedor", String(proveedor));
+    if (tipoVuelo) params.set("tipoVuelo", tipoVuelo);
+    if (ratingMin) params.set("ratingMin", String(ratingMin));
+
+    const qs = params.toString();
+    const url = "/vuelos" + (qs ? `?${qs}` : "");
+
+    navigate(url);
   }
 </script>
 
@@ -38,12 +66,56 @@
     <nav class="nav">
       {#if ui.header?.show_search}
         <form class="search" on:submit={goSearch}>
-          <input placeholder="Buscar vuelos…" bind:value={q} />
-          <button type="submit" class="btn btn-small">Buscar</button>
+          <input
+            class="search-text"
+            placeholder="Origen, destino o código..."
+            bind:value={q}
+          />
+
+          <input
+            class="search-number"
+            type="number"
+            min="0"
+            placeholder="Precio mín."
+            bind:value={priceMin}
+          />
+
+          <input
+            class="search-number"
+            type="number"
+            min="0"
+            placeholder="Precio máx."
+            bind:value={priceMax}
+          />
+
+          <select class="search-select" bind:value={proveedor}>
+            <option value="">Cualquier aerolínea</option>
+            {#each proveedores as p}
+              <option value={p.id}>{p.nombre}</option>
+            {/each}
+          </select>
+
+          <select class="search-select" bind:value={tipoVuelo}>
+            <option value="">Tipo de vuelo</option>
+            <option value="directo">Solo directos</option>
+            <option value="escala">Con escala</option>
+          </select>
+
+          <select class="search-select" bind:value={ratingMin}>
+            <option value="">Rating mínimo</option>
+            <option value="1">★ 1+</option>
+            <option value="2">★ 2+</option>
+            <option value="3">★ 3+</option>
+            <option value="4">★ 4+</option>
+            <option value="5">★ 5</option>
+          </select>
+
+          <button type="submit" class="btn btn-small primary">
+            Buscar
+          </button>
         </form>
       {/if}
 
-      <!-- Navegación principal -->
       <div class="nav-group nav-main">
         <a
           class="btn {current === 'home' ? 'primary' : 'ghost'}"
@@ -82,52 +154,70 @@
         >
           Cancelación de compras
         </a>
+
+        <a
+          class="btn {current === 'info-aerolineas' ? 'primary' : 'ghost'}"
+          aria-current={current === 'info-aerolineas' ? 'page' : undefined}
+          href="/informacion/aerolineas-afiliadas"
+          use:link
+        >
+          Aerolíneas afiliadas
+        </a>
       </div>
 
-      <!-- Zona admin / staff -->
       {#if $isLoggedIn && isStaff}
         <div class="nav-group nav-admin">
-          <a
-            class="btn {current === 'users' ? 'primary' : 'ghost'}"
-            aria-current={current === 'users' ? 'page' : undefined}
-            href="/admin/users"
-            use:link
-          >
-            Usuarios
-          </a>
+          <details class="admin-menu">
+            <summary class="btn ghost">
+              Admin ▾
+            </summary>
+            <div class="admin-menu-items">
+              <a
+                class:active={current === 'users'}
+                href="/admin/users"
+                use:link
+              >
+                Usuarios
+              </a>
 
-          {#if isAdmin}
-            <a
-              class="btn {current === 'admin-reservas' ? 'primary' : 'ghost'}"
-              aria-current={current === 'admin-reservas' ? 'page' : undefined}
-              href="/admin/reservas"
-              use:link
-            >
-              Reservas (admin)
-            </a>
+              {#if isAdmin}
+                <a
+                  class:active={current === 'admin-reservas'}
+                  href="/admin/reservas"
+                  use:link
+                >
+                  Reservas
+                </a>
 
-            <a
-              class="btn {current === 'admin-paginas' ? 'primary' : 'ghost'}"
-              aria-current={current === 'admin-paginas' ? 'page' : undefined}
-              href="/admin/paginas/cancelacion-compras"
-              use:link
-            >
-              Páginas
-            </a>
+                <a
+                  class:active={current === 'admin-paginas'}
+                  href="/admin/paginas/cancelacion-compras"
+                  use:link
+                >
+                  Páginas informativas
+                </a>
 
-            <a
-              class="btn {current === 'portal' ? 'primary' : 'ghost'}"
-              aria-current={current === 'portal' ? 'page' : undefined}
-              href="/admin/portal"
-              use:link
-            >
-              Portal
-            </a>
-          {/if}
+                <a
+                  class:active={current === 'admin-proveedores'}
+                  href="/admin/proveedores"
+                  use:link
+                >
+                  Aerolíneas afiliadas
+                </a>
+
+                <a
+                  class:active={current === 'portal'}
+                  href="/admin/portal"
+                  use:link
+                >
+                  Portal (UI)
+                </a>
+              {/if}
+            </div>
+          </details>
         </div>
       {/if}
 
-      <!-- Zona usuario / login -->
       <div class="nav-group nav-user">
         {#if ui.header?.show_cart}
           <a class="btn ghost" href="/carrito" use:link>
@@ -175,16 +265,18 @@
     top: 0;
     z-index: 10;
   }
+
   .wrap {
     max-width: 960px;
     margin: 0 auto;
     width: 100%;
     padding: 12px 16px;
-    display: flex;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
   }
+
   .brand {
     display: flex;
     align-items: center;
@@ -203,9 +295,34 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    flex: 1;
-    justify-content: flex-end;
     flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .search {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    justify-content: flex-start;
+    max-width: 100%;
+  }
+  .search-text {
+    min-width: 200px;
+    flex: 1 1 220px;
+  }
+  .search-number,
+  .search-select {
+    flex: 0 0 auto;
+    min-width: 110px;
+  }
+
+  .search input,
+  .search select {
+    padding: 7px 10px;
+    border: 1px solid #c7c7c7;
+    border-radius: 10px;
+    font-size: 0.85rem;
   }
 
   .nav-group {
@@ -221,7 +338,6 @@
   }
 
   .nav-user {
-    margin-left: auto;
     gap: 8px;
   }
 
@@ -253,35 +369,59 @@
     border-color: #2a0b0b;
   }
 
-  .search {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    margin-right: 4px;
-  }
-  .search input {
-    padding: 7px 10px;
-    border: 1px solid #c7c7c7;
-    border-radius: 10px;
-    min-width: 200px;
-  }
-
   .user-label {
     opacity: 0.9;
     font-size: 0.88rem;
   }
 
+  .admin-menu {
+    position: relative;
+  }
+  .admin-menu summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .admin-menu summary::-webkit-details-marker {
+    display: none;
+  }
+  .admin-menu-items {
+    position: absolute;
+    right: 0;
+    top: 110%;
+    background: #fff;
+    color: #111827;
+    border-radius: 10px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    padding: 0.4rem 0.6rem;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    z-index: 20;
+  }
+  .admin-menu-items a {
+    padding: 0.25rem 0.4rem;
+    border-radius: 6px;
+    text-decoration: none;
+    color: inherit;
+    font-size: 0.85rem;
+  }
+  .admin-menu-items a:hover {
+    background: #f3f4f6;
+  }
+  .admin-menu-items a.active {
+    background: #d1fae5;
+    font-weight: 600;
+  }
+
   @media (max-width: 768px) {
     .wrap {
-      flex-direction: column;
+      grid-template-columns: 1fr;
       align-items: flex-start;
     }
     .nav {
       width: 100%;
       justify-content: flex-start;
-    }
-    .nav-user {
-      margin-left: 0;
     }
   }
 </style>

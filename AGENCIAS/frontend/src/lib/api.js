@@ -65,8 +65,8 @@ export function qs(obj = {}) {
 
 export const AuthAPI = {
   register: (data) => request('/api/v1/auth/register', { method: 'POST', body: data }),
-  login:  (data) => request('/api/v1/auth/login',    { method: 'POST', body: data }),
-  me:     ()     => request('/api/v1/auth/me'),
+  login:    (data) => request('/api/v1/auth/login',    { method: 'POST', body: data }),
+  me:       ()     => request('/api/v1/auth/me'),
 };
 
 export const UsersAPI = {
@@ -117,8 +117,8 @@ export const ComprasAPI = {
   checkout: (payment) =>
     request('/compras/checkout', { method: 'POST', body: payment }),
 
-  list:   ()    => request('/compras/reservas'),
-  detail: (id)  => request(`/compras/reservas/${id}`),
+  list:   ()   => request('/compras/reservas'),
+  detail: (id) => request(`/compras/reservas/${id}`),
 
   cancel: (id) =>
     request(`/compras/reservas/${id}/cancelar`, {
@@ -158,7 +158,7 @@ export const PaginasAPI = {
   getPublic: (slug) =>
     request(`/api/public/paginas/${encodeURIComponent(slug)}`),
 
-  // Listados y detalle (admin)
+  // Listados y detalle 
   listAdmin: (params) =>
     request('/api/admin/paginas' + qs(params || {})),
 
@@ -200,6 +200,22 @@ export const PaginasAPI = {
   removeAdmin: (slug) =>
     request(`/api/admin/paginas/${encodeURIComponent(slug)}`, {
       method: 'DELETE',
+    }),
+};
+
+export const ProveedoresAPI = {
+  listPublic: () => request('/api/public/proveedores'),
+};
+
+export const ProveedoresAdminAPI = {
+  list: () =>
+    request('/api/admin/proveedores'),
+  get: (id) =>
+    request(`/api/admin/proveedores/${encodeURIComponent(id)}`),
+  update: (id, body) =>
+    request(`/api/admin/proveedores/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body,
     }),
 };
 

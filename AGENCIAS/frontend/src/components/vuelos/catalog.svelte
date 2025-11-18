@@ -4,9 +4,7 @@
   import { navigate } from "@/lib/router";
 
   const API = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8001") + "/api/v1/vuelos";
-  
-  // Limpiar el proveedor guardado cuando se entra al catálogo
-  // (ya que el usuario puede estar buscando vuelos de diferentes proveedores)
+
   clearProveedor();
 
   let origin = "";
@@ -17,8 +15,16 @@
   let origins = [];
   let destinations = [];
   let items = [];
+  let filteredItems = [];
   let loading = false;
   let error = "";
+
+  let q = "";
+  let priceMin = "";
+  let priceMax = "";
+  let proveedor = "";
+  let tipoVuelo = "";
+  let ratingMin = "";
 
   async function getJSON(url) {
     const r = await fetch(url);
@@ -35,12 +41,34 @@
     return await r.json();
   }
 
+  function readUrlFilters() {
+    const url = new URL(window.location.href);
+    const params = url.searchParams;
+
+    q         = params.get("q") ?? "";
+    priceMin  = params.get("priceMin") ?? "";
+    priceMax  = params.get("priceMax") ?? "";
+    proveedor = params.get("proveedor") ?? "";
+    tipoVuelo = params.get("tipoVuelo") ?? "";
+    ratingMin = params.get("ratingMin") ?? "";
+  }
+
   onMount(async () => {
     try {
       origins = await getJSON(`${API}/origins`);
     } catch (e) {
       error = e.message || "No se pudieron cargar los orígenes";
     }
+
+    readUrlFilters();
+    await buscar();
+
+    const onPop = () => {
+      readUrlFilters();
+      buscar();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   });
 
   async function onOriginChange() {
@@ -48,7 +76,9 @@
     destinations = [];
     if (!origin) return;
     try {
-      destinations = await getJSON(`${API}/destinations/${encodeURIComponent(origin)}`);
+      destinations = await getJSON(
+        `${API}/destinations/${encodeURIComponent(origin)}`
+      );
     } catch (e) {
       error = e.message || "No se pudieron cargar los destinos";
     }
@@ -58,16 +88,25 @@
     loading = true;
     error = "";
     try {
-      const q = new URLSearchParams();
-      if (origin) q.set("origin", origin);
-      if (destination) q.set("destination", destination);
-      if (date) q.set("date", date);
-      if (pax) q.set("pax", String(pax));
-      items = await getJSON(`${API}?${q.toString()}`);
-      // Debug: verificar que los items tengan nombreProveedor
+      const qParams = new URLSearchParams();
+      if (origin) qParams.set("origin", origin);
+      if (destination) qParams.set("destination", destination);
+      if (date) qParams.set("date", date);
+      if (pax) qParams.set("pax", String(pax));
+
+      const qs = qParams.toString();
+      const url = qs ? `${API}?${qs}` : API;
+
+      items = await getJSON(url);
+
       if (items && items.length > 0) {
         console.log("[Catalog] Primer vuelo:", items[0]);
-        console.log("[Catalog] nombreProveedor:", items[0].nombreProveedor, "proveedor:", items[0].proveedor);
+        console.log(
+          "[Catalog] nombreProveedor:",
+          items[0].nombreProveedor,
+          "proveedor:",
+          items[0].proveedor
+        );
       }
     } catch (e) {
       error = e.message || "Error al buscar vuelos";
@@ -77,21 +116,56 @@
     }
   }
 
+  $: filteredItems = items.filter((it) => {
+    if (q && q.trim()) {
+      const term = q.trim().toLowerCase();
+      const origen = String(it.origen || "").toLowerCase();
+      const destino = String(it.destino || "").toLowerCase();
+      const codigo = String(it.codigo || it.codigoVuelo || "").toLowerCase();
+      if (
+        !origen.includes(term) &&
+        !destino.includes(term) &&
+        !codigo.includes(term)
+      ) {
+        return false;
+      }
+    }
+
+    const precio = Number(it.precioDesde ?? it.precio ?? it.price ?? 0);
+    if (priceMin && precio < Number(priceMin)) return false;
+    if (priceMax && precio > Number(priceMax)) return false;
+
+    if (proveedor) {
+      const provId = String(it.proveedor || it.proveedorId || "");
+      if (provId !== String(proveedor)) return false;
+    }
+
+    if (tipoVuelo === "directo" && it.tieneEscala) return false;
+    if (tipoVuelo === "escala" && !it.tieneEscala) return false;
+
+    if (ratingMin) {
+      const rating = Number(it.ratingPromedio ?? it.rating ?? 0);
+      if (rating < Number(ratingMin)) return false;
+    }
+
+    return true;
+  });
+
   function fmtMoney(n) {
     if (n == null) return "-";
-    return `Q ${Number(n).toLocaleString("es-GT", { maximumFractionDigits: 2 })}`;
+    return `Q ${Number(n).toLocaleString("es-GT", {
+      maximumFractionDigits: 2,
+    })}`;
   }
 
   function viewDetail(id, proveedor) {
     console.log("[Catalog] viewDetail - ID:", id, "Proveedor:", proveedor);
-    
-    // Guardar el proveedor en el store ANTES de navegar (esto es lo más importante)
+
     if (proveedor) {
       setProveedor(proveedor);
       console.log("[Catalog] Proveedor guardado en store:", proveedor);
     }
-    
-    // Navegar usando el router de Svelte (el proveedor ya está en el store)
+
     navigate(`/vuelos/${id}`);
   }
 </script>
@@ -127,7 +201,7 @@
   </div>
 
   <div class="grid">
-    {#each items as it}
+    {#each filteredItems as it}
       <div class="card">
         <div class="price">Desde {fmtMoney(it.precioDesde)}</div>
         <div class="title">{it.origen} → {it.destino}</div>
@@ -138,14 +212,22 @@
           {/if}
         </div>
         <div class="actions">
-          <button class="btn primary" on:click={() => viewDetail(it.idVuelo, it.proveedor)}>Ver detalle</button>
+          <button
+            class="btn primary"
+            on:click={() => viewDetail(it.idVuelo, it.proveedor)}
+          >
+            Ver detalle
+          </button>
         </div>
       </div>
     {/each}
   </div>
 
-  {#if !loading && items.length === 0}
-    <p class="hint">Usa los filtros y presiona <b>Buscar</b> para ver resultados.</p>
+  {#if !loading && filteredItems.length === 0}
+    <p class="hint">
+      No hay vuelos que coincidan con los filtros.
+      Ajusta la búsqueda o prueba con otros rangos.
+    </p>
   {/if}
 </div>
 

@@ -13,7 +13,9 @@ async function withAuthFetch(url, opts = {}) {
   const r = await fetch(url, { ...opts, headers });
   if (!r.ok) {
     let msg = `HTTP ${r.status}`;
-    try { msg = (await r.json())?.detail || msg; } catch {}
+    try {
+      msg = (await r.json())?.detail || msg;
+    } catch {}
     throw new Error(msg);
   }
   return r.json();
@@ -30,6 +32,12 @@ export const saveHeader = (payload) =>
 
 export const saveFooter = (payload) =>
   withAuthFetch(`${BASE}/portal/footer`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
+export const saveHome = (payload) =>
+  withAuthFetch(`${BASE}/portal/home`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });

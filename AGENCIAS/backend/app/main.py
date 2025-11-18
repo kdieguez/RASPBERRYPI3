@@ -17,6 +17,8 @@ from app.routers.portal import router as portal_router
 from app.routers.compras import router as compras_router
 from app.routers.proveedores import router as proveedores_router
 from app.routers import paginas_informativas
+from app.routers import proveedores_publicos
+from app.routers import proveedores_admin
 
 
 @asynccontextmanager
@@ -26,12 +28,13 @@ async def lifespan(app: FastAPI):
     yield
     await close_mongo_connection()
 
+
 app = FastAPI(title=APP_NAME, version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS, 
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",  
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,6 +48,7 @@ async def health():
     _ = await get_db()["usuarios"].count_documents({})
     return {"status": "ok"}
 
+
 @app.get("/health/full")
 async def health_full():
     await get_db().command("ping")
@@ -52,20 +56,25 @@ async def health_full():
 
     url = f"{AEROLINEAS_API_URL}/api/public/vuelos"
     try:
-        async with httpx.AsyncClient(timeout=10, headers={"Accept": "application/json"}) as client:
+        async with httpx.AsyncClient(
+            timeout=10, headers={"Accept": "application/json"}
+        ) as client:
             r = await client.get(url)
             r.raise_for_status()
             aerolineas_ok = True
     except httpx.TimeoutException:
         raise HTTPException(status_code=502, detail="Aerolíneas no responde (timeout).")
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Error al consultar Aerolíneas: {str(e)}")
+        raise HTTPException(
+            status_code=502, detail=f"Error al consultar Aerolíneas: {str(e)}"
+        )
 
     return {
         "status": "ok",
         "mongo": {"usuarios_count": users_count},
         "aerolineas": {"reachable": aerolineas_ok, "url": url},
     }
+
 
 app.include_router(auth_router)
 app.include_router(users_admin.router)
@@ -74,3 +83,5 @@ app.include_router(portal_router)
 app.include_router(compras_router)
 app.include_router(proveedores_router)
 app.include_router(paginas_informativas.router)
+app.include_router(proveedores_publicos.router)
+app.include_router(proveedores_admin.router)
