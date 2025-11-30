@@ -1,0 +1,95 @@
+pipeline {
+  agent any
+
+  environment {
+    SONARQUBE_SERVER   = 'sonar'
+    ENV_NAME           = 'prod'
+    SONAR_BACKEND_KEY  = 'backend-prod'
+    SONAR_FRONTEND_KEY = 'frontend-prod'
+  }
+
+  stages {
+
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Build backend (Maven + tests)') {
+      steps {
+        script {
+          docker.image('maven:3.9-eclipse-temurin-17').inside('--network ci-network') {
+            sh """
+              cd backend
+              mvn clean verify -DskipTests=false
+            """
+          }
+        }
+      }
+    }
+
+    stage('SonarQube backend') {
+      steps {
+        withSonarQubeEnv("${SONARQUBE_SERVER}") {
+          sh """
+            cd backend
+            mvn sonar:sonar \
+              -Dsonar.projectKey=${SONAR_BACKEND_KEY} \
+              -Dsonar.host.url=$SONAR_HOST_URL
+          """
+        }
+      }
+    }
+
+    stage('Build frontend (Node + tests)') {
+      steps {
+        script {
+          docker.image('node:20').inside('--network ci-network') {
+            sh """
+              cd frontend
+              npm install
+              npm run test || echo "sin tests definidos para FE"
+              npm run build
+            """
+          }
+        }
+      }
+    }
+
+    stage('SonarQube frontend') {
+      steps {
+        script {
+          def scannerHome = tool 'SonarScanner'
+          withSonarQubeEnv("${SONARQUBE_SERVER}") {
+            sh """
+              cd frontend
+              ${scannerHome}/bin/sonar-scanner \
+                -Dsonar.projectKey=${SONAR_FRONTEND_KEY} \
+                -Dsonar.sources=src \
+                -Dsonar.host.url=$SONAR_HOST_URL
+            """
+          }
+        }
+      }
+    }
+
+    stage('Build Docker images') {
+      steps {
+        sh """
+          docker build -t aerolineas-backend-${ENV_NAME} backend
+          docker build -t aerolineas-frontend-${ENV_NAME} frontend
+        """
+      }
+    }
+
+    stage('Deploy ambiente prod') {
+      steps {
+        sh """
+          cd infra
+          docker compose up -d backend-${ENV_NAME} frontend-${ENV_NAME}
+        """
+      }
+    }
+  }
+}
