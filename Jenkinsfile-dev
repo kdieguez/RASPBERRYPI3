@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   environment {
-    SONARQUBE_SERVER   = 'sonar'        
+    SONARQUBE_SERVER   = 'sonar'        // debe coincidir con el Name de Sonar en Jenkins
     ENV_NAME           = 'dev'
     SONAR_BACKEND_KEY  = 'backend-dev'
     SONAR_FRONTEND_KEY = 'frontend-dev'
@@ -31,13 +31,17 @@ pipeline {
 
     stage('SonarQube backend') {
       steps {
-        withSonarQubeEnv("${SONARQUBE_SERVER}") {
-          sh """
-            cd backend
-            mvn sonar:sonar \
-              -Dsonar.projectKey=${SONAR_BACKEND_KEY} \
-              -Dsonar.host.url=$SONAR_HOST_URL
-          """
+        script {
+          docker.image('maven:3.9-eclipse-temurin-17').inside('--network ci-network') {
+            withSonarQubeEnv("${SONARQUBE_SERVER}") {
+              sh """
+                cd backend
+                mvn sonar:sonar \
+                  -Dsonar.projectKey=${SONAR_BACKEND_KEY} \
+                  -Dsonar.host.url=$SONAR_HOST_URL
+              """
+            }
+          }
         }
       }
     }
@@ -60,15 +64,17 @@ pipeline {
     stage('SonarQube frontend') {
       steps {
         script {
-          def scannerHome = tool 'SonarScanner'
-          withSonarQubeEnv("${SONARQUBE_SERVER}") {
-            sh """
-              cd frontend
-              ${scannerHome}/bin/sonar-scanner \
-                -Dsonar.projectKey=${SONAR_FRONTEND_KEY} \
-                -Dsonar.sources=src \
-                -Dsonar.host.url=$SONAR_HOST_URL
-            """
+          // Usamos la imagen oficial del scanner en vez de una tool de Jenkins
+          docker.image('sonarsource/sonar-scanner-cli:5.0.1').inside('--network ci-network') {
+            withSonarQubeEnv("${SONARQUBE_SERVER}") {
+              sh """
+                cd frontend
+                sonar-scanner \
+                  -Dsonar.projectKey=${SONAR_FRONTEND_KEY} \
+                  -Dsonar.sources=src \
+                  -Dsonar.host.url=$SONAR_HOST_URL
+              """
+            }
           }
         }
       }
@@ -86,10 +92,7 @@ pipeline {
     stage('Deploy ambiente dev') {
       steps {
         sh """
-          # Asegurar que Oracle está arriba
           docker start oracle-xe || true
-
-          # Imita lo que tú haces a mano para DEV
           docker start backend-dev  || true
           docker start frontend-dev || true
         """
