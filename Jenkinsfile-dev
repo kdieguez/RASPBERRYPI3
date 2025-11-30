@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   environment {
-    SONARQUBE_SERVER   = 'sonar'        // nombre del servidor Sonar en Jenkins
+    SONARQUBE_SERVER   = 'sonar'        
     ENV_NAME           = 'dev'
     SONAR_BACKEND_KEY  = 'backend-dev'
     SONAR_FRONTEND_KEY = 'frontend-dev'
@@ -60,8 +60,6 @@ pipeline {
     stage('SonarQube frontend') {
       steps {
         script {
-          // Debes tener una herramienta llamada "SonarScanner"
-          // en Manage Jenkins -> Global Tool Configuration
           def scannerHome = tool 'SonarScanner'
           withSonarQubeEnv("${SONARQUBE_SERVER}") {
             sh """
@@ -88,8 +86,12 @@ pipeline {
     stage('Deploy ambiente dev') {
       steps {
         sh """
-          cd infra
-          docker compose up -d backend-${ENV_NAME} frontend-${ENV_NAME}
+          # Asegurar que Oracle está arriba
+          docker start oracle-xe || true
+
+          # Imita lo que tú haces a mano para DEV
+          docker start backend-dev  || true
+          docker start frontend-dev || true
         """
       }
     }
