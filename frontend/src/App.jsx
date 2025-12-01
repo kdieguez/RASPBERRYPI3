@@ -18,7 +18,7 @@ import AdminVuelosList from "./paginas/admin/AdminVuelosList";
 import VueloDetalle from "./paginas/VueloDetalle";
 import Carrito from "./paginas/Carrito";
 import CheckoutAgradecimiento from "./paginas/CheckoutAgradecimiento";
-import Checkout from "./paginas/CheckOut";
+import Checkout from "./paginas/Checkout";
 import HistorialCompras from "./paginas/HistorialCompras";
 import ReservaDetalle from "./paginas/ReservaDetalle";
 import ConfigSitio from "./paginas/admin/ConfigSitio";
