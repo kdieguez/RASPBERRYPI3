@@ -1,43 +1,51 @@
 import { useState } from "react";
-import ReCAPTCHA from "react-google-recaptcha";
-import axios from "../lib/axios";                
+// import ReCAPTCHA from "react-google-recaptcha";  
+import axios from "../lib/axios";
 import { useNavigate, Link } from "react-router-dom";
-import { saveAuth } from "../lib/auth";          
+import { saveAuth } from "../lib/auth";
 import "../styles/registro.css";
 
-const SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+// const SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 
 export default function Register() {
   const nav = useNavigate();
-  const [form, setForm] = useState({ email:"", password:"", nombres:"", apellidos:"" });
-  const [captchaToken, setCaptchaToken] = useState("");
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+    nombres: "",
+    apellidos: ""
+  });
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const onChange = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const onChange = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
   const disabled =
-    !SITE_KEY ||
-    !captchaToken ||
     !form.email ||
     !form.password ||
     !form.nombres ||
     !form.apellidos;
 
   const submit = async (e) => {
-  e.preventDefault();
-  setErr("");
-  setLoading(true);
-  try {
-    const { data } = await axios.post("/api/auth/register", { ...form, captchaToken });
-    saveAuth({ token: data.token, user: data.user, expiresInSec: data.expires_in });
+    e.preventDefault();
+    setErr("");
+    setLoading(true);
+    try {
+      const { data } = await axios.post("/api/auth/register", { ...form });
 
-    nav("/perfil", { replace: true });  
-  } catch (e2) {
-    setErr(e2?.response?.data?.error || "No se pudo crear la cuenta");
-  } finally {
-    setLoading(false);
-  }
-};
+      saveAuth({
+        token: data.token,
+        user: data.user,
+        expiresInSec: data.expires_in
+      });
+
+      nav("/perfil", { replace: true });
+    } catch (e2) {
+      setErr(e2?.response?.data?.error || "No se pudo crear la cuenta");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="container pag-reg">
@@ -48,7 +56,9 @@ export default function Register() {
         <form className="form" onSubmit={submit} noValidate>
           <div className="form-row">
             <div className="form-col">
-              <label className="label" htmlFor="nombres">Nombres</label>
+              <label className="label" htmlFor="nombres">
+                Nombres
+              </label>
               <input
                 id="nombres"
                 className="input"
@@ -59,7 +69,9 @@ export default function Register() {
             </div>
 
             <div className="form-col">
-              <label className="label" htmlFor="apellidos">Apellidos</label>
+              <label className="label" htmlFor="apellidos">
+                Apellidos
+              </label>
               <input
                 id="apellidos"
                 className="input"
@@ -71,7 +83,9 @@ export default function Register() {
           </div>
 
           <div>
-            <label className="label" htmlFor="email">Correo</label>
+            <label className="label" htmlFor="email">
+              Correo
+            </label>
             <input
               id="email"
               className="input"
@@ -84,7 +98,9 @@ export default function Register() {
           </div>
 
           <div>
-            <label className="label" htmlFor="password">Contraseña</label>
+            <label className="label" htmlFor="password">
+              Contraseña
+            </label>
             <input
               id="password"
               className="input"
@@ -97,18 +113,11 @@ export default function Register() {
             />
           </div>
 
-          <div>
-            {SITE_KEY ? (
-              <ReCAPTCHA
-                sitekey={SITE_KEY}
-                onChange={(t) => setCaptchaToken(t || "")}
-              />
-            ) : (
-              <div className="error">Falta VITE_RECAPTCHA_SITE_KEY en el .env</div>
-            )}
-          </div>
-
-          {err && <div className="error" role="alert">{err}</div>}
+          {err && (
+            <div className="error" role="alert">
+              {err}
+            </div>
+          )}
 
           <div className="actions">
             <button
