@@ -85,13 +85,14 @@ pipeline {
       }
     }
 
-    stage('Deploy ambiente dev') {
-      steps {
-        sh """
-          cd infra
-          docker compose up -d backend-${ENV_NAME} frontend-${ENV_NAME}
-        """
-      }
-    }
+   stage('Deploy ambiente prod') {
+  steps {
+    sh """
+      docker start oracle-xe || true
+      docker start backend-prod  || true
+      docker start frontend-prod || true
+    """
+  }
+}
   }
 }
