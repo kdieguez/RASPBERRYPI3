@@ -2,10 +2,10 @@ pipeline {
   agent any
 
   environment {
-    SONARQUBE_SERVER   = 'sonar'
-    ENV_NAME           = 'prod'
-    SONAR_BACKEND_KEY  = 'backend-prod'
-    SONAR_FRONTEND_KEY = 'frontend-prod'
+    SONARQUBE_SERVER   = 'sonar'        // nombre del servidor Sonar en Jenkins
+    ENV_NAME           = 'dev'
+    SONAR_BACKEND_KEY  = 'backend-dev'
+    SONAR_FRONTEND_KEY = 'frontend-dev'
   }
 
   stages {
@@ -31,17 +31,13 @@ pipeline {
 
     stage('SonarQube backend') {
       steps {
-        script {
-          docker.image('maven:3.9-eclipse-temurin-17').inside('--network ci-network') {
-            withSonarQubeEnv("${SONARQUBE_SERVER}") {
-              sh """
-                cd backend
-                mvn sonar:sonar \
-                  -Dsonar.projectKey=${SONAR_BACKEND_KEY} \
-                  -Dsonar.host.url=$SONAR_HOST_URL
-              """
-            }
-          }
+        withSonarQubeEnv("${SONARQUBE_SERVER}") {
+          sh """
+            cd backend
+            mvn sonar:sonar \
+              -Dsonar.projectKey=${SONAR_BACKEND_KEY} \
+              -Dsonar.host.url=$SONAR_HOST_URL
+          """
         }
       }
     }
@@ -64,16 +60,17 @@ pipeline {
     stage('SonarQube frontend') {
       steps {
         script {
-          docker.image('sonarsource/sonar-scanner-cli:5.0.1').inside('--network ci-network') {
-            withSonarQubeEnv("${SONARQUBE_SERVER}") {
-              sh """
-                cd frontend
-                sonar-scanner \
-                  -Dsonar.projectKey=${SONAR_FRONTEND_KEY} \
-                  -Dsonar.sources=src \
-                  -Dsonar.host.url=$SONAR_HOST_URL
-              """
-            }
+          // Debes tener una herramienta llamada "SonarScanner"
+          // en Manage Jenkins -> Global Tool Configuration
+          def scannerHome = tool 'SonarScanner'
+          withSonarQubeEnv("${SONARQUBE_SERVER}") {
+            sh """
+              cd frontend
+              ${scannerHome}/bin/sonar-scanner \
+                -Dsonar.projectKey=${SONAR_FRONTEND_KEY} \
+                -Dsonar.sources=src \
+                -Dsonar.host.url=$SONAR_HOST_URL
+            """
           }
         }
       }
@@ -88,13 +85,14 @@ pipeline {
       }
     }
 
-    stage('Deploy ambiente prod') {
-      steps {
-        sh """
-          cd infra
-          docker compose up -d backend-${ENV_NAME} frontend-${ENV_NAME}
-        """
-      }
-    }
+   stage('Deploy ambiente prod') {
+  steps {
+    sh """
+      docker start oracle-xe || true
+      docker start backend-prod  || true
+      docker start frontend-prod || true
+    """
+  }
+}
   }
 }
