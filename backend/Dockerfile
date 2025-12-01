@@ -18,8 +18,8 @@ COPY --from=build /app/target/aerolineas-backend-1.0.0.jar app.jar
 ENV ORACLE_USER=APP_DEV
 ENV ORACLE_PASSWORD=Dev123
 ENV ORACLE_CONNECT_STRING=oracle-xe:1521/XEPDB1
-ENV SERVER_PORT=8080
+ENV SERVER_PORT=8081
 
-EXPOSE 8080
+EXPOSE 8081
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
