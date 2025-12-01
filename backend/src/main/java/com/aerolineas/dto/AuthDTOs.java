@@ -1,69 +1,95 @@
-package com.aerolineas.dto;
+package com.aerolineas.controller;
 
-public class AuthDTOs {
+import com.aerolineas.dao.UsuarioDAO;
+import com.aerolineas.dto.AuthDTOs.LoginRequest;
+import com.aerolineas.dto.AuthDTOs.LoginResponse;
+import com.aerolineas.dto.AuthDTOs.RegisterRequest;
+import com.aerolineas.dto.AuthDTOs.UserView;
+import com.aerolineas.model.Usuario;
+// import com.aerolineas.util.CaptchaUtil;  // ya no lo usamos
+import com.aerolineas.util.JwtUtil;
+import com.aerolineas.util.PasswordUtil;
+import io.javalin.http.Context;
 
-    public static class RegisterRequest {
-        public String email;
-        public String password;
-        public String nombres;
-        public String apellidos;
-        // public String captchaToken;
+import java.util.Map;
 
-        public RegisterRequest() {
-        }
+public class AuthController {
 
-        public RegisterRequest(String email, String password, String nombres, String apellidos) {
-            this.email = email;
-            this.password = password;
-            this.nombres = nombres;
-            this.apellidos = apellidos;
-        }
+  private final UsuarioDAO usuarios = new UsuarioDAO();
+
+  private static String normEmail(String e) {
+    return e == null ? null : e.trim().toLowerCase();
+  }
+
+  private long expSeconds() {
+    return Long.parseLong(System.getenv().getOrDefault("JWT_EXP_MIN", "120")) * 60L;
+  }
+
+  private String tokenFor(Usuario u) {
+    return JwtUtil.generate(Map.of(
+        "sub", String.valueOf(u.getIdUsuario()),
+        "email", u.getEmail(),
+        "rol", u.getIdRol(),
+        "name", u.getNombres() + " " + u.getApellidos()
+    ));
+  }
+
+  public void register(Context ctx) {
+    RegisterRequest body = ctx.bodyValidator(RegisterRequest.class)
+        .check(b -> b.email != null && b.email.contains("@"), "email inválido")
+        .check(b -> b.password != null && b.password.length() >= 8, "password mínimo 8")
+        .check(b -> b.nombres != null && !b.nombres.isBlank(), "nombres requeridos")
+        .check(b -> b.apellidos != null && !b.apellidos.isBlank(), "apellidos requeridos")
+        // .check(b -> CaptchaUtil.verify(b.captchaToken), "captcha inválido") // desactivado
+        .get();
+
+    final String email = normEmail(body.email);
+
+    if (usuarios.findByEmail(email) != null) {
+      ctx.status(409).json(Map.of("error", "email ya registrado"));
+      return;
     }
 
-    public static class LoginRequest {
-        public String email;
-        public String password;
+    String hash = PasswordUtil.hash(body.password);
+    Usuario u = usuarios.create(email, hash, body.nombres.trim(), body.apellidos.trim());
 
-        public LoginRequest() {
-        }
+    UserView view = new UserView(
+        u.getIdUsuario(), u.getEmail(), u.getNombres(), u.getApellidos(), u.getIdRol()
+    );
 
-        public LoginRequest(String email, String password) {
-            this.email = email;
-            this.password = password;
-        }
+    String token = tokenFor(u);
+    ctx.status(201).json(new LoginResponse(token, expSeconds(), view));
+  }
+
+  public void login(Context ctx) {
+    LoginRequest body = ctx.bodyValidator(LoginRequest.class)
+        .check(b -> b.email != null && b.email.contains("@"), "email inválido")
+        .check(b -> b.password != null && !b.password.isBlank(), "password requerido")
+        .get();
+
+    final String email = normEmail(body.email);
+    Usuario u = usuarios.findByEmail(email);
+
+    if (u == null || !u.isHabilitado() || !PasswordUtil.verify(body.password, u.getContrasenaHash())) {
+      ctx.status(401).json(Map.of("error", "credenciales no válidas"));
+      return;
     }
 
-    public static class UserView {
-        public Long id;
-        public String email;
-        public String nombres;
-        public String apellidos;
-        public Integer idRol;
+    UserView view = new UserView(
+        u.getIdUsuario(), u.getEmail(), u.getNombres(), u.getApellidos(), u.getIdRol()
+    );
 
-        public UserView() {
-        }
+    String token = tokenFor(u);
+    ctx.json(new LoginResponse(token, expSeconds(), view));
+  }
 
-        public UserView(Long id, String email, String nombres, String apellidos, Integer idRol) {
-            this.id = id;
-            this.email = email;
-            this.nombres = nombres;
-            this.apellidos = apellidos;
-            this.idRol = idRol;
-        }
+  public void me(Context ctx) {
+    @SuppressWarnings("unchecked")
+    Map<String, Object> claims = ctx.attribute("claims");
+    if (claims == null) {
+      ctx.status(401).json(Map.of("error", "no autenticado"));
+      return;
     }
-
-    public static class LoginResponse {
-        public String token;
-        public long expiresInSeconds;
-        public UserView user;
-
-        public LoginResponse() {
-        }
-
-        public LoginResponse(String token, long expiresInSeconds, UserView user) {
-            this.token = token;
-            this.expiresInSeconds = expiresInSeconds;
-            this.user = user;
-        }
-    }
+    ctx.json(claims);
+  }
 }
