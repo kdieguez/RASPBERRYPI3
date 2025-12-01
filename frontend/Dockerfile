@@ -13,8 +13,8 @@ RUN npm install
 COPY . .
 
 # Backend que va a usar el frontend dentro de la red de Docker
-# (por defecto backend-dev:8080 en la red ci-network)
-ARG VITE_API_BASE=http://backend-dev:8080
+# (por defecto backend-dev:8081 en la red ci-network)
+ARG VITE_API_BASE=http://backend-dev:8081
 ENV VITE_API_BASE=${VITE_API_BASE}
 
 # Compilamos el frontend (genera la carpeta dist/)
