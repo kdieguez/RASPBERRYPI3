@@ -40,7 +40,7 @@ public class AuthController {
         .check(b -> b.password() != null && b.password().length() >= 8, "password mínimo 8")
         .check(b -> b.nombres() != null && !b.nombres().isBlank(), "nombres requeridos")
         .check(b -> b.apellidos() != null && !b.apellidos().isBlank(), "apellidos requeridos")
-        .check(b -> CaptchaUtil.verify(b.captchaToken()), "captcha inválido")
+       // .check(b -> CaptchaUtil.verify(b.captchaToken()), "captcha inválido")
         .get();
 
     final String email = normEmail(body.email());
