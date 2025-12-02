@@ -1,6 +1,5 @@
 pipeline {
   agent any
-
   environment {
     SONARQUBE_SERVER   = 'sonar'        // debe coincidir con el Name de Sonar en Jenkins
     ENV_NAME           = 'dev'
@@ -35,8 +34,7 @@ pipeline {
           docker.image('maven:3.9-eclipse-temurin-17').inside('--network ci-network') {
             withSonarQubeEnv("${SONARQUBE_SERVER}") {
               sh """
-                cd backend
-                mvn sonar:sonar \
+                cd backend && mvn sonar:sonar \
                   -Dsonar.projectKey=${SONAR_BACKEND_KEY} \
                   -Dsonar.host.url=$SONAR_HOST_URL
               """
@@ -64,12 +62,10 @@ pipeline {
     stage('SonarQube frontend') {
       steps {
         script {
-          // Usamos la imagen oficial del scanner en vez de una tool de Jenkins
           docker.image('sonarsource/sonar-scanner-cli:5.0.1').inside('--network ci-network') {
             withSonarQubeEnv("${SONARQUBE_SERVER}") {
               sh """
-                cd frontend
-                sonar-scanner \
+                cd frontend && sonar-scanner \
                   -Dsonar.projectKey=${SONAR_FRONTEND_KEY} \
                   -Dsonar.sources=src \
                   -Dsonar.host.url=$SONAR_HOST_URL
@@ -89,14 +85,28 @@ pipeline {
       }
     }
 
+    stage('Stop & Remove old containers') {
+      steps {
+        sh """
+          docker stop backend-dev || true
+          docker rm backend-dev || true
+          
+          docker stop frontend-dev || true
+          docker rm frontend-dev || true
+        """
+      }
+    }
+
     stage('Deploy ambiente dev') {
       steps {
         sh """
           docker start oracle-xe || true
-          docker start backend-dev  || true
-          docker start frontend-dev || true
+
+          docker run -d --name backend-dev --network ci-network -p 8081:8080 aerolineas-backend-dev
+          docker run -d --name frontend-dev --network ci-network -p 8084:80 aerolineas-frontend-dev
         """
       }
     }
-  }
+
+  } // stages
 }
