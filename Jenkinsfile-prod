@@ -120,7 +120,7 @@ Por favor revisar los logs en Jenkins.
 Saludos,
 DevTeam
 """,
-        to: "msblanco@unis.edu.gt, kdieguez@unis.edu.gt, dnatareno@unis.edu.gt"
+        to: "msblanco@unis.edu.gt, jjalvarez@unis.edu.gt"
       )
     }
   }
