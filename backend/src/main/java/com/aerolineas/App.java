@@ -1,4 +1,4 @@
-package com.aerolineason;
+package com.aerolineas;
 
 import com.aerolineas.config.DB;
 import com.aerolineas.controller.*;
