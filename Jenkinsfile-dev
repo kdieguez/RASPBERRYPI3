@@ -125,7 +125,7 @@ ${env.BUILD_URL}
 Saludos,
 DevTeam
 """,
-        to: "msblanco@unis.edu.gt"
+        to: "msblanco@unis.edu.gt, kdieguez@gmail.com, dnatareno@gmail.com"
       )
     }
   }
