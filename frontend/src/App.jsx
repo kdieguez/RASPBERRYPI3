@@ -8,7 +8,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import UsuariosList from "./paginas/admin/UsuariosList";
 import UsuarioEdit from "./paginas/admin/UsuarioEdit";
 import "./styles/home.css";
-import VueloNuevo from "./paginas/admin/VuelosNuevos";
+import VueloNuevo from "./paginas/admin/VueloNuevo";
 import AdminPaises from "./paginas/admin/Paises";
 import AdminCiudades from "./paginas/admin/Ciudades";
 import AdminRutas from "./paginas/admin/Rutas";
