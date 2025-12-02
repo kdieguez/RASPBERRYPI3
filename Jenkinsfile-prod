@@ -117,9 +117,6 @@ Hola equipo,
 El pipeline PROD ha fallado.
 Por favor revisar los logs en Jenkins.
 
-Enlace al build:
-${env.BUILD_URL}
-
 Saludos,
 DevTeam
 """,
