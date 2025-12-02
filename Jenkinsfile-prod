@@ -83,15 +83,36 @@ pipeline {
       }
     }
 
-    stage('Deploy ambiente prod') {
+    stage('Stop & Remove old containers') {
       steps {
         sh """
-          docker start oracle-xe || true
-          docker start backend-prod  || true
-          docker start frontend-prod || true
+          docker stop backend-prod || true
+          docker rm backend-prod || true
+          
+          docker stop frontend-prod || true
+          docker rm frontend-prod || true
         """
       }
     }
 
-  }
+    stage('Deploy ambiente prod') {
+      steps {
+        sh """
+          docker start oracle-xe || true
+
+          docker run -d --name backend-prod \
+            --network ci-network \
+            -p 8081:8080 \
+            aerolineas-backend-prod
+
+          docker run -d --name frontend-prod \
+            --network ci-network \
+            -p 8084:80 \
+            aerolineas-frontend-prod
+        """
+      }
+    }
+
+  } // stages
+
 }
