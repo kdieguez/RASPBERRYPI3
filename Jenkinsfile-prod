@@ -105,6 +105,26 @@ pipeline {
       }
     }
 
-
   } // stages
+
+  post {
+    failure {
+      emailext(
+        subject: "Falló pipeline PROD",
+        body: """
+Hola equipo,
+
+El pipeline PROD ha fallado.
+Por favor revisar los logs en Jenkins.
+
+Enlace al build:
+${env.BUILD_URL}
+
+Saludos,
+DevTeam
+""",
+        to: "msblanco@unis.edu.gt, kdieguez@unis.edu.gt, dnatareno@unis.edu.gt"
+      )
+    }
+  }
 }
