@@ -94,21 +94,22 @@ pipeline {
         """
       }
     }
+stage('Deploy ambiente dev') {
+      steps {
+        sh """
+          docker start oracle-xe || true
+          docker run -d --name backend-dev --network ci-network -p 8083:8080 aerolineas-backend-dev
+          docker run -d --name frontend-dev --network ci-network -p 8086:80 aerolineas-frontend-dev
+        """
+      }
+    }
 
     stage('Deploy ambiente prod') {
       steps {
         sh """
           docker start oracle-xe || true
-
-          docker run -d --name backend-prod \
-            --network ci-network \
-            -p 8083:8080 \
-            aerolineas-backend-prod
-
-          docker run -d --name frontend-prod \
-            --network ci-network \
-            -p 8086:80 \
-            aerolineas-frontend-prod
+          docker run -d --name backend-prod --network ci-network -p 8083:8080 aerolineas-backend-prod
+          docker run -d --name frontend-prod --network ci-network -p 8086:80 aerolineas-frontend-prod
         """
       }
     }
