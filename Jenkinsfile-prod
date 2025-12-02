@@ -2,10 +2,11 @@ pipeline {
   agent any
 
   environment {
-    SONARQUBE_SERVER   = 'sonar'        // nombre del servidor Sonar en Jenkins
-    ENV_NAME           = 'dev'
-    SONAR_BACKEND_KEY  = 'backend-dev'
-    SONAR_FRONTEND_KEY = 'frontend-dev'
+    SONARQUBE_SERVER   = 'sonar'
+
+    ENV_NAME           = 'prod'
+    SONAR_BACKEND_KEY  = 'backend-prod'
+    SONAR_FRONTEND_KEY = 'frontend-prod'
   }
 
   stages {
@@ -19,7 +20,9 @@ pipeline {
     stage('Build backend (Maven + tests)') {
       steps {
         script {
-          docker.image('maven:3.9-eclipse-temurin-17').inside('--network ci-network') {
+          docker.image('maven:3.9-eclipse-temurin-17')
+            .inside('--network ci-network') {
+
             sh """
               cd backend
               mvn clean verify -DskipTests=false
@@ -31,13 +34,19 @@ pipeline {
 
     stage('SonarQube backend') {
       steps {
-        withSonarQubeEnv("${SONARQUBE_SERVER}") {
-          sh """
-            cd backend
-            mvn sonar:sonar \
-              -Dsonar.projectKey=${SONAR_BACKEND_KEY} \
-              -Dsonar.host.url=$SONAR_HOST_URL
-          """
+        script {
+          docker.image('maven:3.9-eclipse-temurin-17')
+            .inside('--network ci-network') {
+
+            withSonarQubeEnv("${SONARQUBE_SERVER}") {
+              sh """
+                cd backend
+                mvn sonar:sonar \
+                  -Dsonar.projectKey=${SONAR_BACKEND_KEY} \
+                  -Dsonar.host.url=$SONAR_HOST_URL
+              """
+            }
+          }
         }
       }
     }
@@ -60,8 +69,6 @@ pipeline {
     stage('SonarQube frontend') {
       steps {
         script {
-          // Debes tener una herramienta llamada "SonarScanner"
-          // en Manage Jenkins -> Global Tool Configuration
           def scannerHome = tool 'SonarScanner'
           withSonarQubeEnv("${SONARQUBE_SERVER}") {
             sh """
@@ -85,14 +92,14 @@ pipeline {
       }
     }
 
-   stage('Deploy ambiente prod') {
-  steps {
-    sh """
-      docker start oracle-xe || true
-      docker start backend-prod  || true
-      docker start frontend-prod || true
-    """
-  }
-}
+    stage('Deploy ambiente prod') {
+      steps {
+        sh """
+          docker start oracle-xe      || true
+          docker start backend-prod   || true
+          docker start frontend-prod  || true
+        """
+      }
+    }
   }
 }
