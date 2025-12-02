@@ -32,8 +32,7 @@ pipeline {
           docker.image('maven:3.9-eclipse-temurin-17').inside('--network ci-network') {
             withSonarQubeEnv("${SONARQUBE_SERVER}") {
               sh """
-                cd backend
-                mvn sonar:sonar \
+                cd backend && mvn sonar:sonar \
                   -Dsonar.projectKey=${SONAR_BACKEND_KEY} \
                   -Dsonar.host.url=$SONAR_HOST_URL
               """
@@ -64,8 +63,7 @@ pipeline {
           docker.image('sonarsource/sonar-scanner-cli:5.0.1').inside('--network ci-network') {
             withSonarQubeEnv("${SONARQUBE_SERVER}") {
               sh """
-                cd frontend
-                sonar-scanner \
+                cd frontend && sonar-scanner \
                   -Dsonar.projectKey=${SONAR_FRONTEND_KEY} \
                   -Dsonar.sources=src \
                   -Dsonar.host.url=$SONAR_HOST_URL
