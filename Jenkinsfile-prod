@@ -99,25 +99,12 @@ pipeline {
       steps {
         sh """
           docker start oracle-xe || true
-
-          docker run -d --name backend-prod \
-            --restart unless-stopped \
-            --network ci-network \
-            -e ORACLE_USER=APP_PROD \
-            -e ORACLE_PASSWORD=Prod123 \
-            -e ORACLE_CONNECT_STRING=oracle-xe:1521/XEPDB1 \
-            -e SERVER_PORT=8080 \
-            -p 8083:8080 \
-            aerolineas-backend-prod
-
-          docker run -d --name frontend-prod \
-            --restart unless-stopped \
-            --network ci-network \
-            -p 8086:80 \
-            aerolineas-frontend-prod
+          docker run -d --name backend-prod --network ci-network -p 8083:8080 aerolineas-backend-prod
+          docker run -d --name frontend-prod --network ci-network -p 8086:80 aerolineas-frontend-prod
         """
       }
     }
+
 
   } // stages
 }
