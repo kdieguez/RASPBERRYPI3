@@ -3,7 +3,6 @@ pipeline {
 
   environment {
     SONARQUBE_SERVER   = 'sonar'
-
     ENV_NAME           = 'prod'
     SONAR_BACKEND_KEY  = 'backend-prod'
     SONAR_FRONTEND_KEY = 'frontend-prod'
@@ -20,9 +19,7 @@ pipeline {
     stage('Build backend (Maven + tests)') {
       steps {
         script {
-          docker.image('maven:3.9-eclipse-temurin-17')
-            .inside('--network ci-network') {
-
+          docker.image('maven:3.9-eclipse-temurin-17').inside('--network ci-network') {
             sh """
               cd backend
               mvn clean verify -DskipTests=false
@@ -35,9 +32,7 @@ pipeline {
     stage('SonarQube backend') {
       steps {
         script {
-          docker.image('maven:3.9-eclipse-temurin-17')
-            .inside('--network ci-network') {
-
+          docker.image('maven:3.9-eclipse-temurin-17').inside('--network ci-network') {
             withSonarQubeEnv("${SONARQUBE_SERVER}") {
               sh """
                 cd backend
@@ -69,15 +64,16 @@ pipeline {
     stage('SonarQube frontend') {
       steps {
         script {
-          def scannerHome = tool 'SonarScanner'
-          withSonarQubeEnv("${SONARQUBE_SERVER}") {
-            sh """
-              cd frontend
-              ${scannerHome}/bin/sonar-scanner \
-                -Dsonar.projectKey=${SONAR_FRONTEND_KEY} \
-                -Dsonar.sources=src \
-                -Dsonar.host.url=$SONAR_HOST_URL
-            """
+          docker.image('sonarsource/sonar-scanner-cli:5.0.1').inside('--network ci-network') {
+            withSonarQubeEnv("${SONARQUBE_SERVER}") {
+              sh """
+                cd frontend
+                sonar-scanner \
+                  -Dsonar.projectKey=${SONAR_FRONTEND_KEY} \
+                  -Dsonar.sources=src \
+                  -Dsonar.host.url=$SONAR_HOST_URL
+              """
+            }
           }
         }
       }
@@ -95,11 +91,12 @@ pipeline {
     stage('Deploy ambiente prod') {
       steps {
         sh """
-          docker start oracle-xe      || true
-          docker start backend-prod   || true
-          docker start frontend-prod  || true
+          docker start oracle-xe || true
+          docker start backend-prod  || true
+          docker start frontend-prod || true
         """
       }
     }
+
   }
 }
