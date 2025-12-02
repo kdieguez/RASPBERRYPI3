@@ -126,13 +126,10 @@ Hola equipo,
 El pipeline UAT ha fallado.
 Por favor revisar los logs en Jenkins.
 
-Enlace al build:
-${env.BUILD_URL}
-
 Saludos,
 DevTeam
 """,
-      to: "msblanco@unis.edu.gt, kdieguez@unis.edu.gt, dnatareno@unis.edu.gt"
+      to: "msblanco@unis.edu.gt, kdieguez@unis.edu.gt"
     )
   }
 }
