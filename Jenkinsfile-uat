@@ -1,8 +1,7 @@
 pipeline {
   agent any
-
   environment {
-    SONARQUBE_SERVER   = 'sonar'
+    SONARQUBE_SERVER   = 'sonar'        
     ENV_NAME           = 'uat'
     SONAR_BACKEND_KEY  = 'backend-uat'
     SONAR_FRONTEND_KEY = 'frontend-uat'
@@ -35,8 +34,7 @@ pipeline {
           docker.image('maven:3.9-eclipse-temurin-17').inside('--network ci-network') {
             withSonarQubeEnv("${SONARQUBE_SERVER}") {
               sh """
-                cd backend
-                mvn sonar:sonar \
+                cd backend && mvn sonar:sonar \
                   -Dsonar.projectKey=${SONAR_BACKEND_KEY} \
                   -Dsonar.host.url=$SONAR_HOST_URL
               """
@@ -67,8 +65,7 @@ pipeline {
           docker.image('sonarsource/sonar-scanner-cli:5.0.1').inside('--network ci-network') {
             withSonarQubeEnv("${SONARQUBE_SERVER}") {
               sh """
-                cd frontend
-                sonar-scanner \
+                cd frontend && sonar-scanner \
                   -Dsonar.projectKey=${SONAR_FRONTEND_KEY} \
                   -Dsonar.sources=src \
                   -Dsonar.host.url=$SONAR_HOST_URL
@@ -88,13 +85,35 @@ pipeline {
       }
     }
 
-    stage('Deploy ambiente uat') {
+    stage('Stop & Remove old containers') {
       steps {
         sh """
-          cd infra
-          docker compose up -d backend-${ENV_NAME} frontend-${ENV_NAME}
+          docker stop backend-uat || true
+          docker rm backend-uat || true
+          
+          docker stop frontend-uat || true
+          docker rm frontend-uat || true
         """
       }
     }
-  }
+
+    stage('Deploy ambiente uat') {
+      steps {
+        sh """
+          docker start oracle-xe || true
+
+          docker run -d --name backend-uat \
+            --network ci-network \
+            -p 8082:8080 \
+            aerolineas-backend-uat
+
+          docker run -d --name frontend-uat \
+            --network ci-network \
+            -p 8085:80 \
+            aerolineas-frontend-uat
+        """
+      }
+    }
+
+  } // stages
 }
