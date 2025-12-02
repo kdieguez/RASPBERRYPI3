@@ -19,7 +19,8 @@ pipeline {
     stage('Build backend (Maven + tests)') {
       steps {
         script {
-          docker.image('maven:3.9-eclipse-temurin-17').inside('--network ci-network') {
+          docker.image('maven:3.9-eclipse-temurin-17')
+                .inside('--network ci-network') {
             sh """
               cd backend
               mvn clean verify -DskipTests=false
@@ -32,7 +33,8 @@ pipeline {
     stage('SonarQube backend') {
       steps {
         script {
-          docker.image('maven:3.9-eclipse-temurin-17').inside('--network ci-network') {
+          docker.image('maven:3.9-eclipse-temurin-17')
+                .inside('--network ci-network') {
             withSonarQubeEnv("${SONARQUBE_SERVER}") {
               sh """
                 cd backend
@@ -49,7 +51,8 @@ pipeline {
     stage('Build frontend (Node + tests)') {
       steps {
         script {
-          docker.image('node:20').inside('--network ci-network') {
+          docker.image('node:20')
+                .inside('--network ci-network') {
             sh """
               cd frontend
               npm install
@@ -64,7 +67,8 @@ pipeline {
     stage('SonarQube frontend') {
       steps {
         script {
-          docker.image('sonarsource/sonar-scanner-cli:5.0.1').inside('--network ci-network') {
+          docker.image('sonarsource/sonar-scanner-cli:5.0.1')
+                .inside('--network ci-network') {
             withSonarQubeEnv("${SONARQUBE_SERVER}") {
               sh """
                 cd frontend
@@ -98,5 +102,5 @@ pipeline {
       }
     }
 
-  }
+  } // end stages
 }
