@@ -90,7 +90,7 @@ pipeline {
         sh """
           docker stop backend-dev || true
           docker rm backend-dev || true
-          
+
           docker stop frontend-dev || true
           docker rm frontend-dev || true
         """
@@ -101,7 +101,6 @@ pipeline {
       steps {
         sh """
           docker start oracle-xe || true
-
           docker run -d --name backend-dev --network ci-network -p 8081:8080 aerolineas-backend-dev
           docker run -d --name frontend-dev --network ci-network -p 8084:80 aerolineas-frontend-dev
         """
@@ -109,4 +108,25 @@ pipeline {
     }
 
   } // stages
+
+  post {
+    failure {
+      emailext(
+        subject: "Falló pipeline DEV",
+        body: """
+Hola equipo,
+
+El pipeline DEV ha fallado.
+Por favor revisar los logs en Jenkins.
+
+Enlace al build:
+${env.BUILD_URL}
+
+Saludos,
+DevTeam
+""",
+        to: "msblanco@unis.edu.gt"
+      )
+    }
+  }
 }
