@@ -17,7 +17,7 @@
 .btn:hover{ border-color:#cfcfcf; filter:brightness(0.98); }
 
 .btn-primary{
-  background:var(--primary); color:#fff; border-color:var(--primary);
+  background:var(--primary); color:#104a8e; border-color:var(--primary);
 }
 .btn-primary:hover{ background:var(--primary-700); border-color:var(--primary-700); }
 
