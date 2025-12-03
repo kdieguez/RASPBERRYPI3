@@ -44,8 +44,8 @@
 }
 
 .hdr__cta{
-  background: linear-gradient(90deg, var(--color-primary), #f04545);
-  color: white;
+  background: linear-gradient(90deg, var(--color-primary), #104a8e);
+  color: blue;
   font-weight: 600;
   padding: 10px 16px;
   border-radius: var(--radius);
