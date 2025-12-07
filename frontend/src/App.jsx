@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Register from "./paginas/Registro";
-import Login from "./paginas/Loginses";
+import Login from "./paginas/Login";
 import Perfil from "./paginas/Perfil";
 import ProtectedRoute from "./components/ProtectedRoute";
 import UsuariosList from "./paginas/admin/UsuariosList";

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { comprasApi } from "../api/compras";
 import { getUser } from "../lib/auth";
