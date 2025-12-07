@@ -2,6 +2,7 @@ package com.aerolineas.controller;
 
 import io.javalin.Javalin;
 import io.javalin.http.Context;
+import io.javalin.http.Handler;
 
 import com.aerolineas.dao.ComprasDAO;
 import com.aerolineas.dto.CompraDTO.AddItemReq;
@@ -30,39 +31,60 @@ import com.aerolineas.util.PasswordUtil;
 
 public class ComprasController {
 
-  private final ComprasDAO dao = new ComprasDAO();
-  private final UsuarioDAO usuarioDAO = new UsuarioDAO();
+  private final ComprasDAO dao;
+  private final UsuarioDAO usuarioDAO;
+  private final Handler jwtAuthHandler;
+  private final Handler wsAuthHandler;
+
+  public ComprasController() {
+    this(
+        new ComprasDAO(),
+        new UsuarioDAO(),
+        Auth.jwt(),
+        WebServiceAuth.validate()
+    );
+  }
+
+  public ComprasController(
+      ComprasDAO dao,
+      UsuarioDAO usuarioDAO,
+      Handler jwtAuthHandler,
+      Handler wsAuthHandler
+  ) {
+    this.dao = dao;
+    this.usuarioDAO = usuarioDAO;
+    this.jwtAuthHandler = jwtAuthHandler;
+    this.wsAuthHandler = wsAuthHandler;
+  }
 
   private void authenticate(Context ctx) {
     try {
-      Auth.jwt().handle(ctx);
+      jwtAuthHandler.handle(ctx);
       if (ctx.attribute("claims") != null) {
-        return; 
+        return;
       }
     } catch (Exception e) {
       String wsEmail = ctx.header("X-WebService-Email");
       String wsPassword = ctx.header("X-WebService-Password");
-      
+
       if (wsEmail != null && !wsEmail.isBlank() && wsPassword != null && !wsPassword.isBlank()) {
         try {
-          WebServiceAuth.validate().handle(ctx);
+          wsAuthHandler.handle(ctx);
           if (ctx.attribute("claims") != null) {
-            return; 
+            return;
           }
         } catch (Exception wsEx) {
-
           throw new IllegalStateException("Autenticación requerida: " + wsEx.getMessage());
         }
       } else {
-
         throw new IllegalStateException("Autenticación requerida (JWT o credenciales WebService)");
       }
     }
   }
 
-  private long getUserId(Context ctx) {
+  public long getUserId(Context ctx) {
     authenticate(ctx);
-    
+
     @SuppressWarnings("unchecked")
     Map<String, Object> claims = ctx.attribute("claims");
     if (claims != null) {
@@ -70,7 +92,11 @@ public class ComprasController {
       if (id == null) id = claims.get("id");
       if (id == null) id = claims.get("userId");
       if (id == null) id = claims.get("sub");
-      if (id != null) try { return Long.parseLong(String.valueOf(id)); } catch (Exception ignore) {}
+      if (id != null) {
+        try {
+          return Long.parseLong(String.valueOf(id));
+        } catch (Exception ignore) {}
+      }
     }
     String h = ctx.header("X-User-Id");
     if (h != null && !h.isBlank()) return Long.parseLong(h);
@@ -101,11 +127,13 @@ public class ComprasController {
       f.setAccessible(true);
       Object v = f.get(bean);
       return v == null ? "" : String.valueOf(v);
-    } catch (Exception ignore) { return ""; }
+    } catch (Exception ignore) {
+      return "";
+    }
   }
 
   public void register(Javalin app) {
-    
+
     app.get("/api/dev/test-mail", ctx -> {
       String to = ctx.queryParam("to");
       if (to == null || to.isBlank()) to = ctx.header("X-User-Email");
@@ -116,7 +144,7 @@ public class ComprasController {
       Mailer.send(to, "Prueba SMTP", "<p>Esto es una prueba desde el backend.</p>");
       ctx.result("OK enviado a " + to);
     });
-    
+
     app.get("/api/compras/carrito", ctx -> {
       try {
         long userId = getUserId(ctx);
@@ -139,7 +167,6 @@ public class ComprasController {
         try {
           dao.addOrIncrementItem(userId, req.idVuelo, req.idClase, qty, incluirPareja);
         } catch (NoSuchMethodError | UnsupportedOperationException ex) {
-          
           dao.addOrIncrementItem(userId, req.idVuelo, req.idClase, qty);
         }
         ctx.status(201);
@@ -147,7 +174,7 @@ public class ComprasController {
         ctx.status(400).json(Map.of("error", e.getMessage()));
       }
     });
-    
+
     app.put("/api/compras/items/{idItem}", ctx -> {
       try {
         long userId = getUserId(ctx);
@@ -167,7 +194,7 @@ public class ComprasController {
         ctx.status(400).json(Map.of("error", e.getMessage()));
       }
     });
-    
+
     app.delete("/api/compras/items/{idItem}", ctx -> {
       try {
         long userId = getUserId(ctx);
@@ -188,7 +215,7 @@ public class ComprasController {
         ctx.status(400).json(Map.of("error", e.getMessage()));
       }
     });
-    
+
     app.post("/api/compras/checkout", ctx -> {
       try {
         long userId = getUserId(ctx);
@@ -205,78 +232,70 @@ public class ComprasController {
         if (resumen.items == null || resumen.items.isEmpty())
           throw new IllegalArgumentException("El carrito está vacío.");
 
-        
         @SuppressWarnings("unchecked")
         Map<String, Object> claims = ctx.attribute("claims");
         boolean esWebService = false;
         long idUsuarioWebService = userId;
         if (claims != null) {
           Object rol = claims.get("rol");
-          try { 
+          try {
             int idRol = Integer.parseInt(String.valueOf(rol));
-            esWebService = (idRol == 2); 
+            esWebService = (idRol == 2);
             if (esWebService) {
-              idUsuarioWebService = userId; 
+              idUsuarioWebService = userId;
             }
           } catch (Exception ignore) {}
         }
 
         Long userIdClienteFinal = null;
-        
-        
+
         if (esWebService && req.clienteFinal != null && req.clienteFinal.email != null && !req.clienteFinal.email.isBlank()) {
           String emailCliente = req.clienteFinal.email.trim().toLowerCase();
           String nombresCliente = req.clienteFinal.nombres != null ? req.clienteFinal.nombres.trim() : "";
           String apellidosCliente = req.clienteFinal.apellidos != null ? req.clienteFinal.apellidos.trim() : "";
-          
-          
+
           Usuario usuarioCliente = usuarioDAO.findByEmail(emailCliente);
-          
+
           if (usuarioCliente != null) {
-            
             userIdClienteFinal = usuarioCliente.getIdUsuario();
             System.out.println("[Checkout] Usuario encontrado: " + emailCliente + " (ID: " + userIdClienteFinal + ")");
           } else {
-            
             String passHash = PasswordUtil.hash("agencia123");
             if (nombresCliente.isBlank()) nombresCliente = emailCliente.split("@")[0];
             if (apellidosCliente.isBlank()) apellidosCliente = "";
-            
+
             usuarioCliente = usuarioDAO.createWithRole(emailCliente, passHash, nombresCliente, apellidosCliente, 3);
             userIdClienteFinal = usuarioCliente.getIdUsuario();
             System.out.println("[Checkout] Usuario creado: " + emailCliente + " (ID: " + userIdClienteFinal + ", Rol: 3)");
           }
         }
 
-        
         long idReserva;
         if (esWebService && userIdClienteFinal != null && userIdClienteFinal != userId) {
-          
           idReserva = dao.checkoutConClienteFinal(userId, userIdClienteFinal);
         } else {
-          
           idReserva = dao.checkout(userId);
         }
-        
-        
+
         if (esWebService) {
           try {
             dao.guardarReservaWebService(idReserva, idUsuarioWebService);
             System.out.println("[Checkout] Relación web service-reserva guardada: reserva=" + idReserva + ", ws=" + idUsuarioWebService);
           } catch (Exception e) {
             System.err.println("[Checkout] Error guardando relación web service: " + e.getMessage());
-            
           }
         }
-        
+
         ctx.json(new CheckoutResp(idReserva));
 
-        try { sendEmail(ctx, resumen, idReserva); } catch (Exception ignore) {}
+        try {
+          sendEmail(ctx, resumen, idReserva);
+        } catch (Exception ignore) {}
       } catch (Exception e) {
         ctx.status(400).json(Map.of("error", e.getMessage()));
       }
     });
-   
+
     app.get("/api/compras/reservas", ctx -> {
       try {
         long userId = getUserId(ctx);
@@ -291,26 +310,25 @@ public class ComprasController {
       try {
         long userId = getUserId(ctx);
         long id = Long.parseLong(ctx.pathParam("id"));
-        
-        
+
         @SuppressWarnings("unchecked")
         Map<String, Object> claims = ctx.attribute("claims");
         boolean esWebService = false;
         if (claims != null) {
           Object rol = claims.get("rol");
-          try { 
+          try {
             int idRol = Integer.parseInt(String.valueOf(rol));
-            esWebService = (idRol == 2); 
+            esWebService = (idRol == 2);
           } catch (Exception ignore) {}
         }
-    
+
         var det = esWebService ? dao.getReservaDetalleAdmin(id) : dao.getReservaDetalle(userId, id);
         ctx.json(det);
       } catch (Exception e) {
         ctx.status(400).json(Map.of("error", e.getMessage()));
       }
     });
-   
+
     app.post("/api/compras/reservas/{id}/cancelar", ctx -> {
       try {
         long userId = getUserId(ctx);
@@ -321,10 +339,12 @@ public class ComprasController {
         boolean admin = false;
         if (claims != null) {
           Object rol = claims.get("rol");
-          try { admin = Integer.parseInt(String.valueOf(rol)) == 1; } catch (Exception ignore) {}
+          try {
+            admin = Integer.parseInt(String.valueOf(rol)) == 1;
+          } catch (Exception ignore) {}
         }
 
-        boolean ok = dao.cancelarReserva(userId, id, admin); 
+        boolean ok = dao.cancelarReserva(userId, id, admin);
         if (!ok) {
           ctx.status(409).json(Map.of("error", "La reserva no está en estado cancelable."));
           return;
@@ -341,7 +361,10 @@ public class ComprasController {
         long id = Long.parseLong(ctx.pathParam("id"));
 
         var det = dao.getReservaDetalle(userId, id);
-        if (det == null) { ctx.status(404).json(Map.of("error","Reserva no encontrada")); return; }
+        if (det == null) {
+          ctx.status(404).json(Map.of("error", "Reserva no encontrada"));
+          return;
+        }
 
         String codigo = null;
         try {
@@ -381,7 +404,7 @@ public class ComprasController {
           if (nm != null) nombre = String.valueOf(nm);
         }
 
-        if (email == null || email.isBlank()) email  = ctx.header("X-User-Email");
+        if (email == null || email.isBlank()) email = ctx.header("X-User-Email");
         if (nombre == null || nombre.isBlank()) nombre = ctx.header("X-User-Name");
 
         if (nombre == null || nombre.isBlank()) {
@@ -407,17 +430,17 @@ public class ComprasController {
         ctx.result(pdf);
       } catch (Exception e) {
         e.printStackTrace();
-        ctx.status(400).json(Map.of("error", e.getClass().getSimpleName() + ": " +
+        ctx.status(400).json(Map.of("error",
+            e.getClass().getSimpleName() + ": " +
             (e.getMessage() == null ? "Error generando PDF" : e.getMessage())));
       }
     });
 
-    
-
     app.get("/api/admin/reservas", ctx -> {
-      com.aerolineas.middleware.Auth.jwt().handle(ctx);
+      Auth.jwt().handle(ctx);
       if (ctx.attribute("claims") == null || !isAdmin(ctx)) {
-        ctx.status(403).json(Map.of("error", "solo administradores")); return;
+        ctx.status(403).json(Map.of("error", "solo administradores"));
+        return;
       }
 
       String q       = ctx.queryParam("q");
@@ -427,29 +450,38 @@ public class ComprasController {
       String fDesde  = ctx.queryParam("desde");
       String fHasta  = ctx.queryParam("hasta");
       Integer estado = null;
-      try { estado = ctx.queryParam("estado") == null ? null : Integer.parseInt(ctx.queryParam("estado")); }
-      catch (Exception ignore) {}
+      try {
+        estado = ctx.queryParam("estado") == null ? null : Integer.parseInt(ctx.queryParam("estado"));
+      } catch (Exception ignore) {}
 
-      java.sql.Timestamp tsDesde = null, tsHasta = null;
-      try { if (fDesde != null && !fDesde.isBlank()) tsDesde = java.sql.Timestamp.valueOf(fDesde + " 00:00:00"); } catch (Exception ignore) {}
-      try { if (fHasta != null && !fHasta.isBlank()) tsHasta = java.sql.Timestamp.valueOf(fHasta + " 23:59:59"); } catch (Exception ignore) {}
+      Timestamp tsDesde = null, tsHasta = null;
+      try {
+        if (fDesde != null && !fDesde.isBlank())
+          tsDesde = Timestamp.valueOf(fDesde + " 00:00:00");
+      } catch (Exception ignore) {}
+      try {
+        if (fHasta != null && !fHasta.isBlank())
+          tsHasta = Timestamp.valueOf(fHasta + " 23:59:59");
+      } catch (Exception ignore) {}
 
       var list = dao.listReservasAdmin(q, usuario, codigo, vuelo, tsDesde, tsHasta, estado);
       ctx.json(list);
     });
 
     app.get("/api/admin/reservas/estados", ctx -> {
-      com.aerolineas.middleware.Auth.jwt().handle(ctx);
+      Auth.jwt().handle(ctx);
       if (ctx.attribute("claims") == null || !isAdmin(ctx)) {
-        ctx.status(403).json(Map.of("error", "solo administradores")); return;
+        ctx.status(403).json(Map.of("error", "solo administradores"));
+        return;
       }
       ctx.json(dao.listEstadosReserva());
     });
 
     app.get("/api/admin/reservas/{id}", ctx -> {
-      com.aerolineas.middleware.Auth.jwt().handle(ctx);
+      Auth.jwt().handle(ctx);
       if (ctx.attribute("claims") == null || !isAdmin(ctx)) {
-        ctx.status(403).json(Map.of("error", "solo administradores")); return;
+        ctx.status(403).json(Map.of("error", "solo administradores"));
+        return;
       }
       long id = Long.parseLong(ctx.pathParam("id"));
       var det = dao.getReservaDetalleAdmin(id);
@@ -458,8 +490,8 @@ public class ComprasController {
 
     app.get("/api/public/stats/top-destinos", ctx -> {
       try {
-        String desdeStr = ctx.queryParam("desde"); 
-        String hastaStr = ctx.queryParam("hasta"); 
+        String desdeStr = ctx.queryParam("desde");
+        String hastaStr = ctx.queryParam("hasta");
         String limitStr = ctx.queryParam("limit");
 
         Timestamp desde = null;
@@ -497,8 +529,11 @@ public class ComprasController {
     Map<String, Object> claims = ctx.attribute("claims");
     if (claims == null) return false;
     Object rol = claims.get("rol");
-    try { return Integer.parseInt(String.valueOf(rol)) == 1; }
-    catch (Exception e) { return false; }
+    try {
+      return Integer.parseInt(String.valueOf(rol)) == 1;
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   private void sendEmail(Context ctx, CarritoResp resumen, long idReserva) {

@@ -9,7 +9,15 @@ import java.util.Map;
 
 public class CiudadController {
 
-    private final CiudadDAO dao = new CiudadDAO();
+    private final CiudadDAO dao;
+
+    public CiudadController() {
+        this.dao = new CiudadDAO();
+    }
+
+    public CiudadController(CiudadDAO dao) {
+        this.dao = dao;
+    }
 
     public void routes(Javalin app) {
 
