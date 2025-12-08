@@ -1,0 +1,66 @@
+---
+kind: pipeline
+type: docker
+name: prod
+
+steps:
+  - name: backend-tests-and-sonar
+    image: maven:3.9-eclipse-temurin-17
+    environment:
+      SONAR_TOKEN:
+        from_secret: sonar_token
+      SONAR_HOST_URL:
+        from_secret: sonar_host_url
+    commands:
+      - cd backend
+      - mvn clean verify sonar:sonar \
+          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.host.url=$SONAR_HOST_URL
+
+  - name: frontend-tests
+    image: node:20
+    commands:
+      - cd frontend
+      - npm ci
+      - npm test -- --watch=false --ci
+
+  - name: build-images-prod
+    image: docker:26-cli
+    environment:
+      DOCKER_HOST: tcp://docker:2375
+      DOCKER_USERNAME:
+        from_secret: docker_username
+      DOCKER_PASSWORD:
+        from_secret: docker_password
+    commands:
+      - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+      - docker build -t aerolineas-backend-prod ./backend
+      - docker build -t aerolineas-frontend-prod ./frontend
+
+  - name: deploy-prod
+    image: docker:26-cli
+    environment:
+      DOCKER_HOST: tcp://docker:2375
+    commands:
+      - docker stop backend-prod frontend-prod || true
+      - docker rm backend-prod frontend-prod || true
+
+      - docker run -d --name backend-prod \
+          -p 8083:8080 \
+          aerolineas-backend-prod
+
+      - docker run -d --name frontend-prod \
+          -p 8086:80 \
+          aerolineas-frontend-prod
+
+services:
+  - name: docker
+    image: docker:26-dind
+    privileged: true
+
+trigger:
+  branch:
+    - main
+  event:
+    - push
+    - pull_request
