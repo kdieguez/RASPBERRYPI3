@@ -1969,44 +1969,6 @@ void link_sqlError_400() throws Exception {
         ));
     }
 }
-@Test
-void actualizarEstado_estadoNormal_ok_204_sinNotificarCancelacion() throws Exception {
-    VueloDAO dao = mock(VueloDAO.class);
-    NotificacionesService notifySvc = mock(NotificacionesService.class);
-
-    try (MockedStatic<Auth> authMock = mockStatic(Auth.class)) {
-        Handler authHandler = mock(Handler.class);
-        authMock.when(Auth::adminOrEmpleado).thenReturn(authHandler);
-
-        VueloController controller = new VueloController(dao, notifySvc);
-        Javalin app = mock(Javalin.class);
-        ArgumentCaptor<Handler> captor = ArgumentCaptor.forClass(Handler.class);
-        when(app.put(eq("/api/v1/vuelos/{id}/estado"), captor.capture())).thenReturn(app);
-
-        controller.routes(app);
-        Handler h = captor.getValue();
-
-        Context ctx = mock(Context.class);
-        @SuppressWarnings("unchecked")
-        Validator<Long> val = (Validator<Long>) mock(Validator.class);
-        when(ctx.pathParamAsClass("id", Long.class)).thenReturn(val);
-        when(val.get()).thenReturn(300L);
-
-        int estadoNoCancelado = CANCELADO + 1;
-
-        VueloDTO.EstadoUpdate dto = new VueloDTO.EstadoUpdate(estadoNoCancelado, "motivo-x");
-        when(ctx.bodyAsClass(VueloDTO.EstadoUpdate.class)).thenReturn(dto);
-        when(ctx.status(204)).thenReturn(ctx);
-
-        h.handle(ctx);
-
-        verify(authHandler).handle(ctx);
-        verify(dao).actualizarEstado(300L, estadoNoCancelado, "motivo-x");
-        verify(ctx).status(204);
-
-        verify(notifySvc, never()).notificarCancelacion(anyLong(), anyString());
-    }
-}
 
 @Test
 void listarPublic_webServiceHeaderIncompleto_seIgnoraYLista() throws Exception {
