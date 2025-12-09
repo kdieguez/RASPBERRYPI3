@@ -14,7 +14,11 @@ steps:
         from_secret: sonar_host_url
     commands:
       - cd backend
-      - mvn -DskipTests=false -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true clean verify sonar:sonar
+      - mvn -DskipTests=false \
+           -Dsonar.login=$SONAR_TOKEN \
+           -Dsonar.host.url=$SONAR_HOST_URL \
+           -Dsonar.qualitygate.wait=true \
+           clean verify sonar:sonar
     when:
       event:
         - push
@@ -36,9 +40,11 @@ steps:
   # 3) Build imágenes PROD (solo push a main)
   - name: build-images-prod
     image: docker:26-cli
-    environment:
-      DOCKER_HOST: tcp://docker:2375
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
     commands:
+      - docker version
       - docker build -t aerolineas-backend-prod ./backend
       - docker build -t aerolineas-frontend-prod ./frontend
     when:
@@ -50,8 +56,9 @@ steps:
   # 4) Deploy PROD (solo push a main)
   - name: deploy-prod
     image: docker:26-cli
-    environment:
-      DOCKER_HOST: tcp://docker:2375
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
     commands:
       - docker stop backend-prod frontend-prod || true
       - docker rm backend-prod frontend-prod || true
@@ -69,10 +76,11 @@ steps:
       event:
         - push
 
-services:
-  - name: docker
-    image: docker:26-dind
-    privileged: true
+# Volumen para compartir el Docker del host con los steps
+volumes:
+  - name: dockersock
+    host:
+      path: /var/run/docker.sock
 
 trigger:
   branch:
