@@ -3,6 +3,12 @@ kind: pipeline
 type: docker
 name: prod
 
+# Montamos el socket de Docker del host en los steps que lo necesiten
+volumes:
+  - name: dockersock
+    host:
+      path: /var/run/docker.sock
+
 steps:
   - name: backend-tests-and-sonar
     image: maven:3.9-eclipse-temurin-17
@@ -13,7 +19,10 @@ steps:
         from_secret: sonar_host_url
     commands:
       - cd backend
-      - mvn clean verify sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true
+      - mvn clean verify sonar:sonar \
+          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.host.url=$SONAR_HOST_URL \
+          -Dsonar.qualitygate.wait=true
     when:
       event:
         - push
@@ -32,19 +41,21 @@ steps:
 
   - name: build-images-prod
     image: docker:26-cli
-    environment:
-      DOCKER_HOST: tcp://docker:2375
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
     commands:
       - docker build -t aerolineas-backend-prod ./backend
       - docker build -t aerolineas-frontend-prod ./frontend
     when:
       event:
-        - push   # solo en push (después del merge a main)
+        - push   # solo cuando ya se hace push a main (después del merge)
 
   - name: deploy-prod
     image: docker:26-cli
-    environment:
-      DOCKER_HOST: tcp://docker:2375
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
     commands:
       - docker stop backend-prod frontend-prod || true
       - docker rm backend-prod frontend-prod || true
@@ -59,11 +70,6 @@ steps:
     when:
       event:
         - push   # igual, solo en push (no en pull_request)
-
-services:
-  - name: docker
-    image: docker:26-dind
-    privileged: true
 
 trigger:
   branch:
