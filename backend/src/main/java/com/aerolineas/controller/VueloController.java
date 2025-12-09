@@ -258,44 +258,51 @@ public class VueloController {
       }
     });
 
-    app.put("/api/v1/vuelos/{id}/estado", ctx -> {
-      Auth.adminOrEmpleado().handle(ctx);
-      long idVuelo = ctx.pathParamAsClass("id", Long.class).get();
-      var dto = ctx.bodyAsClass(VueloDTO.EstadoUpdate.class);
-      if (dto.idEstado() == null) {
-        ctx.status(400).json(Map.of("error", "idEstado es requerido"));
-        return;
-      }
-      if (dto.idEstado() == CANCELADO) {
-        String mot = dto.motivo();
-        if (mot == null || mot.isBlank()) {
-          ctx.status(400).json(Map.of("error", "motivo es requerido para cancelar"));
-          return;
-        }
-      }
-      try {
-        dao.actualizarEstado(idVuelo, dto.idEstado(), dto.motivo());
-        ctx.status(204);
+app.put("/api/v1/vuelos/{id}/estado", ctx -> {
+  Auth.adminOrEmpleado().handle(ctx);
+  long idVuelo = ctx.pathParamAsClass("id", Long.class).get();
+  var dto = ctx.bodyAsClass(VueloDTO.EstadoUpdate.class);
 
-        if (dto.idEstado() == CANCELADO) {
-          new Thread(() -> {
-            try {
-              notifySvc.notificarCancelacion(idVuelo, dto.motivo());
-            } catch (Exception ignore) {}
-          }, "mail-cancel-vuelo-" + idVuelo).start();
-        }
+  if (dto.idEstado() == null) {
+    ctx.status(400).json(Map.of("error", "idEstado es requerido"));
+    return;
+  }
 
-      } catch (SQLException e) {
-        String msg = e.getMessage() == null ? "" : e.getMessage();
-        if (msg.contains("no existe")) {
-          ctx.status(404).json(Map.of("error", msg));
-        } else if (msg.contains("cancelado") || msg.contains("inválido") || msg.contains("motivo")) {
-          ctx.status(409).json(Map.of("error", msg));
-        } else {
-          ctx.status(400).json(Map.of("error", msg));
-        }
-      }
-    });
+  // 👉 Calculamos una sola vez si es cancelación
+  boolean esCancelacion = dto.idEstado() == CANCELADO;
+
+  // Validación extra solo si es cancelación
+  if (esCancelacion) {
+    String mot = dto.motivo();
+    if (mot == null || mot.isBlank()) {
+      ctx.status(400).json(Map.of("error", "motivo es requerido para cancelar"));
+      return;
+    }
+  }
+
+  try {
+    dao.actualizarEstado(idVuelo, dto.idEstado(), dto.motivo());
+    ctx.status(204);
+
+    if (esCancelacion) {
+      new Thread(() -> {
+        try {
+          notifySvc.notificarCancelacion(idVuelo, dto.motivo());
+        } catch (Exception ignore) {}
+      }, "mail-cancel-vuelo-" + idVuelo).start();
+    }
+
+  } catch (SQLException e) {
+    String msg = e.getMessage() == null ? "" : e.getMessage();
+    if (msg.contains("no existe")) {
+      ctx.status(404).json(Map.of("error", msg));
+    } else if (msg.contains("cancelado") || msg.contains("inválido") || msg.contains("motivo")) {
+      ctx.status(409).json(Map.of("error", msg));
+    } else {
+      ctx.status(400).json(Map.of("error", msg));
+    }
+  }
+});
 
     // ----- vuelos con escala (admin) -----
     app.post("/api/v1/admin/vuelos/con-escala", ctx -> {
