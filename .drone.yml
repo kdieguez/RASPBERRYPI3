@@ -3,7 +3,7 @@ kind: pipeline
 type: docker
 name: prod
 
-# Volumen para usar el Docker del host
+# Usar el Docker del host
 volumes:
   - name: dockersock
     host:
@@ -46,7 +46,7 @@ steps:
       - docker build -t aerolineas-frontend-prod ./frontend
     when:
       event:
-        - push   # solo cuando ya se hace push a main (después del merge)
+        - push   # solo cuando ya se hace push a main
 
   - name: deploy-prod
     image: docker:26-cli
@@ -56,17 +56,11 @@ steps:
     commands:
       - docker stop backend-prod frontend-prod || true
       - docker rm backend-prod frontend-prod || true
-
-      - docker run -d --name backend-prod \
-          -p 8083:8080 \
-          aerolineas-backend-prod
-
-      - docker run -d --name frontend-prod \
-          -p 8086:80 \
-          aerolineas-frontend-prod
+      - docker run -d --name backend-prod -p 8083:8080 aerolineas-backend-prod
+      - docker run -d --name frontend-prod -p 8086:80 aerolineas-frontend-prod
     when:
       event:
-        - push   # igual, solo en push (no en pull_request)
+        - push   # solo en push, no en pull_request
 
 trigger:
   branch:
