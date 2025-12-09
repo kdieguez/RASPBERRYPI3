@@ -4,7 +4,7 @@ type: docker
 name: dev
 
 steps:
-  - name: backend-tests-and-sonar-dev
+  - name: backend-tests-and-sonar
     image: maven:3.9-eclipse-temurin-17
     environment:
       SONAR_TOKEN:
@@ -13,7 +13,7 @@ steps:
         from_secret: sonar_host_url
     commands:
       - cd backend
-      # Tests + Sonar + Quality Gate (dev)
+      # Tests + Sonar + Quality Gate
       - mvn -B -DskipTests=false clean verify sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true
     when:
       branch:
@@ -22,7 +22,7 @@ steps:
         - push
         - pull_request
 
-  - name: frontend-tests-dev
+  - name: frontend-tests
     image: node:20
     commands:
       - cd frontend
@@ -47,7 +47,7 @@ steps:
       branch:
         - dev
       event:
-        - push          # solo después de push a dev
+        - push          # solo después del merge a dev
 
   - name: deploy-dev
     image: docker:26-cli
@@ -66,36 +66,7 @@ steps:
       event:
         - push          # deploy solo en push a dev
 
-  # enviar correo si algo del pipeline falla (dev)
-  - name: notify-failure-email-dev
-    image: drillster/drone-email
-    settings:
-      host:
-        from_secret: smtp_host
-      username:
-        from_secret: smtp_user
-      password:
-        from_secret: smtp_password
-      from:
-        from_secret: smtp_from
-      recipients:
-        from_secret: notify_to
-      subject: "[Drone][DEV] Falló pipeline ${DRONE_REPO_NAME} #${DRONE_BUILD_NUMBER}"
-      body: >
-        Hola,
-        el pipeline (DEV) del repositorio ${DRONE_REPO_NAME} ha fallado.
-        Rama: ${DRONE_BRANCH}
-        Autor: ${DRONE_COMMIT_AUTHOR}
-        Mensaje del commit: ${DRONE_COMMIT_MESSAGE}
-        Estado: ${DRONE_BUILD_STATUS}
-        Revisa el detalle aquí: ${DRONE_BUILD_LINK}
-    when:
-      status:
-        - failure
-      branch:
-        - dev
-
-# Usamos el Docker del host (NO DIND) también en dev
+# Usamos el Docker del host (NO DIND)
 volumes:
   - name: docker_sock
     host:
@@ -107,5 +78,3 @@ trigger:
   event:
     - push
     - pull_request
-
-    
