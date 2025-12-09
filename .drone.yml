@@ -14,10 +14,7 @@ steps:
     commands:
       - cd backend
       # Tests + Sonar + Quality Gate (dev)
-      - mvn -B -DskipTests=false clean verify sonar:sonar \
-          -Dsonar.login=$SONAR_TOKEN \
-          -Dsonar.host.url=$SONAR_HOST_URL \
-          -Dsonar.qualitygate.wait=true
+      - mvn -B -DskipTests=false clean verify sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true
     when:
       branch:
         - dev
@@ -50,7 +47,7 @@ steps:
       branch:
         - dev
       event:
-        - push          # solo después de push a rama dev
+        - push          # solo después de push a dev
 
   - name: deploy-dev
     image: docker:26-cli
