@@ -14,15 +14,11 @@ steps:
         from_secret: sonar_host_url
     commands:
       - cd backend
-      # Usamos SOLO las env vars, sin -Dsonar.host.url ni -Dsonar.login
-      - mvn -B clean verify sonar:sonar \
-          -DskipTests=false \
-          -Dsonar.qualitygate.wait=true
+      - mvn -B -DskipTests=false -Dsonar.qualitygate.wait=true clean verify sonar:sonar
     when:
       event:
         - push
         - pull_request
-
   # 2) Tests frontend (Vitest)
   - name: frontend-tests
     image: node:20
