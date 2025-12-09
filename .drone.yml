@@ -13,7 +13,7 @@ steps:
         from_secret: sonar_host_url
     commands:
       - cd backend
-      # Tests + Sonar + Quality Gate (CORREGIDO: todo en una sola línea)
+      # Tests + Sonar + Quality Gate (uat)
       - mvn -B -DskipTests=false clean verify sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true
     when:
       branch:
@@ -65,6 +65,35 @@ steps:
         - uat
       event:
         - push          # deploy solo en push a uat
+
+  # enviar correo si algo del pipeline falla (uat)
+  - name: notify-failure-email-uat
+    image: drillster/drone-email
+    settings:
+      host:
+        from_secret: smtp_host
+      username:
+        from_secret: smtp_user
+      password:
+        from_secret: smtp_password
+      from:
+        from_secret: smtp_from
+      recipients:
+        from_secret: notify_to
+      subject: "[Drone][UAT] Falló pipeline ${DRONE_REPO_NAME} #${DRONE_BUILD_NUMBER}"
+      body: >
+        Hola,
+        el pipeline (UAT) del repositorio ${DRONE_REPO_NAME} ha fallado.
+        Rama: ${DRONE_BRANCH}
+        Autor: ${DRONE_COMMIT_AUTHOR}
+        Mensaje del commit: ${DRONE_COMMIT_MESSAGE}
+        Estado: ${DRONE_BUILD_STATUS}
+        Revisa el detalle aquí: ${DRONE_BUILD_LINK}
+    when:
+      status:
+        - failure
+      branch:
+        - uat
 
 # Usamos el Docker del host (NO DIND)
 volumes:
