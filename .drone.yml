@@ -15,7 +15,12 @@ steps:
       - cd backend
       - mvn clean verify sonar:sonar \
           -Dsonar.login=$SONAR_TOKEN \
-          -Dsonar.host.url=$SONAR_HOST_URL
+          -Dsonar.host.url=$SONAR_HOST_URL \
+          -Dsonar.qualitygate.wait=true
+    when:
+      event:
+        - push
+        - pull_request
 
   - name: frontend-tests
     image: node:20
@@ -23,6 +28,10 @@ steps:
       - cd frontend
       - npm ci
       - npm test -- --watch=false --ci
+    when:
+      event:
+        - push
+        - pull_request
 
   - name: build-images-prod
     image: docker:26-cli
@@ -36,6 +45,9 @@ steps:
       - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
       - docker build -t aerolineas-backend-prod ./backend
       - docker build -t aerolineas-frontend-prod ./frontend
+    when:
+      event:
+        - push   # solo cuando ya se hace push a main (después del merge)
 
   - name: deploy-prod
     image: docker:26-cli
@@ -52,6 +64,9 @@ steps:
       - docker run -d --name frontend-prod \
           -p 8086:80 \
           aerolineas-frontend-prod
+    when:
+      event:
+        - push   # igual, solo en push (no en pull_request)
 
 services:
   - name: docker
