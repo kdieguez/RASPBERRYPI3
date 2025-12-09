@@ -13,17 +13,28 @@ import java.time.Period;
 import java.util.Map;
 
 public class PerfilController {
-  private final UsuarioDAO usuarios = new UsuarioDAO();
-  private final PasajeroDAO pasajeros = new PasajeroDAO();
-  private final PaisDAO paises = new PaisDAO();
+
+  private final UsuarioDAO usuarios;
+  private final PasajeroDAO pasajeros;
+  private final PaisDAO paises;
+
+  public PerfilController() {
+    this(new UsuarioDAO(), new PasajeroDAO(), new PaisDAO());
+  }
+
+  public PerfilController(UsuarioDAO usuarios, PasajeroDAO pasajeros, PaisDAO paises) {
+    this.usuarios = usuarios;
+    this.pasajeros = pasajeros;
+    this.paises = paises;
+  }
 
   public record UpdPerfilReq(
       String nombres,
       String apellidos,
-      String newPassword,     
-      String fechaNacimiento, 
-      Long idPais,            
-      String pasaporte        
+      String newPassword,
+      String fechaNacimiento,
+      Long idPais,
+      String pasaporte
   ) {}
 
   public record PasajeroView(Long idPasajero, String fechaNacimiento, Integer edad,
@@ -59,7 +70,9 @@ public class PerfilController {
               p.getPasaporte()
           );
 
-      PerfilView out = new PerfilView(u.getIdUsuario(), u.getEmail(), u.getNombres(), u.getApellidos(), u.getIdRol(), pv);
+      PerfilView out = new PerfilView(
+          u.getIdUsuario(), u.getEmail(), u.getNombres(), u.getApellidos(), u.getIdRol(), pv
+      );
       ctx.json(out);
     } catch (Exception e) {
       ctx.status(500).json(Map.of("error", "No se pudo obtener el perfil"));

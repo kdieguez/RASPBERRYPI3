@@ -4,6 +4,7 @@ import com.aerolineas.config.DB;
 import java.sql.*;
 import java.util.*;
 import java.math.BigDecimal;
+import java.util.function.Supplier;
 
 import com.aerolineas.dto.CompraDTO;
 import com.aerolineas.dto.CompraDTO.CarritoItem;
@@ -13,19 +14,55 @@ import com.aerolineas.dto.CompraDTO.ReservaItem;
 import com.aerolineas.dto.CompraDTO.ReservaListItem;
 
 public class ComprasDAO {
+  private final Supplier<Connection> connSupplier;
 
-  private static Connection getConn() throws SQLException {
-    try {
-      Class<?> dbClass = Class.forName("com.aerolineas.config.DB");
+  public ComprasDAO() {
+    this(() -> {
       try {
-        var m = dbClass.getMethod("getConnection");
-        return (Connection) m.invoke(null);
-      } catch (NoSuchMethodException nsme) {
-        var m = dbClass.getMethod("get");
-        return (Connection) m.invoke(null);
+        return getRealConnection();
+      } catch (SQLException e) {
+        throw new RuntimeException(e);
       }
+    });
+  }
+
+  public ComprasDAO(Supplier<Connection> connSupplier) {
+    this.connSupplier = connSupplier;
+  }
+
+private static Connection getRealConnection() throws SQLException {
+    try {
+        return DB.getConnection();
+    } catch (SQLException e) {
+        String base = "No se pudo obtener conexión desde DB:";
+        String msg = e.getMessage();
+        if (msg != null && !msg.isBlank()) {
+            base += " " + msg;
+        }
+        throw new SQLException(base, e);
     } catch (Exception e) {
-      throw new SQLException("No se pudo obtener conexión desde DB: " + e.getMessage(), e);
+
+        String base = "No se pudo obtener conexión desde DB:";
+        String msg = e.getMessage();
+        if (msg != null && !msg.isBlank()) {
+            base += " " + msg;
+        }
+        throw new SQLException(base, e);
+    }
+}
+
+  private Connection getConn() throws SQLException {
+    try {
+      return DB.getConnection();
+    } catch (Exception  e) {
+      String baseMsg = "No se pudo obtener conexión desde DB:";
+        String detail = e.getMessage();
+
+        String msg = (detail == null || detail.isBlank())
+                ? baseMsg
+                : baseMsg + " " + detail;
+
+        throw new SQLException(msg, e);
     }
   }
 
@@ -1162,5 +1199,5 @@ public class ComprasDAO {
     }
     return out;
   }
-
+  
 }

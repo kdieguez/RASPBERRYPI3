@@ -3,9 +3,17 @@ package com.aerolineas.util;
 import org.mindrot.jbcrypt.BCrypt;
 
 public class PasswordUtil {
+
   private static int cost() {
-    try { return Integer.parseInt(System.getenv().getOrDefault("BCRYPT_COST", "10")); }
-    catch (Exception e) { return 10; }
+    String raw = System.getenv("BCRYPT_COST");
+    if (raw == null || raw.isBlank()) {
+      raw = System.getProperty("BCRYPT_COST", "10");
+    }
+    try {
+      return Integer.parseInt(raw);
+    } catch (Exception e) {
+      return 10;
+    }
   }
 
   public static String hash(String plain) {

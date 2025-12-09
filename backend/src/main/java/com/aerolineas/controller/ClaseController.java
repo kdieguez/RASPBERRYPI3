@@ -4,16 +4,29 @@ import com.aerolineas.dao.ClaseDAO;
 import com.aerolineas.middleware.WebServiceAuth;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
+import io.javalin.http.Handler;
 
 public class ClaseController {
-  private final ClaseDAO dao = new ClaseDAO();
 
-  private void validateOptionalWebService(Context ctx) throws Exception {
+  private final ClaseDAO dao;
+  private final Handler wsValidator;
+
+  public ClaseController() {
+    this(new ClaseDAO(), WebServiceAuth.validate());
+  }
+
+  public ClaseController(ClaseDAO dao, Handler wsValidator) {
+    this.dao = dao;
+    this.wsValidator = wsValidator;
+  }
+
+  void validateOptionalWebService(Context ctx) throws Exception {
     String wsEmail = ctx.header("X-WebService-Email");
     String wsPassword = ctx.header("X-WebService-Password");
-    
-    if (wsEmail != null && !wsEmail.isBlank() && wsPassword != null && !wsPassword.isBlank()) {
-      WebServiceAuth.validate().handle(ctx);
+
+    if (wsEmail != null && !wsEmail.isBlank()
+        && wsPassword != null && !wsPassword.isBlank()) {
+      wsValidator.handle(ctx);
     }
   }
 
