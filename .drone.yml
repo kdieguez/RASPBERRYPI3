@@ -1,0 +1,83 @@
+---
+kind: pipeline
+type: docker
+name: dev
+
+steps:
+  - name: backend-tests-and-sonar-dev
+    image: maven:3.9-eclipse-temurin-17
+    environment:
+      SONAR_TOKEN:
+        from_secret: sonar_token
+      SONAR_HOST_URL:
+        from_secret: sonar_host_url
+    commands:
+      - cd backend
+      # Tests + Sonar + Quality Gate (dev)
+      - mvn -B -DskipTests=false clean verify sonar:sonar \
+          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.host.url=$SONAR_HOST_URL \
+          -Dsonar.qualitygate.wait=true
+    when:
+      branch:
+        - dev
+      event:
+        - push
+        - pull_request
+
+  - name: frontend-tests-dev
+    image: node:20
+    commands:
+      - cd frontend
+      - npm ci
+      - npm test -- --watch=false
+    when:
+      branch:
+        - dev
+      event:
+        - push
+        - pull_request
+
+  - name: build-images-dev
+    image: docker:26-cli
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
+    commands:
+      - docker build -t aerolineas-backend-dev ./backend
+      - docker build -t aerolineas-frontend-dev ./frontend
+    when:
+      branch:
+        - dev
+      event:
+        - push          # solo después de push a rama dev
+
+  - name: deploy-dev
+    image: docker:26-cli
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
+    commands:
+      - docker stop backend-dev frontend-dev || true
+      - docker rm backend-dev frontend-dev || true
+
+      - docker run -d --name backend-dev -p 8081:8080 aerolineas-backend-dev
+      - docker run -d --name frontend-dev -p 8084:80 aerolineas-frontend-dev
+    when:
+      branch:
+        - dev
+      event:
+        - push          # deploy solo en push a dev
+
+# Usamos el Docker del host (NO DIND) también en dev
+volumes:
+  - name: docker_sock
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  branch:
+    - dev
+  event:
+    - push
+    - pull_request
