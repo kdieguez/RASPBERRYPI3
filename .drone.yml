@@ -13,15 +13,11 @@ steps:
         from_secret: sonar_host_url
     commands:
       - cd backend
-      - mvn clean verify sonar:sonar \
-          -Dsonar.login=$SONAR_TOKEN \
-          -Dsonar.host.url=$SONAR_HOST_URL \
-          -Dsonar.qualitygate.wait=true
+      - mvn clean verify sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true
     when:
       event:
         - push
         - pull_request
-
   - name: frontend-tests
     image: node:20
     commands:
