@@ -13,14 +13,14 @@ steps:
         from_secret: sonar_host_url
     commands:
       - cd backend
-      # Tests + Sonar + Quality Gate en un solo comando
+      # Tests + Sonar + Quality Gate
       - mvn -B -DskipTests=false clean verify sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true
     when:
       branch:
-        - main          # prod = main
+        - main
       event:
         - push
-        - pull_request  # también cuando es PR
+        - pull_request
 
   - name: frontend-tests
     image: node:20
@@ -37,8 +37,9 @@ steps:
 
   - name: build-images-prod
     image: docker:26-cli
-    environment:
-      DOCKER_HOST: tcp://docker:2375
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
     commands:
       - docker build -t aerolineas-backend-prod ./backend
       - docker build -t aerolineas-frontend-prod ./frontend
@@ -46,30 +47,30 @@ steps:
       branch:
         - main
       event:
-        - push   # solo en push a main (después del merge)
+        - push          # solo después del merge a main
 
   - name: deploy-prod
     image: docker:26-cli
-    environment:
-      DOCKER_HOST: tcp://docker:2375
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
     commands:
       - docker stop backend-prod frontend-prod || true
       - docker rm backend-prod frontend-prod || true
-      # OJO: todo en una sola línea, sin '\'
+
       - docker run -d --name backend-prod -p 8083:8080 aerolineas-backend-prod
       - docker run -d --name frontend-prod -p 8086:80 aerolineas-frontend-prod
     when:
       branch:
         - main
       event:
-        - push   # deploy solo cuando ya hubo merge a main
+        - push          # deploy solo en push a main
 
-services:
-  - name: docker
-    image: docker:26-dind
-    privileged: true
-    environment:
-      DOCKER_TLS_CERTDIR: ""
+# Usamos el Docker del host (NO DIND)
+volumes:
+  - name: docker_sock
+    host:
+      path: /var/run/docker.sock
 
 trigger:
   branch:
