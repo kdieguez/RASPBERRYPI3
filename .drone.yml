@@ -23,7 +23,7 @@ steps:
     commands:
       - cd frontend
       - npm ci
-      - npm test -- --watch=false --ci
+      - npx vitest run
     when:
       event:
         - push
