@@ -4,7 +4,7 @@ type: docker
 name: prod
 
 steps:
-  # 1) Tests + SonarQube backend
+  # 1) Backend: tests + SonarQube (con Quality Gate)
   - name: backend-tests-and-sonar
     image: maven:3.9-eclipse-temurin-17
     environment:
@@ -14,11 +14,10 @@ steps:
         from_secret: sonar_host_url
     commands:
       - cd backend
-      - mvn -DskipTests=false \
-           -Dsonar.login=$SONAR_TOKEN \
-           -Dsonar.host.url=$SONAR_HOST_URL \
-           -Dsonar.qualitygate.wait=true \
-           clean verify sonar:sonar
+      # Usamos SOLO las env vars, sin -Dsonar.host.url ni -Dsonar.login
+      - mvn -B clean verify sonar:sonar \
+          -DskipTests=false \
+          -Dsonar.qualitygate.wait=true
     when:
       event:
         - push
@@ -36,14 +35,13 @@ steps:
         - push
         - pull_request
 
-  # 3) Build imágenes PROD (solo push a main)
+  # 3) Build imágenes PROD (solo cuando hay push a main)
   - name: build-images-prod
     image: docker:26-cli
     volumes:
       - name: dockersock
         path: /var/run/docker.sock
     commands:
-      - docker version
       - docker build -t aerolineas-backend-prod ./backend
       - docker build -t aerolineas-frontend-prod ./frontend
     when:
@@ -52,7 +50,7 @@ steps:
       event:
         - push
 
-  # 4) Deploy PROD (solo push a main)
+  # 4) Deploy PROD (solo cuando hay push a main)
   - name: deploy-prod
     image: docker:26-cli
     volumes:
