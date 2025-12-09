@@ -1,3 +1,9 @@
+---
+kind: pipeline
+type: docker
+name: uat
+
+steps:
   - name: backend-tests-and-sonar-uat
     image: maven:3.9-eclipse-temurin-17
     environment:
@@ -7,6 +13,7 @@
         from_secret: sonar_host_url
     commands:
       - cd backend
+      # Tests + Sonar + Quality Gate (CORREGIDO: todo en una sola línea)
       - mvn -B -DskipTests=false clean verify sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true
     when:
       branch:
@@ -14,3 +21,60 @@
       event:
         - push
         - pull_request
+
+  - name: frontend-tests-uat
+    image: node:20
+    commands:
+      - cd frontend
+      - npm ci
+      - npm test -- --watch=false
+    when:
+      branch:
+        - uat
+      event:
+        - push
+        - pull_request
+
+  - name: build-images-uat
+    image: docker:26-cli
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
+    commands:
+      - docker build -t aerolineas-backend-uat ./backend
+      - docker build -t aerolineas-frontend-uat ./frontend
+    when:
+      branch:
+        - uat
+      event:
+        - push          # solo después del merge a uat
+
+  - name: deploy-uat
+    image: docker:26-cli
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
+    commands:
+      - docker stop backend-uat frontend-uat || true
+      - docker rm backend-uat frontend-uat || true
+
+      - docker run -d --name backend-uat -p 8082:8080 aerolineas-backend-uat
+      - docker run -d --name frontend-uat -p 8085:80 aerolineas-frontend-uat
+    when:
+      branch:
+        - uat
+      event:
+        - push          # deploy solo en push a uat
+
+# Usamos el Docker del host (NO DIND)
+volumes:
+  - name: docker_sock
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  branch:
+    - uat
+  event:
+    - push
+    - pull_request
