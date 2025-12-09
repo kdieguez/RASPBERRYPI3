@@ -13,74 +13,84 @@ import java.util.Map;
 
 public class ContenidoHomeController {
 
-  private final TipDAO tipDAO = new TipDAO();
-  private final NoticiaDAO noticiaDAO = new NoticiaDAO();
+    private final TipDAO tipDAO;
+    private final NoticiaDAO noticiaDAO;
 
-  public void routes(Javalin app) {
+    public ContenidoHomeController() {
+        this(new TipDAO(), new NoticiaDAO());
+    }
 
-    app.get("/api/public/tips", ctx -> {
-      List<TipDTO> tips = tipDAO.listar();
-      ctx.json(tips);
-    });
+    public ContenidoHomeController(TipDAO tipDAO, NoticiaDAO noticiaDAO) {
+        this.tipDAO = tipDAO;
+        this.noticiaDAO = noticiaDAO;
+    }
 
-    app.get("/api/public/noticias", ctx -> {
-      List<NoticiaDTO> noticias = noticiaDAO.listar();
-      ctx.json(noticias);
-    });
+    public void routes(Javalin app) {
 
-    app.get("/api/v1/admin/tips", ctx -> {
-      Auth.adminOrEmpleado().handle(ctx);
-      ctx.json(tipDAO.listar());
-    });
+        app.get("/api/public/tips", ctx -> {
+            List<TipDTO> tips = tipDAO.listar();
+            ctx.json(tips);
+        });
 
-    app.post("/api/v1/admin/tips", ctx -> {
-      Auth.adminOrEmpleado().handle(ctx);
-      TipDTO.Upsert dto = ctx.bodyAsClass(TipDTO.Upsert.class);
-      long id = tipDAO.crear(dto);
-      ctx.status(201).json(Map.of("idTip", id));
-    });
+        app.get("/api/public/noticias", ctx -> {
+            List<NoticiaDTO> noticias = noticiaDAO.listar();
+            ctx.json(noticias);
+        });
 
-    app.put("/api/v1/admin/tips/{id}", ctx -> {
-      Auth.adminOrEmpleado().handle(ctx);
-      long id = ctx.pathParamAsClass("id", Long.class).get();
-      TipDTO.Upsert dto = ctx.bodyAsClass(TipDTO.Upsert.class);
-      tipDAO.actualizar(id, dto);
-      ctx.status(204);
-    });
+        app.get("/api/v1/admin/tips", ctx -> {
+            Auth.adminOrEmpleado().handle(ctx);
+            ctx.json(tipDAO.listar());
+        });
 
-    app.delete("/api/v1/admin/tips/{id}", ctx -> {
-      Auth.adminOrEmpleado().handle(ctx);
-      long id = ctx.pathParamAsClass("id", Long.class).get();
-      tipDAO.eliminar(id);
-      ctx.status(204);
-    });
+        app.post("/api/v1/admin/tips", ctx -> {
+            Auth.adminOrEmpleado().handle(ctx);
+            TipDTO.Upsert dto = ctx.bodyAsClass(TipDTO.Upsert.class);
+            long id = tipDAO.crear(dto);
+            ctx.status(201).json(Map.of("idTip", id));
+        });
 
-    app.get("/api/v1/admin/noticias", ctx -> {
-      Auth.adminOrEmpleado().handle(ctx);
-      ctx.json(noticiaDAO.listar());
-    });
+        app.put("/api/v1/admin/tips/{id}", ctx -> {
+            Auth.adminOrEmpleado().handle(ctx);
+            long id = ctx.pathParamAsClass("id", Long.class).get();
+            TipDTO.Upsert dto = ctx.bodyAsClass(TipDTO.Upsert.class);
+            tipDAO.actualizar(id, dto);
+            ctx.status(204);
+        });
 
-    app.post("/api/v1/admin/noticias", ctx -> {
-      Auth.adminOrEmpleado().handle(ctx);
-      NoticiaDTO.Upsert dto = ctx.bodyAsClass(NoticiaDTO.Upsert.class);
-      long id = noticiaDAO.crear(dto);
-      ctx.status(201).json(Map.of("idNoticia", id));
-    });
+        app.delete("/api/v1/admin/tips/{id}", ctx -> {
+            Auth.adminOrEmpleado().handle(ctx);
+            long id = ctx.pathParamAsClass("id", Long.class).get();
+            tipDAO.eliminar(id);
+            ctx.status(204);
+        });
 
-    app.put("/api/v1/admin/noticias/{id}", ctx -> {
-      Auth.adminOrEmpleado().handle(ctx);
-      long id = ctx.pathParamAsClass("id", Long.class).get();
-      NoticiaDTO.Upsert dto = ctx.bodyAsClass(NoticiaDTO.Upsert.class);
-      noticiaDAO.actualizar(id, dto);
-      ctx.status(204);
-    });
+        app.get("/api/v1/admin/noticias", ctx -> {
+            Auth.adminOrEmpleado().handle(ctx);
+            ctx.json(noticiaDAO.listar());
+        });
 
-    app.delete("/api/v1/admin/noticias/{id}", ctx -> {
-      Auth.adminOrEmpleado().handle(ctx);
-      long id = ctx.pathParamAsClass("id", Long.class).get();
-      noticiaDAO.eliminar(id);
-      ctx.status(204);
-    });
-    app.exception(Exception.class, JsonErrorHandler.of(500));
-  }
+        app.post("/api/v1/admin/noticias", ctx -> {
+            Auth.adminOrEmpleado().handle(ctx);
+            NoticiaDTO.Upsert dto = ctx.bodyAsClass(NoticiaDTO.Upsert.class);
+            long id = noticiaDAO.crear(dto);
+            ctx.status(201).json(Map.of("idNoticia", id));
+        });
+
+        app.put("/api/v1/admin/noticias/{id}", ctx -> {
+            Auth.adminOrEmpleado().handle(ctx);
+            long id = ctx.pathParamAsClass("id", Long.class).get();
+            NoticiaDTO.Upsert dto = ctx.bodyAsClass(NoticiaDTO.Upsert.class);
+            noticiaDAO.actualizar(id, dto);
+            ctx.status(204);
+        });
+
+        app.delete("/api/v1/admin/noticias/{id}", ctx -> {
+            Auth.adminOrEmpleado().handle(ctx);
+            long id = ctx.pathParamAsClass("id", Long.class).get();
+            noticiaDAO.eliminar(id);
+            ctx.status(204);
+        });
+
+        app.exception(Exception.class, JsonErrorHandler.of(500));
+    }
 }

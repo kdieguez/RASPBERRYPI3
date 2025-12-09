@@ -153,6 +153,10 @@ public class DB {
     catch (Exception e) { return false; }
   }
 
+    static void resetForTests() {
+    schema = null;
+  }
+
   /**
    * Obtiene el schema de Oracle configurado.
    * Prioridad:
@@ -162,6 +166,7 @@ public class DB {
    * 4. Fallback a "AEROLINEA"
    * @return El nombre del schema en mayúsculas
    */
+
   public static String getSchema() {
     if (schema == null) {
       String schemaProp = System.getProperty("schema");

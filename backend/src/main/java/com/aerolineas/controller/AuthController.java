@@ -6,7 +6,6 @@ import com.aerolineas.dto.AuthDTOs.LoginResponse;
 import com.aerolineas.dto.AuthDTOs.RegisterRequest;
 import com.aerolineas.dto.AuthDTOs.UserView;
 import com.aerolineas.model.Usuario;
-import com.aerolineas.util.CaptchaUtil;
 import com.aerolineas.util.JwtUtil;
 import com.aerolineas.util.PasswordUtil;
 import io.javalin.http.Context;
@@ -15,7 +14,15 @@ import java.util.Map;
 
 public class AuthController {
 
-  private final UsuarioDAO usuarios = new UsuarioDAO();
+  private final UsuarioDAO usuarios;
+
+  public AuthController() {
+    this.usuarios = new UsuarioDAO();
+  }
+  
+  public AuthController(UsuarioDAO usuarios) {
+    this.usuarios = usuarios;
+  }
 
   private static String normEmail(String e) {
     return e == null ? null : e.trim().toLowerCase();
@@ -34,14 +41,27 @@ public class AuthController {
     ));
   }
 
-  public void register(Context ctx) {
-    RegisterRequest body = ctx.bodyValidator(RegisterRequest.class)
-        .check(b -> b.email() != null && b.email().contains("@"), "email inválido")
-        .check(b -> b.password() != null && b.password().length() >= 8, "password mínimo 8")
-        .check(b -> b.nombres() != null && !b.nombres().isBlank(), "nombres requeridos")
-        .check(b -> b.apellidos() != null && !b.apellidos().isBlank(), "apellidos requeridos")
-       // .check(b -> CaptchaUtil.verify(b.captchaToken()), "captcha inválido")
-        .get();
+  public void register(Context ctx) throws Exception {
+    
+    RegisterRequest body = ctx.bodyAsClass(RegisterRequest.class);
+
+    if (body.email() == null || !body.email().contains("@")) {
+      ctx.status(400).json(Map.of("error", "email inválido"));
+      return;
+    }
+    if (body.password() == null || body.password().length() < 8) {
+      ctx.status(400).json(Map.of("error", "password mínimo 8"));
+      return;
+    }
+    if (body.nombres() == null || body.nombres().isBlank()) {
+      ctx.status(400).json(Map.of("error", "nombres requeridos"));
+      return;
+    }
+    if (body.apellidos() == null || body.apellidos().isBlank()) {
+      ctx.status(400).json(Map.of("error", "apellidos requeridos"));
+      return;
+    }
+    
 
     final String email = normEmail(body.email());
 
@@ -61,16 +81,23 @@ public class AuthController {
     ctx.status(201).json(new LoginResponse(token, expSeconds(), view));
   }
 
-  public void login(Context ctx) {
-    LoginRequest body = ctx.bodyValidator(LoginRequest.class)
-        .check(b -> b.email() != null && b.email().contains("@"), "email inválido")
-        .check(b -> b.password() != null && !b.password().isBlank(), "password requerido")
-        .get();
+  public void login(Context ctx) throws Exception {
+    LoginRequest body = ctx.bodyAsClass(LoginRequest.class);
+
+    if (body.email() == null || !body.email().contains("@")) {
+      ctx.status(400).json(Map.of("error", "email inválido"));
+      return;
+    }
+    if (body.password() == null || body.password().isBlank()) {
+      ctx.status(400).json(Map.of("error", "password requerido"));
+      return;
+    }
 
     final String email = normEmail(body.email());
     Usuario u = usuarios.findByEmail(email);
 
-    if (u == null || !u.isHabilitado() || !PasswordUtil.verify(body.password(), u.getContrasenaHash())) {
+    if (u == null || !u.isHabilitado() ||
+        !PasswordUtil.verify(body.password(), u.getContrasenaHash())) {
       ctx.status(401).json(Map.of("error", "credenciales no válidas"));
       return;
     }
@@ -83,8 +110,9 @@ public class AuthController {
     ctx.json(new LoginResponse(token, expSeconds(), view));
   }
 
+  @SuppressWarnings("unchecked")
   public void me(Context ctx) {
-    Map<String, Object> claims = ctx.<Map<String, Object>>attribute("claims");
+    Map<String, Object> claims = ctx.attribute("claims");
     if (claims == null) {
       ctx.status(401).json(Map.of("error", "no autenticado"));
       return;

@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
 public class CaptchaUtil {
-  private static final HttpClient client = HttpClient.newHttpClient();
+  private static HttpClient client = HttpClient.newHttpClient();
   private static final ObjectMapper mapper = new ObjectMapper();
   public static boolean verify(String responseToken) {
     try {
