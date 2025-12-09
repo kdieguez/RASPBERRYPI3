@@ -1,10 +1,10 @@
 ---
 kind: pipeline
 type: docker
-name: prod   # main = prod
+name: prod
 
 steps:
-  # 1) BACKEND: tests + SonarQube (Quality Gate obligatorio)
+  # 1) Tests + SonarQube backend
   - name: backend-tests-and-sonar
     image: maven:3.9-eclipse-temurin-17
     environment:
@@ -14,37 +14,35 @@ steps:
         from_secret: sonar_host_url
     commands:
       - cd backend
-      - mvn clean verify sonar:sonar \
+      - mvn \
+          -DskipTests=false \
           -Dsonar.login=$SONAR_TOKEN \
           -Dsonar.host.url=$SONAR_HOST_URL \
-          -Dsonar.qualitygate.wait=true
+          -Dsonar.qualitygate.wait=true \
+          clean verify sonar:sonar
     when:
-      branch:
-        - main
       event:
         - push
         - pull_request
 
-  # 2) FRONTEND: tests con Vitest
+  # 2) Tests frontend (Vitest)
   - name: frontend-tests
     image: node:20
     commands:
       - cd frontend
       - npm ci
-      - npm test
+      # Vitest sin --ci porque tu versión no lo soporta
+      - npm test -- --run --watch=false
     when:
-      branch:
-        - main
       event:
         - push
         - pull_request
 
-  # 3) SOLO EN MERGE A MAIN: construir imágenes de prod
+  # 3) Build imágenes para PROD (solo cuando se hace push a main)
   - name: build-images-prod
     image: docker:26-cli
-    volumes:
-      - name: dockersock
-        path: /var/run/docker.sock
+    environment:
+      DOCKER_HOST: tcp://docker:2375
     commands:
       - docker build -t aerolineas-backend-prod ./backend
       - docker build -t aerolineas-frontend-prod ./frontend
@@ -54,12 +52,11 @@ steps:
       event:
         - push
 
-  # 4) SOLO EN MERGE A MAIN: desplegar prod (backend-prod + frontend-prod)
+  # 4) Deploy PROD (solo cuando se hace push a main)
   - name: deploy-prod
     image: docker:26-cli
-    volumes:
-      - name: dockersock
-        path: /var/run/docker.sock
+    environment:
+      DOCKER_HOST: tcp://docker:2375
     commands:
       - docker stop backend-prod frontend-prod || true
       - docker rm backend-prod frontend-prod || true
@@ -77,13 +74,11 @@ steps:
       event:
         - push
 
-# Usamos el Docker del HOST (no Docker Hub, no dind)
-volumes:
-  - name: dockersock
-    host:
-      path: /var/run/docker.sock
+services:
+  - name: docker
+    image: docker:26-dind
+    privileged: true
 
-# Este pipeline solo se ejecuta cuando se toca main
 trigger:
   branch:
     - main
