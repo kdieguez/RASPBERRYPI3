@@ -13,7 +13,10 @@ steps:
         from_secret: sonar_host_url
     commands:
       - cd backend
-      - mvn clean verify sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true
+      - mvn clean verify sonar:sonar \
+          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.host.url=$SONAR_HOST_URL \
+          -Dsonar.qualitygate.wait=true
     when:
       event:
         - push
@@ -34,25 +37,23 @@ steps:
     image: docker:26-cli
     environment:
       DOCKER_HOST: tcp://docker:2375
-      DOCKER_USERNAME:
-        from_secret: docker_username
-      DOCKER_PASSWORD:
-        from_secret: docker_password
     commands:
-      - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+      # 👇 YA SIN login a Docker Hub
       - docker build -t aerolineas-backend-prod ./backend
       - docker build -t aerolineas-frontend-prod ./frontend
     when:
       event:
-        - push   # solo en push (después del merge a main)
+        - push   # solo cuando ya se hizo push a main (después del merge)
 
   - name: deploy-prod
     image: docker:26-cli
     environment:
       DOCKER_HOST: tcp://docker:2375
     commands:
-      - docker stop backend-prod frontend-prod || true
-      - docker rm backend-prod frontend-prod || true
+      - docker stop backend-prod || true
+      - docker stop frontend-prod || true
+      - docker rm backend-prod || true
+      - docker rm frontend-prod || true
 
       - docker run -d --name backend-prod \
           -p 8083:8080 \
