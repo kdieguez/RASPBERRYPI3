@@ -30,7 +30,6 @@ steps:
     commands:
       - cd frontend
       - npm ci
-      # Vitest sin --ci porque tu versión no lo soporta
       - npm test -- --run --watch=false
     when:
       event:
@@ -76,7 +75,6 @@ steps:
       event:
         - push
 
-# Volumen para compartir el Docker del host con los steps
 volumes:
   - name: dockersock
     host:
