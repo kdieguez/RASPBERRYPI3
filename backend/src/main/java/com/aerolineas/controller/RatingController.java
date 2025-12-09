@@ -10,9 +10,19 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class RatingController {
-  private final RatingDAO dao = new RatingDAO();
 
-  static record CreateReq(Integer calificacion) {}
+  private final RatingDAO dao;
+
+  public RatingController() {
+    this(new RatingDAO());
+  }
+
+  public RatingController(RatingDAO dao) {
+    this.dao = dao;
+  }
+
+  
+  public static record CreateReq(Integer calificacion) {}
 
   private Long tryUserId(io.javalin.http.Context ctx) {
     try {

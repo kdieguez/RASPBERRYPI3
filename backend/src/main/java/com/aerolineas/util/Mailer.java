@@ -10,10 +10,17 @@ public final class Mailer {
 
   private static String env(String k, String def) {
     String v = System.getenv(k);
+    if (v == null || v.isBlank()) {
+      v = System.getProperty(k);
+    }
     return (v == null || v.isBlank()) ? def : v.trim();
   }
+
   private static boolean bool(String k, boolean def) {
     String v = System.getenv(k);
+    if (v == null || v.isBlank()) {
+      v = System.getProperty(k);
+    }
     if (v == null) return def;
     v = v.trim().toLowerCase();
     return v.equals("1") || v.equals("true") || v.equals("yes") || v.equals("y");
@@ -21,7 +28,7 @@ public final class Mailer {
 
   private static Session buildSession() {
     String host = env("MAIL_HOST", "smtp.gmail.com");
-    String port = env("MAIL_PORT", "587"); 
+    String port = env("MAIL_PORT", "587");
     boolean auth = bool("MAIL_AUTH", true);
     boolean tls  = bool("MAIL_TLS",  true);
     boolean debug = bool("MAIL_DEBUG", false);

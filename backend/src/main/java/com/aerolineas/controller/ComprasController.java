@@ -437,56 +437,58 @@ public class ComprasController {
     });
 
     app.get("/api/admin/reservas", ctx -> {
-      Auth.jwt().handle(ctx);
-      if (ctx.attribute("claims") == null || !isAdmin(ctx)) {
-        ctx.status(403).json(Map.of("error", "solo administradores"));
-        return;
-      }
+  jwtAuthHandler.handle(ctx);
+  if (ctx.attribute("claims") == null || !isAdmin(ctx)) {
+    ctx.status(403).json(Map.of("error", "solo administradores"));
+    return;
+  }
 
-      String q       = ctx.queryParam("q");
-      String usuario = ctx.queryParam("usuario");
-      String codigo  = ctx.queryParam("codigo");
-      String vuelo   = ctx.queryParam("vuelo");
-      String fDesde  = ctx.queryParam("desde");
-      String fHasta  = ctx.queryParam("hasta");
-      Integer estado = null;
-      try {
-        estado = ctx.queryParam("estado") == null ? null : Integer.parseInt(ctx.queryParam("estado"));
-      } catch (Exception ignore) {}
+  String q       = ctx.queryParam("q");
+  String usuario = ctx.queryParam("usuario");
+  String codigo  = ctx.queryParam("codigo");
+  String vuelo   = ctx.queryParam("vuelo");
+  String fDesde  = ctx.queryParam("desde");
+  String fHasta  = ctx.queryParam("hasta");
+  Integer estado = null;
+  try {
+    estado = ctx.queryParam("estado") == null ? null : Integer.parseInt(ctx.queryParam("estado"));
+  } catch (Exception ignore) {}
 
-      Timestamp tsDesde = null, tsHasta = null;
-      try {
-        if (fDesde != null && !fDesde.isBlank())
-          tsDesde = Timestamp.valueOf(fDesde + " 00:00:00");
-      } catch (Exception ignore) {}
-      try {
-        if (fHasta != null && !fHasta.isBlank())
-          tsHasta = Timestamp.valueOf(fHasta + " 23:59:59");
-      } catch (Exception ignore) {}
+  Timestamp tsDesde = null, tsHasta = null;
+  try {
+    if (fDesde != null && !fDesde.isBlank())
+      tsDesde = Timestamp.valueOf(fDesde + " 00:00:00");
+  } catch (Exception ignore) {}
+  try {
+    if (fHasta != null && !fHasta.isBlank())
+      tsHasta = Timestamp.valueOf(fHasta + " 23:59:59");
+  } catch (Exception ignore) {}
 
-      var list = dao.listReservasAdmin(q, usuario, codigo, vuelo, tsDesde, tsHasta, estado);
-      ctx.json(list);
-    });
+  var list = dao.listReservasAdmin(q, usuario, codigo, vuelo, tsDesde, tsHasta, estado);
+  ctx.json(list);
+});
 
-    app.get("/api/admin/reservas/estados", ctx -> {
-      Auth.jwt().handle(ctx);
-      if (ctx.attribute("claims") == null || !isAdmin(ctx)) {
-        ctx.status(403).json(Map.of("error", "solo administradores"));
-        return;
-      }
-      ctx.json(dao.listEstadosReserva());
-    });
 
-    app.get("/api/admin/reservas/{id}", ctx -> {
-      Auth.jwt().handle(ctx);
-      if (ctx.attribute("claims") == null || !isAdmin(ctx)) {
-        ctx.status(403).json(Map.of("error", "solo administradores"));
-        return;
-      }
-      long id = Long.parseLong(ctx.pathParam("id"));
-      var det = dao.getReservaDetalleAdmin(id);
-      ctx.json(det);
-    });
+app.get("/api/admin/reservas/estados", ctx -> {
+  jwtAuthHandler.handle(ctx);
+  if (ctx.attribute("claims") == null || !isAdmin(ctx)) {
+    ctx.status(403).json(Map.of("error", "solo administradores"));
+    return;
+  }
+  ctx.json(dao.listEstadosReserva());
+});
+
+
+app.get("/api/admin/reservas/{id}", ctx -> {
+  jwtAuthHandler.handle(ctx);
+  if (ctx.attribute("claims") == null || !isAdmin(ctx)) {
+    ctx.status(403).json(Map.of("error", "solo administradores"));
+    return;
+  }
+  long id = Long.parseLong(ctx.pathParam("id"));
+  var det = dao.getReservaDetalleAdmin(id);
+  ctx.json(det);
+});
 
     app.get("/api/public/stats/top-destinos", ctx -> {
       try {

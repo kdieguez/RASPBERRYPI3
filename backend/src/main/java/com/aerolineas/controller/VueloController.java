@@ -15,16 +15,29 @@ import java.util.Map;
 import static com.aerolineas.util.EstadosVuelo.*;
 
 public class VueloController {
-  private final VueloDAO dao = new VueloDAO();
-  private final NotificacionesService notifySvc = new NotificacionesService();
 
-  static record RoundtripReq(VueloDTO.Create ida, VueloDTO.Create regreso) {}
-  static record LinkReq(Long idIda, Long idRegreso) {}
+  private final VueloDAO dao;
+  private final NotificacionesService notifySvc;
 
+  // Constructor por defecto (producción)
+  public VueloController() {
+    this(new VueloDAO(), new NotificacionesService());
+  }
+
+  // Constructor inyectable (tests)
+  public VueloController(VueloDAO dao, NotificacionesService notifySvc) {
+    this.dao = dao;
+    this.notifySvc = notifySvc;
+  }
+
+  public static record RoundtripReq(VueloDTO.Create ida, VueloDTO.Create regreso) {}
+  public static record LinkReq(Long idIda, Long idRegreso) {}
+
+  // === Helper para WebService opcional ===
   private void validateOptionalWebService(Context ctx) throws Exception {
     String wsEmail = ctx.header("X-WebService-Email");
     String wsPassword = ctx.header("X-WebService-Password");
-    
+
     if (wsEmail != null && !wsEmail.isBlank() && wsPassword != null && !wsPassword.isBlank()) {
       WebServiceAuth.validate().handle(ctx);
     }
@@ -32,16 +45,18 @@ public class VueloController {
 
   public void routes(Javalin app) {
 
+    // ================== PÚBLICOS ==================
     app.get("/api/public/vuelos", ctx -> {
       validateOptionalWebService(ctx);
       ctx.json(dao.listarVuelosPublic());
     });
+
     app.get("/api/v1/vuelos", ctx -> {
       validateOptionalWebService(ctx);
       ctx.json(dao.listarVuelosPublic());
     });
 
-    // Endpoints públicos para vuelos con escala
+    // ------ vuelos con escala (públicos) ------
     app.get("/api/public/vuelos/con-escala", ctx -> {
       validateOptionalWebService(ctx);
       try {
@@ -109,9 +124,14 @@ public class VueloController {
       validateOptionalWebService(ctx);
       long idV = ctx.pathParamAsClass("id", Long.class).get();
       var v = dao.obtenerVueloPublic(idV);
-      if (v == null) { ctx.status(404).json(Map.of("error", "Vuelo no encontrado")); return; }
+      if (v == null) {
+        ctx.status(404).json(Map.of("error", "Vuelo no encontrado"));
+        return;
+      }
       ctx.json(v);
     });
+
+    // ================== ADMIN ==================
 
     app.get("/api/v1/admin/vuelos", ctx -> {
       Auth.adminOrEmpleado().handle(ctx);
@@ -122,7 +142,10 @@ public class VueloController {
       Auth.adminOrEmpleado().handle(ctx);
       long id = ctx.pathParamAsClass("id", Long.class).get();
       var v = dao.obtenerVueloAdmin(id);
-      if (v == null) { ctx.status(404).json(Map.of("error","Vuelo no encontrado")); return; }
+      if (v == null) {
+        ctx.status(404).json(Map.of("error","Vuelo no encontrado"));
+        return;
+      }
       ctx.json(v);
     });
 
@@ -144,16 +167,20 @@ public class VueloController {
       var dto = ctx.bodyAsClass(VueloDTO.UpdateAdmin.class);
 
       if (dto.codigo()==null || dto.codigo().isBlank()) {
-        ctx.status(400).json(Map.of("error","Código requerido")); return;
+        ctx.status(400).json(Map.of("error","Código requerido"));
+        return;
       }
       if (dto.fechaSalida().isAfter(dto.fechaLlegada())) {
-        ctx.status(400).json(Map.of("error","La salida debe ser menor que la llegada")); return;
+        ctx.status(400).json(Map.of("error","La salida debe ser menor que la llegada"));
+        return;
       }
       if (dto.clases()==null || dto.clases().isEmpty()) {
-        ctx.status(400).json(Map.of("error","Debe indicar al menos una clase")); return;
+        ctx.status(400).json(Map.of("error","Debe indicar al menos una clase"));
+        return;
       }
       if (dto.motivoCambio()==null || dto.motivoCambio().isBlank()) {
-        ctx.status(400).json(Map.of("error","motivoCambio es requerido para modificar")); return;
+        ctx.status(400).json(Map.of("error","motivoCambio es requerido para modificar"));
+        return;
       }
 
       try {
@@ -161,7 +188,9 @@ public class VueloController {
         ctx.status(204);
 
         new Thread(() -> {
-          try { notifySvc.notificarCambio(id, dto.motivoCambio()); } catch (Exception ignore) {}
+          try {
+            notifySvc.notificarCambio(id, dto.motivoCambio());
+          } catch (Exception ignore) {}
         }, "mail-cambio-vuelo-" + id).start();
 
       } catch (SQLException e) {
@@ -191,7 +220,7 @@ public class VueloController {
       try {
         long idIda     = dao.crearVueloReturnId(req.ida());
         long idRegreso = dao.crearVueloReturnId(req.regreso());
-        dao.vincularPareja(idIda, idRegreso); 
+        dao.vincularPareja(idIda, idRegreso);
         ctx.status(201).json(Map.of("idIda", idIda, "idRegreso", idRegreso));
       } catch (SQLException e) {
         String msg = e.getMessage() == null ? "" : e.getMessage();
@@ -209,7 +238,7 @@ public class VueloController {
         return;
       }
       try {
-        dao.vincularPareja(req.idIda(), req.idRegreso()); 
+        dao.vincularPareja(req.idIda(), req.idRegreso());
         ctx.status(204);
       } catch (SQLException e) {
         String msg = e.getMessage() == null ? "" : e.getMessage();
@@ -217,7 +246,6 @@ public class VueloController {
       }
     });
 
-    
     app.put("/api/v1/vuelos/{id}/unlink", ctx -> {
       Auth.adminOrEmpleado().handle(ctx);
       long idVuelo = ctx.pathParamAsClass("id", Long.class).get();
@@ -251,7 +279,9 @@ public class VueloController {
 
         if (dto.idEstado() == CANCELADO) {
           new Thread(() -> {
-            try { notifySvc.notificarCancelacion(idVuelo, dto.motivo()); } catch (Exception ignore) {}
+            try {
+              notifySvc.notificarCancelacion(idVuelo, dto.motivo());
+            } catch (Exception ignore) {}
           }, "mail-cancel-vuelo-" + idVuelo).start();
         }
 
@@ -267,7 +297,7 @@ public class VueloController {
       }
     });
 
-    // Endpoints para vuelos con escala
+    // ----- vuelos con escala (admin) -----
     app.post("/api/v1/admin/vuelos/con-escala", ctx -> {
       Auth.adminOrEmpleado().handle(ctx);
       VueloDTO.VueloConEscalaCreate dto = ctx.bodyAsClass(VueloDTO.VueloConEscalaCreate.class);
