@@ -1969,7 +1969,6 @@ void link_sqlError_400() throws Exception {
         ));
     }
 }
-
 @Test
 void actualizarEstado_estadoNormal_ok_204_sinNotificarCancelacion() throws Exception {
     VueloDAO dao = mock(VueloDAO.class);
@@ -1993,14 +1992,16 @@ void actualizarEstado_estadoNormal_ok_204_sinNotificarCancelacion() throws Excep
         when(ctx.pathParamAsClass("id", Long.class)).thenReturn(val);
         when(val.get()).thenReturn(300L);
 
-        VueloDTO.EstadoUpdate dto = new VueloDTO.EstadoUpdate(2, "motivo-x");
+        int estadoNoCancelado = CANCELADO + 1;
+
+        VueloDTO.EstadoUpdate dto = new VueloDTO.EstadoUpdate(estadoNoCancelado, "motivo-x");
         when(ctx.bodyAsClass(VueloDTO.EstadoUpdate.class)).thenReturn(dto);
         when(ctx.status(204)).thenReturn(ctx);
 
         h.handle(ctx);
 
         verify(authHandler).handle(ctx);
-        verify(dao).actualizarEstado(300L, 2, "motivo-x");
+        verify(dao).actualizarEstado(300L, estadoNoCancelado, "motivo-x");
         verify(ctx).status(204);
 
         verify(notifySvc, never()).notificarCancelacion(anyLong(), anyString());
