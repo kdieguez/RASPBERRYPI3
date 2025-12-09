@@ -66,35 +66,6 @@ steps:
       event:
         - push          # deploy solo en push a main
 
-  # enviar correo si algo del pipeline falla
-  - name: notify-failure-email
-    image: drillster/drone-email
-    settings:
-      host:
-        from_secret: smtp_host
-      username:
-        from_secret: smtp_user
-      password:
-        from_secret: smtp_password
-      from:
-        from_secret: smtp_from
-      recipients:
-        from_secret: notify_to
-      subject: "[Drone] Falló pipeline ${DRONE_REPO_NAME} #${DRONE_BUILD_NUMBER}"
-      body: >
-        Hola,
-        el pipeline del repositorio ${DRONE_REPO_NAME} ha fallado.
-        Rama: ${DRONE_BRANCH}
-        Autor: ${DRONE_COMMIT_AUTHOR}
-        Mensaje del commit: ${DRONE_COMMIT_MESSAGE}
-        Estado: ${DRONE_BUILD_STATUS}
-        Revisa el detalle aquí: ${DRONE_BUILD_LINK}
-    when:
-      status:
-        - failure
-      branch:
-        - main
-
 # Usamos el Docker del host (NO DIND)
 volumes:
   - name: docker_sock
