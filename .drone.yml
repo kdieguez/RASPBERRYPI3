@@ -18,12 +18,13 @@ steps:
       event:
         - push
         - pull_request
-  - name: frontend-tests
-    image: node:20
-    commands:
+   - name: frontend-tests
+     image: node:20
+     commands:
       - cd frontend
       - npm ci
-      - npx vitest run
+      - npm test
+
     when:
       event:
         - push
