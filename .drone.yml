@@ -14,12 +14,7 @@ steps:
         from_secret: sonar_host_url
     commands:
       - cd backend
-      - mvn \
-          -DskipTests=false \
-          -Dsonar.login=$SONAR_TOKEN \
-          -Dsonar.host.url=$SONAR_HOST_URL \
-          -Dsonar.qualitygate.wait=true \
-          clean verify sonar:sonar
+      - mvn -DskipTests=false -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true clean verify sonar:sonar
     when:
       event:
         - push
@@ -38,7 +33,7 @@ steps:
         - push
         - pull_request
 
-  # 3) Build imágenes para PROD (solo cuando se hace push a main)
+  # 3) Build imágenes PROD (solo push a main)
   - name: build-images-prod
     image: docker:26-cli
     environment:
@@ -52,7 +47,7 @@ steps:
       event:
         - push
 
-  # 4) Deploy PROD (solo cuando se hace push a main)
+  # 4) Deploy PROD (solo push a main)
   - name: deploy-prod
     image: docker:26-cli
     environment:
