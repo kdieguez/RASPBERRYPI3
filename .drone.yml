@@ -4,7 +4,6 @@ type: docker
 name: prod
 
 steps:
-  # 1) Backend: tests + SonarQube (con Quality Gate)
   - name: backend-tests-and-sonar
     image: maven:3.9-eclipse-temurin-17
     environment:
@@ -14,29 +13,38 @@ steps:
         from_secret: sonar_host_url
     commands:
       - cd backend
-      - mvn -B -DskipTests=false -Dsonar.qualitygate.wait=true clean verify sonar:sonar
+      # Tests backend
+      - mvn -B clean verify -DskipTests=false
+      # Análisis Sonar + Quality Gate
+      - mvn -B sonar:sonar \
+          -DskipTests=false \
+          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.host.url=$SONAR_HOST_URL \
+          -Dsonar.qualitygate.wait=true
     when:
+      branch:
+        - main          # prod = main
       event:
         - push
-        - pull_request
-  # 2) Tests frontend (Vitest)
+        - pull_request  # también en PR
+
   - name: frontend-tests
     image: node:20
     commands:
       - cd frontend
       - npm ci
-      - npm test -- --run --watch=false
+      - npm test -- --watch=false
     when:
+      branch:
+        - main
       event:
         - push
         - pull_request
 
-  # 3) Build imágenes PROD (solo cuando hay push a main)
   - name: build-images-prod
     image: docker:26-cli
-    volumes:
-      - name: dockersock
-        path: /var/run/docker.sock
+    environment:
+      DOCKER_HOST: tcp://docker:2375
     commands:
       - docker build -t aerolineas-backend-prod ./backend
       - docker build -t aerolineas-frontend-prod ./frontend
@@ -44,35 +52,30 @@ steps:
       branch:
         - main
       event:
-        - push
+        - push   # solo en push a main (después del merge)
 
-  # 4) Deploy PROD (solo cuando hay push a main)
   - name: deploy-prod
     image: docker:26-cli
-    volumes:
-      - name: dockersock
-        path: /var/run/docker.sock
+    environment:
+      DOCKER_HOST: tcp://docker:2375
     commands:
       - docker stop backend-prod frontend-prod || true
       - docker rm backend-prod frontend-prod || true
-
-      - docker run -d --name backend-prod \
-          -p 8083:8080 \
-          aerolineas-backend-prod
-
-      - docker run -d --name frontend-prod \
-          -p 8086:80 \
-          aerolineas-frontend-prod
+      # OJO: aquí sin backslashes, todo en una sola línea
+      - docker run -d --name backend-prod -p 8083:8080 aerolineas-backend-prod
+      - docker run -d --name frontend-prod -p 8086:80 aerolineas-frontend-prod
     when:
       branch:
         - main
       event:
-        - push
+        - push   # deploy solo cuando ya hubo merge a main
 
-volumes:
-  - name: dockersock
-    host:
-      path: /var/run/docker.sock
+services:
+  - name: docker
+    image: docker:26-dind
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""   # importante para usar tcp://docker:2375
 
 trigger:
   branch:
