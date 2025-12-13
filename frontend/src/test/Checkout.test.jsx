@@ -9,7 +9,7 @@ import Checkout from "../paginas/Checkout";
 import { comprasApi } from "../api/compras";
 import { getUser } from "../lib/auth";
 
-// 🔹 Mock de useNavigate
+//  Mock de useNavigate
 const mockNavigate = vi.fn();
 
 vi.mock("react-router-dom", async () => {
@@ -20,7 +20,7 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-// 🔹 Mock de API de compras
+//  Mock de API de compras
 vi.mock("../api/compras", () => ({
   comprasApi: {
     getCart: vi.fn(),
@@ -28,18 +28,18 @@ vi.mock("../api/compras", () => ({
   },
 }));
 
-// 🔹 Mock de auth
+//  Mock de auth
 vi.mock("../lib/auth", () => ({
   getUser: vi.fn(),
 }));
 
-// 🔹 Mock de RouteLine (no nos importa la lógica interna aquí)
+//  Mock de RouteLine (no nos importa la lógica interna aquí)
 vi.mock("../components/RouteLine", () => ({
   __esModule: true,
   default: () => <div data-testid="route-line" />,
 }));
 
-// 🔹 Mock de alert
+//  Mock de alert
 global.alert = vi.fn();
 
 describe("Checkout", () => {

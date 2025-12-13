@@ -8,7 +8,7 @@ import Carrito from "../paginas/Carrito";
 import { comprasApi } from "../api/compras";
 import { getUser } from "../lib/auth";
 
-// 🔹 Mock de useNavigate
+//  Mock de useNavigate
 const mockNavigate = vi.fn();
 
 vi.mock("react-router-dom", async () => {
@@ -19,7 +19,7 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-// 🔹 Mock de la API de compras
+//  Mock de la API de compras
 vi.mock("../api/compras", () => ({
   comprasApi: {
     getCart: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock("../api/compras", () => ({
   },
 }));
 
-// 🔹 Mock de auth
+//  Mock de auth
 vi.mock("../lib/auth", () => ({
   getUser: vi.fn(),
 }));
