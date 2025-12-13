@@ -55,7 +55,7 @@ steps:
       - docker rm backend-prod frontend-prod || true
       - docker run -d --name backend-prod -p 8083:8080 aerolineas-backend-prod
       - docker run -d --name frontend-prod -p 8086:80 aerolineas-frontend-prod
-      depends_on:
+    depends_on:
       - build-images-prod
 
 volumes:
