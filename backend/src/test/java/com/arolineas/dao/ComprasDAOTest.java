@@ -2325,4 +2325,684 @@ void getRealConnection_error_envuelveSQLException() throws Exception {
     }
 }
 
+@Test
+@DisplayName("getRealConnection envuelve Exception (no SQLException) con mensaje descriptivo")
+void getRealConnection_exceptionNoSql_conMensaje() throws Exception {
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenThrow(new RuntimeException("Boom"));
+
+    Method m = ComprasDAO.class.getDeclaredMethod("getRealConnection");
+    m.setAccessible(true);
+
+    SQLException ex = assertThrows(SQLException.class, () -> {
+      try { m.invoke(null); }
+      catch (java.lang.reflect.InvocationTargetException ite) {
+        Throwable t = ite.getTargetException();
+        if (t instanceof Exception e) throw e;
+        throw ite;
+      }
+    });
+
+    assertTrue(ex.getMessage().startsWith("No se pudo obtener conexión desde DB:"));
+    assertTrue(ex.getMessage().contains("Boom"));
+    assertNotNull(ex.getCause());
+    assertTrue(ex.getCause() instanceof RuntimeException);
+  }
+}
+
+@Test
+@DisplayName("getRealConnection cuando Exception no tiene mensaje usa solo texto base")
+void getRealConnection_exceptionNoSql_sinMensaje() throws Exception {
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenThrow(new RuntimeException());
+
+    Method m = ComprasDAO.class.getDeclaredMethod("getRealConnection");
+    m.setAccessible(true);
+
+    SQLException ex = assertThrows(SQLException.class, () -> {
+      try { m.invoke(null); }
+      catch (java.lang.reflect.InvocationTargetException ite) {
+        Throwable t = ite.getTargetException();
+        if (t instanceof Exception e) throw e;
+        throw ite;
+      }
+    });
+
+    assertEquals("No se pudo obtener conexión desde DB:", ex.getMessage());
+  }
+}
+
+@Test
+@DisplayName("setFieldIfExists atrapa Exception cuando no puede asignar el valor")
+void setFieldIfExists_errorAsignando_noLanza() throws Exception {
+  class Dummy {
+    private int ciudadOrigen; 
+  }
+  Dummy d = new Dummy();
+
+  Method m = ComprasDAO.class.getDeclaredMethod("setFieldIfExists", Object.class, String.class, Object.class);
+  m.setAccessible(true);
+  
+  assertDoesNotThrow(() -> {
+    try { m.invoke(null, d, "ciudadOrigen", "Madrid"); }
+    catch (java.lang.reflect.InvocationTargetException ite) { throw new RuntimeException(ite.getTargetException()); }
+  });
+}
+
+@Test
+@DisplayName("addOrIncrementItem normaliza cantidad<=0 a 1")
+void addOrIncrementItem_cantidadCero_seVuelveUno() throws Exception {
+  long userId = 1L, cartId = 10L, idVuelo = 20L;
+  int idClase = 1;
+
+  Connection cn = mock(Connection.class);
+  PreparedStatement ps = mock(PreparedStatement.class);
+  ResultSet rs = mock(ResultSet.class);
+
+  ComprasDAO dao = spy(new ComprasDAO());
+  doReturn(cartId).when(dao).ensureCartForUser(userId);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+    when(cn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);
+    
+    when(rs.next()).thenReturn(true, true, true, true);
+    when(rs.getInt("ACTIVO")).thenReturn(1);
+    when(rs.getString("ESTADO")).thenReturn("DISPONIBLE");
+    
+    when(rs.getInt("CUPO_TOTAL")).thenReturn(100);
+    when(rs.getBigDecimal("PRECIO")).thenReturn(new BigDecimal("10"));
+    
+    when(rs.getInt(1)).thenReturn(0, 0);
+
+    when(ps.executeUpdate()).thenReturn(1);
+
+    dao.addOrIncrementItem(userId, idVuelo, idClase, 0, false);
+    
+    verify(ps).setInt(4, 1);
+    verify(ps).setInt(5, 1);
+  }
+}
+
+@Test
+@DisplayName("addOrIncrementItem lanza SQLException si getClaseInfo devuelve null")
+void addOrIncrementItem_claseNoDisponible_lanza() throws Exception {
+  long userId = 1L, cartId = 10L, idVuelo = 20L;
+  int idClase = 1;
+
+  Connection cn = mock(Connection.class);
+  PreparedStatement ps = mock(PreparedStatement.class);
+  ResultSet rs = mock(ResultSet.class);
+
+  ComprasDAO dao = spy(new ComprasDAO());
+  doReturn(cartId).when(dao).ensureCartForUser(userId);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+    when(cn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);
+
+    
+    when(rs.next()).thenReturn(true, false); 
+    when(rs.getInt("ACTIVO")).thenReturn(1);
+    when(rs.getString("ESTADO")).thenReturn("DISPONIBLE");
+
+    SQLException ex = assertThrows(SQLException.class, () ->
+        dao.addOrIncrementItem(userId, idVuelo, idClase, 1, false)
+    );
+
+    assertTrue(ex.getMessage().contains("Clase no disponible"));
+    verify(cn).rollback();
+  }
+}
+@Test
+@DisplayName("addOrIncrementItem lanza SQLException si no se encuentra precio (SALIDA_CLASE null y VUELO_CLASE sin fila)")
+void addOrIncrementItem_precioNoEncontrado_lanza() throws Exception {
+  long userId = 1L, cartId = 10L, idVuelo = 20L;
+  int idClase = 1;
+
+  Connection cn = mock(Connection.class);
+
+  PreparedStatement psValidarVuelo = mock(PreparedStatement.class); 
+  PreparedStatement psSalidaClase  = mock(PreparedStatement.class); 
+  PreparedStatement psVueloClase   = mock(PreparedStatement.class); 
+
+  ResultSet rsValidarVuelo = mock(ResultSet.class);
+  ResultSet rsSalidaClase  = mock(ResultSet.class);
+  ResultSet rsVueloClase   = mock(ResultSet.class);
+
+  ComprasDAO dao = spy(new ComprasDAO());
+  doReturn(cartId).when(dao).ensureCartForUser(userId);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+    
+    when(cn.prepareStatement(anyString()))
+        .thenReturn(psValidarVuelo, psSalidaClase, psVueloClase);
+    
+    when(psValidarVuelo.executeQuery()).thenReturn(rsValidarVuelo);
+    when(rsValidarVuelo.next()).thenReturn(true);
+    when(rsValidarVuelo.getInt("ACTIVO")).thenReturn(1);
+    when(rsValidarVuelo.getString("ESTADO")).thenReturn("DISPONIBLE");
+    
+    when(psSalidaClase.executeQuery()).thenReturn(rsSalidaClase);
+    when(rsSalidaClase.next()).thenReturn(true);
+    when(rsSalidaClase.getInt("CUPO_TOTAL")).thenReturn(100);
+    when(rsSalidaClase.getBigDecimal("PRECIO")).thenReturn(null);
+    
+    when(psVueloClase.executeQuery()).thenReturn(rsVueloClase);
+    when(rsVueloClase.next()).thenReturn(false);
+
+    SQLException ex = assertThrows(SQLException.class, () ->
+        dao.addOrIncrementItem(userId, idVuelo, idClase, 1, false)
+    );
+
+    assertTrue(ex.getMessage().contains("No se encontró precio"));
+
+    verify(cn).setAutoCommit(false);
+    verify(cn).rollback();
+    verify(cn).setAutoCommit(true);
+  }
+}
+
+
+@Test
+@DisplayName("addOrIncrementItem con incluirPareja=true pero sin pareja inserta solo una vez")
+void addOrIncrementItem_incluirPareja_sinPareja_noDuplica() throws Exception {
+  long userId = 1L, cartId = 10L, idVuelo = 20L;
+  int idClase = 1;
+
+  Connection cn = mock(Connection.class);
+  PreparedStatement ps = mock(PreparedStatement.class);
+  ResultSet rs = mock(ResultSet.class);
+
+  ComprasDAO dao = spy(new ComprasDAO());
+  doReturn(cartId).when(dao).ensureCartForUser(userId);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+    when(cn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);
+     
+    when(rs.next()).thenReturn(true, true, true, true, true, false);
+    when(rs.getInt("ACTIVO")).thenReturn(1);
+    when(rs.getString("ESTADO")).thenReturn("DISPONIBLE");
+    when(rs.getInt("CUPO_TOTAL")).thenReturn(10);
+    when(rs.getBigDecimal("PRECIO")).thenReturn(new BigDecimal("10"));
+    when(rs.getInt(1)).thenReturn(0, 0);
+    when(rs.getLong(1)).thenReturn(0L);
+    when(rs.wasNull()).thenReturn(true);
+
+    when(ps.executeUpdate()).thenReturn(1);
+
+    dao.addOrIncrementItem(userId, idVuelo, idClase, 1, true);
+    
+    verify(ps, times(1)).executeUpdate();
+  }
+}
+
+@Test
+@DisplayName("updateQuantity lanza SQLException cuando el item no existe")
+void updateQuantity_itemNoExiste_lanza() throws Exception {
+  long userId = 1L, cartId = 10L, idItem = 99L;
+
+  Connection cn = mock(Connection.class);
+  PreparedStatement ps = mock(PreparedStatement.class);
+  ResultSet rs = mock(ResultSet.class);
+
+  ComprasDAO dao = spy(new ComprasDAO());
+  doReturn(cartId).when(dao).ensureCartForUser(userId);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+    when(cn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);
+    when(rs.next()).thenReturn(false);
+
+    SQLException ex = assertThrows(SQLException.class, () ->
+        dao.updateQuantity(userId, idItem, 3, false)
+    );
+    assertTrue(ex.getMessage().contains("Item no encontrado"));
+    verify(cn).rollback();
+  }
+}
+
+@Test
+@DisplayName("updateQuantity lanza SQLException si cupo insuficiente al aumentar")
+void updateQuantity_aumenta_cupoInsuficiente_lanza() throws Exception {
+  long userId = 1L, cartId = 10L, idItem = 99L;
+
+  Connection cn = mock(Connection.class);
+  PreparedStatement ps = mock(PreparedStatement.class);
+  ResultSet rs = mock(ResultSet.class);
+
+  ComprasDAO dao = spy(new ComprasDAO());
+  doReturn(cartId).when(dao).ensureCartForUser(userId);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+    when(cn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);    
+    
+    when(rs.next()).thenReturn(true, true, true, true, true);
+    when(rs.getLong("ID_VUELO")).thenReturn(20L);
+    when(rs.getInt("ID_CLASE")).thenReturn(1);
+    when(rs.getInt("CANTIDAD")).thenReturn(2);
+
+    when(rs.getInt("ACTIVO")).thenReturn(1);
+    when(rs.getString("ESTADO")).thenReturn("DISPONIBLE");
+    when(rs.getInt("CUPO_TOTAL")).thenReturn(5);
+    when(rs.getBigDecimal("PRECIO")).thenReturn(new BigDecimal("10"));
+    when(rs.getInt(1)).thenReturn(3, 2);
+
+    SQLException ex = assertThrows(SQLException.class, () ->
+        dao.updateQuantity(userId, idItem, 5, false)
+    );
+    assertTrue(ex.getMessage().contains("Cupo insuficiente"));
+    verify(cn).rollback();
+  }
+}
+
+@Test
+@DisplayName("updateQuantity syncPareja=true pero sin item de pareja: actualiza solo el original")
+void updateQuantity_syncPareja_sinItemPareja_actualizaSoloUno() throws Exception {
+  long userId = 1L, cartId = 10L, idItem = 99L;
+
+  Connection cn = mock(Connection.class);
+  PreparedStatement ps = mock(PreparedStatement.class);
+  ResultSet rs = mock(ResultSet.class);
+
+  ComprasDAO dao = spy(new ComprasDAO());
+  doReturn(cartId).when(dao).ensureCartForUser(userId);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+    when(cn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);
+    
+    when(rs.next()).thenReturn(true, true, false);
+    when(rs.getLong("ID_VUELO")).thenReturn(10L);
+    when(rs.getInt("ID_CLASE")).thenReturn(1);
+    when(rs.getInt("CANTIDAD")).thenReturn(5);
+    when(rs.getLong(1)).thenReturn(20L);
+    when(rs.wasNull()).thenReturn(false);
+
+    when(ps.executeUpdate()).thenReturn(1);
+
+    dao.updateQuantity(userId, idItem, 3, true);
+
+    verify(ps, times(1)).executeUpdate(); 
+    verify(cn).commit();
+  }
+}
+
+@Test
+@DisplayName("checkout continúa si COUNT no retorna fila (rs.next=false) y llama al SP")
+void checkout_rsNextFalse_aunLlamaSP() throws Exception {
+  long userId = 1L, cartId = 10L;
+
+  Connection cn = mock(Connection.class);
+  PreparedStatement ps = mock(PreparedStatement.class);
+  ResultSet rs = mock(ResultSet.class);
+  CallableStatement cs = mock(CallableStatement.class);
+
+  ComprasDAO dao = spy(new ComprasDAO());
+  doReturn(cartId).when(dao).ensureCartForUser(userId);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+    dbMock.when(DB::getSchema).thenReturn("SCHEMA");
+
+    when(cn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);
+    when(rs.next()).thenReturn(false);
+
+    when(cn.prepareCall(anyString())).thenReturn(cs);
+    when(cs.execute()).thenReturn(false);
+    when(cs.getLong(3)).thenReturn(123L);
+
+    long id = dao.checkout(userId);
+    assertEquals(123L, id);
+    verify(cn).prepareCall(contains("PR_CHECKOUT_CARRITO"));
+  }
+}
+
+@Test
+@DisplayName("checkoutConClienteFinal si rs.next=false no lanza por vacío y sigue a crear carrito")
+void checkoutConClienteFinal_rsNextFalse_sigue() throws Exception {
+  long userWs = 10L, userFinal = 20L, cartWsId = 100L;
+  long cartFinalId = 200L;
+
+  Connection cn = mock(Connection.class);
+
+  
+  PreparedStatement psCount = mock(PreparedStatement.class);
+  ResultSet rsCount = mock(ResultSet.class);
+
+  
+  PreparedStatement psSelectFinal = mock(PreparedStatement.class);
+  ResultSet rsSelectFinal = mock(ResultSet.class);
+
+  
+  PreparedStatement psInsertFinal = mock(PreparedStatement.class);
+
+  
+  PreparedStatement psSelectNew = mock(PreparedStatement.class);
+  ResultSet rsSelectNew = mock(ResultSet.class);
+
+  
+  PreparedStatement psMerge = mock(PreparedStatement.class);
+
+  
+  CallableStatement cs = mock(CallableStatement.class);
+
+  ComprasDAO dao = spy(new ComprasDAO());
+  doReturn(cartWsId).when(dao).ensureCartForUser(userWs);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(DB::getSchema).thenReturn("SCHEMA");
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+    
+    when(cn.prepareStatement(anyString()))
+        .thenReturn(
+            psCount,        
+            psSelectFinal,  
+            psInsertFinal,  
+            psSelectNew,    
+            psMerge         
+        );
+
+    when(psCount.executeQuery()).thenReturn(rsCount);
+    when(rsCount.next()).thenReturn(false); 
+
+    
+    when(psSelectFinal.executeQuery()).thenReturn(rsSelectFinal);
+    when(rsSelectFinal.next()).thenReturn(false); 
+
+    when(psInsertFinal.executeUpdate()).thenReturn(1);
+
+    when(psSelectNew.executeQuery()).thenReturn(rsSelectNew);
+    when(rsSelectNew.next()).thenReturn(true);
+    when(rsSelectNew.getLong(1)).thenReturn(cartFinalId);
+
+    when(psMerge.executeUpdate()).thenReturn(3);
+
+    
+    when(cn.prepareCall(anyString())).thenReturn(cs);
+    when(cs.execute()).thenReturn(false);
+    when(cs.getLong(3)).thenReturn(999L);
+
+    assertDoesNotThrow(() -> dao.checkoutConClienteFinal(userWs, userFinal));
+  }
+}
+
+@Test
+@DisplayName("Constructor por defecto: ejecuta el Supplier (lambda$new$0) y retorna conexión")
+void constructorDefault_ejecutaSupplier_lambdaNew0() throws Exception {
+  Connection cn = mock(Connection.class);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+
+    ComprasDAO dao = new ComprasDAO();
+
+    
+    var f = ComprasDAO.class.getDeclaredField("connSupplier");
+    f.setAccessible(true);
+
+    @SuppressWarnings("unchecked")
+    java.util.function.Supplier<Connection> supplier =
+        (java.util.function.Supplier<Connection>) f.get(dao);
+
+    Connection res = supplier.get();
+
+    assertSame(cn, res);
+    dbMock.verify(DB::getConnection, times(1));
+  }
+}
+
+@Test
+@DisplayName("updateQuantity syncPareja=true: al aumentar falla por cupo insuficiente en regreso")
+void updateQuantity_aumenta_syncPareja_cupoInsuficienteRegreso_lanza() throws Exception {
+  long userId = 1L, cartId = 10L, idItem = 99L;
+
+  Connection cn = mock(Connection.class);
+
+  PreparedStatement psItem = mock(PreparedStatement.class);       
+  PreparedStatement psParejaId = mock(PreparedStatement.class);   
+  PreparedStatement psFindParejaItem = mock(PreparedStatement.class); 
+  PreparedStatement psValidarIda = mock(PreparedStatement.class); 
+  PreparedStatement psClaseIda = mock(PreparedStatement.class);   
+  PreparedStatement psReservadosIda = mock(PreparedStatement.class);
+  PreparedStatement psEnCarritosIda = mock(PreparedStatement.class);
+  PreparedStatement psValidarReg = mock(PreparedStatement.class); 
+  PreparedStatement psClaseReg = mock(PreparedStatement.class);   
+  PreparedStatement psCantPareja = mock(PreparedStatement.class); 
+  PreparedStatement psReservadosReg = mock(PreparedStatement.class);
+  PreparedStatement psEnCarritosReg = mock(PreparedStatement.class);
+
+  ResultSet rsItem = mock(ResultSet.class);
+  ResultSet rsParejaId = mock(ResultSet.class);
+  ResultSet rsFindParejaItem = mock(ResultSet.class);
+  ResultSet rsValidarIda = mock(ResultSet.class);
+  ResultSet rsClaseIda = mock(ResultSet.class);
+  ResultSet rsReservadosIda = mock(ResultSet.class);
+  ResultSet rsEnCarritosIda = mock(ResultSet.class);
+  ResultSet rsValidarReg = mock(ResultSet.class);
+  ResultSet rsClaseReg = mock(ResultSet.class);
+  ResultSet rsCantPareja = mock(ResultSet.class);
+  ResultSet rsReservadosReg = mock(ResultSet.class);
+  ResultSet rsEnCarritosReg = mock(ResultSet.class);
+
+  ComprasDAO dao = spy(new ComprasDAO());
+  doReturn(cartId).when(dao).ensureCartForUser(userId);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+    when(cn.prepareStatement(anyString())).thenReturn(
+        psItem,
+        psParejaId,
+        psFindParejaItem,
+        psValidarIda,
+        psClaseIda,
+        psReservadosIda,
+        psEnCarritosIda,
+        psValidarReg,
+        psClaseReg,
+        psCantPareja,
+        psReservadosReg,
+        psEnCarritosReg
+    );
+
+    
+    when(psItem.executeQuery()).thenReturn(rsItem);
+    when(rsItem.next()).thenReturn(true);
+    when(rsItem.getLong("ID_VUELO")).thenReturn(10L);
+    when(rsItem.getInt("ID_CLASE")).thenReturn(1);
+    when(rsItem.getInt("CANTIDAD")).thenReturn(2);
+
+    
+    when(psParejaId.executeQuery()).thenReturn(rsParejaId);
+    when(rsParejaId.next()).thenReturn(true);
+    when(rsParejaId.getLong(1)).thenReturn(20L);
+    when(rsParejaId.wasNull()).thenReturn(false);
+
+    
+    when(psFindParejaItem.executeQuery()).thenReturn(rsFindParejaItem);
+    when(rsFindParejaItem.next()).thenReturn(true);
+    when(rsFindParejaItem.getLong(1)).thenReturn(2000L);
+
+    
+    when(psValidarIda.executeQuery()).thenReturn(rsValidarIda);
+    when(rsValidarIda.next()).thenReturn(true);
+    when(rsValidarIda.getInt("ACTIVO")).thenReturn(1);
+    when(rsValidarIda.getString("ESTADO")).thenReturn("DISPONIBLE");
+
+    
+    when(psClaseIda.executeQuery()).thenReturn(rsClaseIda);
+    when(rsClaseIda.next()).thenReturn(true);
+    when(rsClaseIda.getInt("CUPO_TOTAL")).thenReturn(100);
+    when(rsClaseIda.getBigDecimal("PRECIO")).thenReturn(new BigDecimal("10"));
+
+    
+    when(psReservadosIda.executeQuery()).thenReturn(rsReservadosIda);
+    when(rsReservadosIda.next()).thenReturn(true);
+    when(rsReservadosIda.getInt(1)).thenReturn(0);
+
+    when(psEnCarritosIda.executeQuery()).thenReturn(rsEnCarritosIda);
+    when(rsEnCarritosIda.next()).thenReturn(true);
+    when(rsEnCarritosIda.getInt(1)).thenReturn(0);
+
+    
+    when(psValidarReg.executeQuery()).thenReturn(rsValidarReg);
+    when(rsValidarReg.next()).thenReturn(true);
+    when(rsValidarReg.getInt("ACTIVO")).thenReturn(1);
+    when(rsValidarReg.getString("ESTADO")).thenReturn("DISPONIBLE");
+
+    
+    when(psClaseReg.executeQuery()).thenReturn(rsClaseReg);
+    when(rsClaseReg.next()).thenReturn(true);
+    when(rsClaseReg.getInt("CUPO_TOTAL")).thenReturn(5);
+    when(rsClaseReg.getBigDecimal("PRECIO")).thenReturn(new BigDecimal("10"));
+
+    
+    when(psCantPareja.executeQuery()).thenReturn(rsCantPareja);
+    when(rsCantPareja.next()).thenReturn(true);
+    when(rsCantPareja.getInt(1)).thenReturn(2);
+
+    
+    when(psReservadosReg.executeQuery()).thenReturn(rsReservadosReg);
+    when(rsReservadosReg.next()).thenReturn(true);
+    when(rsReservadosReg.getInt(1)).thenReturn(3);
+
+    when(psEnCarritosReg.executeQuery()).thenReturn(rsEnCarritosReg);
+    when(rsEnCarritosReg.next()).thenReturn(true);
+    when(rsEnCarritosReg.getInt(1)).thenReturn(0);
+
+    SQLException ex = assertThrows(SQLException.class, () ->
+        dao.updateQuantity(userId, idItem, 5, true)
+    );
+    assertTrue(ex.getMessage().contains("Cupo insuficiente en regreso"));
+
+    verify(cn).rollback();
+  }
+}
+
+@Test
+@DisplayName("listReservasAdmin: usuario no numérico usa LIKE por email")
+void listReservasAdmin_usuarioNoNumerico_usaLikeEmail() throws Exception {
+  Connection cn = mock(Connection.class);
+  PreparedStatement ps = mock(PreparedStatement.class);
+  ResultSet rs = mock(ResultSet.class);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+    when(cn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);
+    when(rs.next()).thenReturn(false);
+
+    new ComprasDAO().listReservasAdmin(null, "john@doe.com", null, null, null, null, null);
+
+    // Verifica que se setea el parámetro con LIKE (por ejemplo contiene "@doe")
+    verify(ps, atLeastOnce()).setObject(anyInt(), contains("john@doe.com"));
+  }
+}
+
+@Test
+@DisplayName("listReservasAdmin: vuelo numérico hace JOIN y filtra por v.ID_VUELO")
+void listReservasAdmin_vueloNumerico_filtraPorIdVuelo() throws Exception {
+  Connection cn = mock(Connection.class);
+  PreparedStatement ps = mock(PreparedStatement.class);
+  ResultSet rs = mock(ResultSet.class);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+    when(cn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);
+    when(rs.next()).thenReturn(false);
+
+    new ComprasDAO().listReservasAdmin(null, null, null, "123", null, null, null);
+
+    verify(ps, atLeastOnce()).setObject(anyInt(), eq(123L));
+  }
+}
+
+@Test
+@DisplayName("listReservasAdmin: vuelo no numérico filtra por codigo LIKE")
+void listReservasAdmin_vueloNoNumerico_filtraPorCodigoLike() throws Exception {
+  Connection cn = mock(Connection.class);
+  PreparedStatement ps = mock(PreparedStatement.class);
+  ResultSet rs = mock(ResultSet.class);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+    when(cn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);
+    when(rs.next()).thenReturn(false);
+
+    new ComprasDAO().listReservasAdmin(null, null, null, "AV-XYZ", null, null, null);
+
+    verify(ps, atLeastOnce()).setObject(anyInt(), contains("av-xyz"));
+  }
+}
+
+@Test
+@DisplayName("listReservasAdmin: q numérico agrega filtro OR por ID_USUARIO")
+void listReservasAdmin_qNumerico_agregaOrIdUsuario() throws Exception {
+  Connection cn = mock(Connection.class);
+  PreparedStatement ps = mock(PreparedStatement.class);
+  ResultSet rs = mock(ResultSet.class);
+
+  try (MockedStatic<DB> dbMock = mockStatic(DB.class)) {
+    dbMock.when(DB::getConnection).thenReturn(cn);
+    dbMock.when(() -> DB.table(anyString())).thenAnswer(inv -> inv.getArgument(0));
+
+    when(cn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);
+    when(rs.next()).thenReturn(false);
+
+    new ComprasDAO().listReservasAdmin("200", null, null, null, null, null, null);
+
+    verify(ps, atLeastOnce()).setObject(anyInt(), eq(200L));
+  }
+}
+
+@Test
+@DisplayName("cancelarReservaAdmin lanza IllegalStateException cuando cancelarReserva devuelve false")
+void cancelarReservaAdmin_noCancelable_lanzaExcepcion() throws Exception {
+  ComprasDAO dao = spy(new ComprasDAO());
+  doReturn(false).when(dao).cancelarReserva(0L, 777L, true);
+
+  IllegalStateException ex = assertThrows(IllegalStateException.class,
+      () -> dao.cancelarReservaAdmin(777L));
+
+  assertEquals("La reserva no está en estado cancelable.", ex.getMessage());
+}
+
 }
