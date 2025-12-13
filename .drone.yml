@@ -10,7 +10,7 @@ steps:
       SONAR_TOKEN:
         from_secret: sonar_token
       SONAR_HOST_URL:
-        from_secret: sonar_host_url
+        from_secret: sonar_host_URL
     commands:
       - cd backend
       - mvn -B clean verify sonar:sonar \
