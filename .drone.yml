@@ -20,7 +20,7 @@ steps:
     commands:
       - cd frontend
       - npm ci
-      - npm test -- --watch=false
+      - npm run test:ci
     depends_on:
       - backend-tests-sonar-qg
 
