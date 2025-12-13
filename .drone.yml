@@ -8,7 +8,7 @@ steps:
     image: maven:3.9-eclipse-temurin-17
     environment:
       SONAR_TOKEN:
-        from_secret: sonar_token
+        from_secret: sonar_Token
       SONAR_HOST_URL:
         from_secret: sonar_host_URL
     commands:
