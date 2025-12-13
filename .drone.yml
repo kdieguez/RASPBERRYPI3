@@ -1,10 +1,10 @@
 ---
 kind: pipeline
 type: docker
-name: dev
+name: ci-pr-dev
 
 steps:
-  - name: backend-tests-and-sonar
+  - name: backend-tests-sonar-qg
     image: maven:3.9-eclipse-temurin-17
     environment:
       SONAR_TOKEN:
@@ -13,14 +13,10 @@ steps:
         from_secret: sonar_host_url
     commands:
       - cd backend
-      # Tests + Sonar + Quality Gate
-      - mvn -B -DskipTests=false clean verify sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true
-    when:
-      branch:
-        - dev
-      event:
-        - push
-        - pull_request
+      - mvn -B clean verify sonar:sonar \
+          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.host.url=$SONAR_HOST_URL \
+          -Dsonar.qualitygate.wait=true
 
   - name: frontend-tests
     image: node:20
@@ -28,13 +24,21 @@ steps:
       - cd frontend
       - npm ci
       - npm test -- --watch=false
-    when:
-      branch:
-        - dev
-      event:
-        - push
-        - pull_request
+    depends_on:
+      - backend-tests-sonar-qg
 
+trigger:
+  event:
+    - pull_request
+  branch:
+    - dev
+
+---
+kind: pipeline
+type: docker
+name: cd-dev
+
+steps:
   - name: build-images-dev
     image: docker:26-cli
     volumes:
@@ -43,11 +47,6 @@ steps:
     commands:
       - docker build -t aerolineas-backend-dev ./backend
       - docker build -t aerolineas-frontend-dev ./frontend
-    when:
-      branch:
-        - dev
-      event:
-        - push          # solo después del merge a dev
 
   - name: deploy-dev
     image: docker:26-cli
@@ -57,24 +56,18 @@ steps:
     commands:
       - docker stop backend-dev frontend-dev || true
       - docker rm backend-dev frontend-dev || true
-
       - docker run -d --name backend-dev -p 8081:8080 aerolineas-backend-dev
       - docker run -d --name frontend-dev -p 8084:80 aerolineas-frontend-dev
-    when:
-      branch:
-        - dev
-      event:
-        - push          # deploy solo en push a dev
+    depends_on:
+      - build-images-dev
 
-# Usamos el Docker del host (NO DIND)
 volumes:
   - name: docker_sock
     host:
       path: /var/run/docker.sock
 
 trigger:
-  branch:
-    - dev
   event:
     - push
-    - pull_request
+  branch:
+    - dev
