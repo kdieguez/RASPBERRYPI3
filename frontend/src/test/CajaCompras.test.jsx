@@ -12,7 +12,7 @@ import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import CajaCompras from "../paginas/CajaCompras";
 
-// 🔹 Mock de useNavigate
+//  Mock de useNavigate
 const mockNavigate = vi.fn();
 
 vi.mock("react-router-dom", async () => {
@@ -23,10 +23,10 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-// 🔹 Mock de la API de clases
+//  Mock de la API de clases
 vi.mock("../api/adminCatalogos", () => ({
   clasesApi: {
-    list: vi.fn().mockReturnValue({
+    list: vi.fn().mockResolvedValue({
       data: [
         { idClase: "1", nombre: "Turista" },
         { idClase: "2", nombre: "Ejecutiva" },
