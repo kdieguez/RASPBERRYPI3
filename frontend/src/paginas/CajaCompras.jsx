@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { clasesApi } from "../api/adminCatalogos";
 import "../styles/cajaCompras.css";
@@ -17,8 +17,6 @@ export default function CajaCompras() {
 
   const [clases, setClases] = useState([]);
   const [idClase, setIdClase] = useState("");
-
-
 
   useEffect(() => {
     (async () => {
@@ -141,11 +139,11 @@ export default function CajaCompras() {
             <label className="label">Fecha de ida</label>
             <input
               className="input"
+              data-testid="fecha-ida"
               type="date"
               min={todayISO()}
               value={fechaIda}
               onChange={(e) => setFechaIda(e.target.value)}
-              data-testid="fecha-ida"
             />
           </div>
 
@@ -154,11 +152,11 @@ export default function CajaCompras() {
               <label className="label">Fecha de vuelta</label>
               <input
                 className="input"
+                data-testid="fecha-vuelta"
                 type="date"
                 min={fechaIda || todayISO()}
                 value={fechaVuelta}
                 onChange={(e) => setFechaVuelta(e.target.value)}
-                data-testid="fecha-vuelta"
               />
             </div>
           )}
