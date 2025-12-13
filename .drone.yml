@@ -1,26 +1,19 @@
 ---
 kind: pipeline
 type: docker
-name: prod
+name: ci-pr-prod
 
 steps:
   - name: backend-tests-and-sonar
     image: maven:3.9-eclipse-temurin-17
     environment:
       SONAR_TOKEN:
-        from_secret: sonar_token
+        from_secret: sonar_Token
       SONAR_HOST_URL:
-        from_secret: sonar_host_url
+        from_secret: sonar_host_URL
     commands:
       - cd backend
-      # Tests + Sonar + Quality Gate
-      - mvn -B -DskipTests=false clean verify sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true
-    when:
-      branch:
-        - main
-      event:
-        - push
-        - pull_request
+      - mvn -B clean verify sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true
 
   - name: frontend-tests
     image: node:20
@@ -28,13 +21,20 @@ steps:
       - cd frontend
       - npm ci
       - npm test -- --watch=false
-    when:
-      branch:
-        - main
-      event:
-        - push
-        - pull_request
+    depends_on:
+      - backend-tests-sonar-qg
+trigger:
+  event:
+    - pull_request
+  branch:
+    - main
 
+---
+kind: pipeline
+type: docker
+name: cd-dev
+
+steps:
   - name: build-images-prod
     image: docker:26-cli
     volumes:
@@ -43,11 +43,6 @@ steps:
     commands:
       - docker build -t aerolineas-backend-prod ./backend
       - docker build -t aerolineas-frontend-prod ./frontend
-    when:
-      branch:
-        - main
-      event:
-        - push          # solo después del merge a main
 
   - name: deploy-prod
     image: docker:26-cli
@@ -57,24 +52,18 @@ steps:
     commands:
       - docker stop backend-prod frontend-prod || true
       - docker rm backend-prod frontend-prod || true
-
       - docker run -d --name backend-prod -p 8083:8080 aerolineas-backend-prod
       - docker run -d --name frontend-prod -p 8086:80 aerolineas-frontend-prod
-    when:
-      branch:
-        - main
-      event:
-        - push          # deploy solo en push a main
+      depends_on:
+      - build-images-dev
 
-# Usamos el Docker del host (NO DIND)
 volumes:
   - name: docker_sock
     host:
       path: /var/run/docker.sock
 
 trigger:
-  branch:
-    - main
   event:
     - push
-    - pull_request
+  branch:
+    - main
