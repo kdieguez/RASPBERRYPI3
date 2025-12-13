@@ -19,7 +19,7 @@ public class ComprasDAO {
   public ComprasDAO() {
     this(() -> {
       try {
-        return getRealConnection();
+        return DB.getConnection();
       } catch (SQLException e) {
         throw new RuntimeException(e);
       }
@@ -33,38 +33,36 @@ public class ComprasDAO {
 private static Connection getRealConnection() throws SQLException {
     try {
         return DB.getConnection();
-    } catch (SQLException e) {
-        String base = "No se pudo obtener conexión desde DB:";
-        String msg = e.getMessage();
-        if (msg != null && !msg.isBlank()) {
-            base += " " + msg;
-        }
-        throw new SQLException(base, e);
     } catch (Exception e) {
-
         String base = "No se pudo obtener conexión desde DB:";
         String msg = e.getMessage();
-        if (msg != null && !msg.isBlank()) {
-            base += " " + msg;
-        }
-        throw new SQLException(base, e);
+        String full = (msg == null || msg.isBlank()) ? base : (base + " " + msg);
+
+        throw new SQLException(full, e);
     }
 }
 
+
   private Connection getConn() throws SQLException {
     try {
-      return DB.getConnection();
-    } catch (Exception  e) {
-      String baseMsg = "No se pudo obtener conexión desde DB:";
-        String detail = e.getMessage();
+      return connSupplier.get();
+    } catch (RuntimeException e) {
+      Throwable cause = e.getCause();
 
-        String msg = (detail == null || detail.isBlank())
-                ? baseMsg
-                : baseMsg + " " + detail;
+      if (cause instanceof SQLException se) {
+        String base = "No se pudo obtener conexión desde DB:";
+        String msg = se.getMessage();
+        if (msg != null && !msg.isBlank()) base += " " + msg;
+        throw new SQLException(base, se);
+      }
 
-        throw new SQLException(msg, e);
+      String base = "No se pudo obtener conexión desde DB:";
+      String msg = e.getMessage();
+      if (msg != null && !msg.isBlank()) base += " " + msg;
+      throw new SQLException(base, e);
     }
   }
+
 
   private static void setFieldIfExists(Object obj, String field, Object value) {
     try {
