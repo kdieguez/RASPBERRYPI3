@@ -9,14 +9,14 @@ const PORT =
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true,          
-    port: PORT,          
-    strictPort: false,   
+    host: true,
+    port: PORT,
+    strictPort: false,
   },
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setupTests.js',
     globals: true,
-    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}']
-  }
+    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+  },
 })
