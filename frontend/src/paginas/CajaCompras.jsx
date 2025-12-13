@@ -139,6 +139,7 @@ export default function CajaCompras() {
             <label className="label">Fecha de ida</label>
             <input
               className="input"
+              data-testid="fecha-ida"
               type="date"
               min={todayISO()}
               value={fechaIda}
@@ -151,6 +152,7 @@ export default function CajaCompras() {
               <label className="label">Fecha de vuelta</label>
               <input
                 className="input"
+                data-testid="fecha-vuelta"
                 type="date"
                 min={fechaIda || todayISO()}
                 value={fechaVuelta}
