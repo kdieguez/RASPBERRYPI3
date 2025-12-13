@@ -1,26 +1,19 @@
 ---
 kind: pipeline
 type: docker
-name: uat
+name: ci-pr-uat
 
 steps:
-  - name: backend-tests-and-sonar
+  - name: backend-tests-sonar-qg
     image: maven:3.9-eclipse-temurin-17
     environment:
       SONAR_TOKEN:
-        from_secret: sonar_token
+        from_secret: sonar_Token
       SONAR_HOST_URL:
-        from_secret: sonar_host_url
+        from_secret: sonar_host_URL
     commands:
       - cd backend
-      # Tests + Sonar + Quality Gate
-      - mvn -B -DskipTests=false clean verify sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true
-    when:
-      branch:
-        - uat
-      event:
-        - push
-        - pull_request
+      - mvn -B clean verify sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.qualitygate.wait=true
 
   - name: frontend-tests
     image: node:20
@@ -28,13 +21,21 @@ steps:
       - cd frontend
       - npm ci
       - npm test -- --watch=false
-    when:
-      branch:
-        - uat
-      event:
-        - push
-        - pull_request
+    depends_on:
+      - backend-tests-sonar-qg
 
+trigger:
+  event:
+    - pull_request
+  branch:
+    - uat
+
+---
+kind: pipeline
+type: docker
+name: cd-uat
+
+steps:
   - name: build-images-uat
     image: docker:26-cli
     volumes:
@@ -43,11 +44,6 @@ steps:
     commands:
       - docker build -t aerolineas-backend-uat ./backend
       - docker build -t aerolineas-frontend-uat ./frontend
-    when:
-      branch:
-        - uat
-      event:
-        - push          # solo después del merge a uat
 
   - name: deploy-uat
     image: docker:26-cli
@@ -57,24 +53,18 @@ steps:
     commands:
       - docker stop backend-uat frontend-uat || true
       - docker rm backend-uat frontend-uat || true
-
       - docker run -d --name backend-uat -p 8082:8080 aerolineas-backend-uat
       - docker run -d --name frontend-uat -p 8085:80 aerolineas-frontend-uat
-    when:
-      branch:
-        - uat
-      event:
-        - push          # deploy solo en push a uat
+    depends_on:
+      - build-images-uat
 
-# Usamos el Docker del host (NO DIND)
 volumes:
   - name: docker_sock
     host:
       path: /var/run/docker.sock
 
 trigger:
-  branch:
-    - uat
   event:
     - push
-    - pull_request
+  branch:
+    - uat
