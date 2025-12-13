@@ -1,15 +1,22 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+const PORT =
+  Number(process.env.PORT) ||
+  Number(process.env.VITE_PORT) ||
+  5173
 
 export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: true,
+    port: PORT,
+    strictPort: false,
+  },
   test: {
+    environment: 'jsdom',
+    setupFiles: './src/test/setupTests.js',
     globals: true,
-    environment: 'happy-dom',
-    setupFiles: ['./src/test/setupTests.js'],
-    include: ['src/test/**/*.test.{js,jsx,ts,tsx}'],
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'lcov'],
-      reportsDirectory: './coverage',
-    },
+    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
   },
 })
