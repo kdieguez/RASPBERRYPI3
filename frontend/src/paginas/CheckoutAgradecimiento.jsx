@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import "../styles/checkout.css";
+ "../styles/checkout.css";
 import { comprasApi } from "../api/compras";
 
 export default function CheckoutAgradecimiento() {
