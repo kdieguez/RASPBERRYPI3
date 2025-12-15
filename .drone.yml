@@ -24,8 +24,22 @@ steps:
       - npm test -- --watch=false
     depends_on:
       - backend-tests-sonar-qg
+      
+trigger:
+  event:
+    - pull_request
+  branch:
+    - dev
 
-  - name: notify-lead-ci-failure
+---
+kind: pipeline
+type: docker
+name: notify-ci-pr-dev-failure
+depends_on:
+  - ci-pr-dev
+
+steps:
+  - name: email
     image: plugins/email
     settings:
       host:
@@ -42,7 +56,7 @@ steps:
         - dnatareno@unis.edu.gt
         - msblanco@unis.edu.gt
         - kdieguez@unis.edu.gt
-        
+     
       subject: "[DRONE] Falló CI: ${DRONE_REPO} (${DRONE_BRANCH})"
       body: |
         Falló el pipeline: ${DRONE_STAGE_NAME}
@@ -53,19 +67,16 @@ steps:
         Autor: ${DRONE_COMMIT_AUTHOR}
         Mensaje: ${DRONE_COMMIT_MESSAGE}
 
-        Link del build (ver el step en rojo):
+        Link del build:
         ${DRONE_BUILD_LINK}
-    when:
-      status:
-        - failure
-      event:
-        - pull_request
 
 trigger:
   event:
     - pull_request
   branch:
     - dev
+  status:
+    - failure
 
 ---
 kind: pipeline
@@ -94,8 +105,27 @@ steps:
       - docker run -d --name frontend-dev -p 8084:80 aerolineas-frontend-dev
     depends_on:
       - build-images-dev
+     
+volumes:
+  - name: docker_sock
+    host:
+      path: /var/run/docker.sock
 
-  - name: notify-lead-cd-failure
+trigger:
+  event:
+    - push
+  branch:
+    - dev
+
+---
+kind: pipeline
+type: docker
+name: notify-cd-dev-failure
+depends_on:
+  - cd-dev
+
+steps:
+  - name: email
     image: plugins/email
     settings:
       host:
@@ -112,6 +142,7 @@ steps:
         - dnatareno@unis.edu.gt
         - msblanco@unis.edu.gt
         - kdieguez@unis.edu.gt
+      
       subject: "[DRONE] Falló CD/Deploy: ${DRONE_REPO} (${DRONE_BRANCH})"
       body: |
         Falló el pipeline: ${DRONE_STAGE_NAME}
@@ -122,18 +153,11 @@ steps:
 
         Link del build:
         ${DRONE_BUILD_LINK}
-    when:
-      status:
-        - failure
-      event:
-        - push
-volumes:
-  - name: docker_sock
-    host:
-      path: /var/run/docker.sock
 
 trigger:
   event:
     - push
   branch:
     - dev
+  status:
+    - failure
