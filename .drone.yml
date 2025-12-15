@@ -89,7 +89,7 @@ steps:
     commands:
       - docker stop backend-dev frontend-dev || true
       - docker rm backend-dev frontend-dev || true
-      - docker run -d --name backend-dev -p 8081:8080 aerolineas-backend-dev
+      - docker run -d --name backend-dev --network ci-network -p 8081:8080 aerolineas-backend-dev
       - docker run -d --name frontend-dev -p 8084:80 aerolineas-frontend-dev
     depends_on:
       - build-images-dev
