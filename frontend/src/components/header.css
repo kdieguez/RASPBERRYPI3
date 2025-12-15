@@ -45,7 +45,7 @@
 
 .hdr__cta{
   background: linear-gradient(90deg, var(--color-primary));
-  color: blue;
+  color: red;
   font-weight: 600;
   padding: 10px 16px;
   border-radius: var(--radius);
