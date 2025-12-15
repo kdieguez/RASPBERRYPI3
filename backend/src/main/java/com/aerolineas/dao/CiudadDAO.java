@@ -1,6 +1,6 @@
 package com.aerolineas.dao;
 
-import com.aerolineas.config.DB;
+
 import com.aerolineas.dto.CiudadDTOs;
 
 import java.sql.*;
