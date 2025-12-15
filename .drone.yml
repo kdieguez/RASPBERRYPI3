@@ -20,15 +20,63 @@ steps:
     commands:
       - cd frontend
       - npm ci
+      - npm run build
       - npm test -- --watch=false
     depends_on:
       - backend-tests-sonar-qg
+  
+trigger:
+  event:
+    - pull_request
+  branch:
+    - uat
+
+---
+kind: pipeline
+type: docker
+name: notify-ci-pr-uat-failure
+depends_on:
+  - ci-pr-uat
+
+steps:
+  - name: email
+    image: plugins/email
+    settings:
+      host:
+        from_secret: smtp_host
+      port:
+        from_secret: smtp_port
+      username:
+        from_secret: smtp_user
+      password:
+        from_secret: smtp_pass
+      from:
+        from_secret: mail_from
+      recipients:
+        - dnatareno@unis.edu.gt
+        - msblanco@unis.edu.gt
+        - kdieguez@unis.edu.gt
+     
+      subject: "[DRONE] Falló CI: ${DRONE_REPO} (${DRONE_BRANCH})"
+      body: |
+        Falló el pipeline: ${DRONE_STAGE_NAME}
+        Repo: ${DRONE_REPO}
+        Branch: ${DRONE_BRANCH}
+        Evento: ${DRONE_BUILD_EVENT}
+        Commit: ${DRONE_COMMIT_SHA}
+        Autor: ${DRONE_COMMIT_AUTHOR}
+        Mensaje: ${DRONE_COMMIT_MESSAGE}
+
+        Link del build:
+        ${DRONE_BUILD_LINK}
 
 trigger:
   event:
     - pull_request
   branch:
     - uat
+  status:
+    - failure
 
 ---
 kind: pipeline
@@ -53,7 +101,7 @@ steps:
     commands:
       - docker stop backend-uat frontend-uat || true
       - docker rm backend-uat frontend-uat || true
-      - docker run -d --name backend-uat -p 8082:8080 aerolineas-backend-uat
+      - docker run -d --name backend-uat --network ci-network -p 8082:8080 aerolineas-backend-uat
       - docker run -d --name frontend-uat -p 8085:80 aerolineas-frontend-uat
     depends_on:
       - build-images-uat
@@ -68,3 +116,48 @@ trigger:
     - push
   branch:
     - uat
+
+---
+kind: pipeline
+type: docker
+name: notify-cd-uat-failure
+depends_on:
+  - cd-uat
+
+steps:
+  - name: email
+    image: plugins/email
+    settings:
+      host:
+        from_secret: smtp_host
+      port:
+        from_secret: smtp_port
+      username:
+        from_secret: smtp_user
+      password:
+        from_secret: smtp_pass
+      from:
+        from_secret: mail_from
+      recipients:
+        - dnatareno@unis.edu.gt
+        - msblanco@unis.edu.gt
+        - kdieguez@unis.edu.gt
+      
+      subject: "[DRONE] Falló CD/Deploy: ${DRONE_REPO} (${DRONE_BRANCH})"
+      body: |
+        Falló el pipeline: ${DRONE_STAGE_NAME}
+        Repo: ${DRONE_REPO}
+        Branch: ${DRONE_BRANCH}
+        Evento: ${DRONE_BUILD_EVENT}
+        Commit: ${DRONE_COMMIT_SHA}
+
+        Link del build:
+        ${DRONE_BUILD_LINK}
+
+trigger:
+  event:
+    - push
+  branch:
+    - uat
+  status:
+    - failure
