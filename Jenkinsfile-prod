@@ -1,10 +1,16 @@
 pipeline {
   agent any
+
   environment {
     SONARQUBE_SERVER   = 'sonar'
     ENV_NAME           = 'prod'
-    SONAR_BACKEND_KEY  = 'backend-prod'
-    SONAR_FRONTEND_KEY = 'frontend-prod'
+
+    // Mismos projectKey que usas en Drone
+    SONAR_BACKEND_KEY  = 'aerolineas-backend-prod'
+    SONAR_FRONTEND_KEY = 'aerolineas-frontend-prod'   // si NO lo usas, puedes borrar el stage
+
+    // Correos (igual que Drone)
+    MAIL_TO = 'dnatareno@unis.edu.gt, jjalvarez@unis.edu.gt, msblanco@unis.edu.gt, kdieguez@unis.edu.gt'
   }
 
   stages {
@@ -13,28 +19,22 @@ pipeline {
       steps { checkout scm }
     }
 
-    stage('Build backend (Maven + tests)') {
-      steps {
-        script {
-          docker.image('maven:3.9-eclipse-temurin-17').inside('--network ci-network') {
-            sh """
-              cd backend
-              mvn clean verify -DskipTests=false
-            """
-          }
-        }
-      }
-    }
-
-    stage('SonarQube backend') {
+    // =========================
+    // CI: solo para PR hacia main
+    // =========================
+    stage('CI (PR -> main) - Backend tests + Sonar') {
+      when { changeRequest target: 'main' }
       steps {
         script {
           docker.image('maven:3.9-eclipse-temurin-17').inside('--network ci-network') {
             withSonarQubeEnv("${SONARQUBE_SERVER}") {
               sh """
-                cd backend && mvn sonar:sonar \
+                cd backend
+                mvn -B clean verify sonar:sonar \
                   -Dsonar.projectKey=${SONAR_BACKEND_KEY} \
-                  -Dsonar.host.url=$SONAR_HOST_URL
+                  -Dsonar.host.url=$SONAR_HOST_URL \
+                  -Dsonar.login=$SONAR_AUTH_TOKEN \
+                  -Dsonar.qualitygate.wait=true
               """
             }
           }
@@ -42,31 +42,36 @@ pipeline {
       }
     }
 
-    stage('Build frontend (Node + tests)') {
+    stage('CI (PR -> main) - Frontend tests') {
+      when { changeRequest target: 'main' }
       steps {
         script {
           docker.image('node:20').inside('--network ci-network') {
             sh """
               cd frontend
-              npm install
-              npm run test || echo "sin tests definidos para FE"
+              npm ci
               npm run build
+              npm test -- --watch=false
             """
           }
         }
       }
     }
 
-    stage('SonarQube frontend') {
+    // (Opcional) Si quieres igualar tu Jenkins actual que también corre Sonar FE
+    stage('CI (PR -> main) - Sonar Frontend (opcional)') {
+      when { changeRequest target: 'main' }
       steps {
         script {
           docker.image('sonarsource/sonar-scanner-cli:5.0.1').inside('--network ci-network') {
             withSonarQubeEnv("${SONARQUBE_SERVER}") {
               sh """
-                cd frontend && sonar-scanner \
+                cd frontend
+                sonar-scanner \
                   -Dsonar.projectKey=${SONAR_FRONTEND_KEY} \
                   -Dsonar.sources=src \
-                  -Dsonar.host.url=$SONAR_HOST_URL
+                  -Dsonar.host.url=$SONAR_HOST_URL \
+                  -Dsonar.login=$SONAR_AUTH_TOKEN
               """
             }
           }
@@ -74,54 +79,84 @@ pipeline {
       }
     }
 
-    stage('Build Docker images') {
+    // =========================
+    // CD: solo para push/merge a main (NO PR)
+    // =========================
+    stage('CD (push -> main) - Build Docker images') {
+      when {
+        allOf {
+          branch 'main'
+          expression { return env.CHANGE_ID == null } // asegura que no sea PR
+        }
+      }
       steps {
         sh """
-          docker build -t aerolineas-backend-${ENV_NAME} backend
-          docker build -t aerolineas-frontend-${ENV_NAME} frontend
+          docker build -t aerolineas-backend-${ENV_NAME} ./backend
+          docker build -t aerolineas-frontend-${ENV_NAME} ./frontend
         """
       }
     }
 
-    stage('Stop & Remove old containers') {
+    stage('CD (push -> main) - Stop/Remove old containers') {
+      when {
+        allOf {
+          branch 'main'
+          expression { return env.CHANGE_ID == null }
+        }
+      }
       steps {
         sh """
-          docker stop backend-prod || true
-          docker rm backend-prod || true
-          
-          docker stop frontend-prod || true
-          docker rm frontend-prod || true
+          docker stop backend-prod frontend-prod || true
+          docker rm backend-prod frontend-prod || true
         """
       }
     }
 
-    stage('Deploy ambiente prod') {
+    stage('CD (push -> main) - Deploy PROD') {
+      when {
+        allOf {
+          branch 'main'
+          expression { return env.CHANGE_ID == null }
+        }
+      }
       steps {
         sh """
           docker start oracle-xe || true
+
           docker run -d --name backend-prod --network ci-network -p 8083:8080 aerolineas-backend-prod
           docker run -d --name frontend-prod --network ci-network -p 8086:80 aerolineas-frontend-prod
         """
       }
     }
-
-  } // stages
+  }
 
   post {
     failure {
-      emailext(
-        subject: "Falló pipeline PROD",
-        body: """
-Hola equipo,
+      script {
+        def isPR = (env.CHANGE_ID != null && env.CHANGE_ID.trim() != '')
+        def tipo = isPR ? "CI (Pull Request a main)" : "CD/Deploy (push a main)"
 
-El pipeline PROD ha fallado.
-Por favor revisar los logs en Jenkins.
+        // Info útil tipo Drone
+        def extra = isPR
+          ? "PR: #${env.CHANGE_ID}\nTarget: ${env.CHANGE_TARGET}\nSource: ${env.BRANCH_NAME}"
+          : "Branch: ${env.BRANCH_NAME}"
 
-Saludos,
-DevTeam
-""",
-        to: "msblanco@unis.edu.gt, jjalvarez@unis.edu.gt"
-      )
+        emailext(
+          subject: "[JENKINS] Falló ${tipo}: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+          to: "${MAIL_TO}",
+          body: """Falló el pipeline: ${tipo}
+
+${extra}
+
+Job: ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+URL: ${env.BUILD_URL}
+
+Commit: ${env.GIT_COMMIT ?: 'N/A'}
+"""
+        )
+      }
     }
   }
 }
+
