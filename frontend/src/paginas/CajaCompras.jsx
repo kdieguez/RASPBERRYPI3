@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { clasesApi } from "../api/adminCatalogos";
-import "../styles/cajaCompras.css";
+import "../styles/cajaCompras.css"
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
