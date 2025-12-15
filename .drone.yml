@@ -20,6 +20,7 @@ steps:
     commands:
       - cd frontend
       - npm ci
+      - npm run build
       - npm test -- --watch=false
     depends_on:
       - backend-tests-and-sonar
@@ -33,7 +34,55 @@ trigger:
 ---
 kind: pipeline
 type: docker
-name: cd-dev
+name: notify-ci-pr-prod-failure
+depends_on:
+  - ci-pr-prod
+
+steps:
+  - name: email
+    image: plugins/email
+    settings:
+      host:
+        from_secret: smtp_host
+      port:
+        from_secret: smtp_port
+      username:
+        from_secret: smtp_user
+      password:
+        from_secret: smtp_pass
+      from:
+        from_secret: mail_from
+      recipients:
+        - dnatareno@unis.edu.gt
+        - msblanco@unis.edu.gt
+        - kdieguez@unis.edu.gt
+     
+      subject: "[DRONE] Falló CI: ${DRONE_REPO} (${DRONE_BRANCH})"
+      body: |
+        Falló el pipeline: ${DRONE_STAGE_NAME}
+        Repo: ${DRONE_REPO}
+        Branch: ${DRONE_BRANCH}
+        Evento: ${DRONE_BUILD_EVENT}
+        Commit: ${DRONE_COMMIT_SHA}
+        Autor: ${DRONE_COMMIT_AUTHOR}
+        Mensaje: ${DRONE_COMMIT_MESSAGE}
+
+        Link del build:
+        ${DRONE_BUILD_LINK}
+
+trigger:
+  event:
+    - pull_request
+  branch:
+    - prod
+  status:
+    - failure
+
+
+---
+kind: pipeline
+type: docker
+name: cd-prod
 
 steps:
   - name: build-images-prod
@@ -68,3 +117,48 @@ trigger:
     - push
   branch:
     - main
+
+---
+kind: pipeline
+type: docker
+name: notify-cd-prod-failure
+depends_on:
+  - cd-prod
+
+steps:
+  - name: email
+    image: plugins/email
+    settings:
+      host:
+        from_secret: smtp_host
+      port:
+        from_secret: smtp_port
+      username:
+        from_secret: smtp_user
+      password:
+        from_secret: smtp_pass
+      from:
+        from_secret: mail_from
+      recipients:
+        - dnatareno@unis.edu.gt
+        - msblanco@unis.edu.gt
+        - kdieguez@unis.edu.gt
+      
+      subject: "[DRONE] Falló CD/Deploy: ${DRONE_REPO} (${DRONE_BRANCH})"
+      body: |
+        Falló el pipeline: ${DRONE_STAGE_NAME}
+        Repo: ${DRONE_REPO}
+        Branch: ${DRONE_BRANCH}
+        Evento: ${DRONE_BUILD_EVENT}
+        Commit: ${DRONE_COMMIT_SHA}
+
+        Link del build:
+        ${DRONE_BUILD_LINK}
+
+trigger:
+  event:
+    - push
+  branch:
+    - dev
+  status:
+    - failure
