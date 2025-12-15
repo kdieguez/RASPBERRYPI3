@@ -54,6 +54,7 @@ steps:
         from_secret: mail_from
       recipients:
         - dnatareno@unis.edu.gt
+        - jjalvarez@unis.edu.gt
         - msblanco@unis.edu.gt
         - kdieguez@unis.edu.gt
      
