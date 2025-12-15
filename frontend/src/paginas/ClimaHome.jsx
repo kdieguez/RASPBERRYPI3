@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { climaApi } from "../api/clima";
+mport { climaApi } from "../api/clima";
 
 const API_KEY = import.meta.env.VITE_WEATHER_API_KEY;
 
