@@ -24,6 +24,42 @@ steps:
     depends_on:
       - backend-tests-sonar-qg
 
+  - name: notify-lead-ci-failure
+    image: plugins/email
+    settings:
+      host:
+        from_secret: smtp_host
+      port:
+        from_secret: smtp_port
+      username:
+        from_secret: smtp_user
+      password:
+        from_secret: smtp_pass
+      from:
+        from_secret: mail_from
+      recipients:
+        - dnatareno@unis.edu.gt
+        - msblanco@unis.edu.gt
+        - kdieguez@unis.edu.gt
+        
+      subject: "[DRONE] Falló CI: ${DRONE_REPO} (${DRONE_BRANCH})"
+      body: |
+        Falló el pipeline: ${DRONE_STAGE_NAME}
+        Repo: ${DRONE_REPO}
+        Branch: ${DRONE_BRANCH}
+        Evento: ${DRONE_BUILD_EVENT}
+        Commit: ${DRONE_COMMIT_SHA}
+        Autor: ${DRONE_COMMIT_AUTHOR}
+        Mensaje: ${DRONE_COMMIT_MESSAGE}
+
+        Link del build (ver el step en rojo):
+        ${DRONE_BUILD_LINK}
+    when:
+      status:
+        - failure
+      event:
+        - pull_request
+
 trigger:
   event:
     - pull_request
@@ -58,6 +94,38 @@ steps:
     depends_on:
       - build-images-dev
 
+  - name: notify-lead-cd-failure
+    image: plugins/email
+    settings:
+      host:
+        from_secret: smtp_host
+      port:
+        from_secret: smtp_port
+      username:
+        from_secret: smtp_user
+      password:
+        from_secret: smtp_pass
+      from:
+        from_secret: mail_from
+      recipients:
+        - dnatareno@unis.edu.gt
+        - msblanco@unis.edu.gt
+        - kdieguez@unis.edu.gt
+      subject: "[DRONE] Falló CD/Deploy: ${DRONE_REPO} (${DRONE_BRANCH})"
+      body: |
+        Falló el pipeline: ${DRONE_STAGE_NAME}
+        Repo: ${DRONE_REPO}
+        Branch: ${DRONE_BRANCH}
+        Evento: ${DRONE_BUILD_EVENT}
+        Commit: ${DRONE_COMMIT_SHA}
+
+        Link del build:
+        ${DRONE_BUILD_LINK}
+    when:
+      status:
+        - failure
+      event:
+        - push
 volumes:
   - name: docker_sock
     host:
