@@ -14,7 +14,7 @@ class ComentarioDTOTest {
     ComentarioDTO.Create create = new ComentarioDTO.Create("Un comentario", 10L);
 
     assertEquals("Un comentario", create.comentario());
-    assertEquals(10L, create.idPadre());
+    assertEquals(17L, create.idPadre());
   }
 
   @Test
