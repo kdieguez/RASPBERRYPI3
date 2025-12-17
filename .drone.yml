@@ -42,16 +42,20 @@ steps:
         STARTED=$(echo "$BUILD_JSON" | jq -r '.started')
         FINISHED=$(echo "$BUILD_JSON" | jq -r '.finished')
 
-        if [ "$FINISHED" = "0" ] || [ -z "$FINISHED" ]; then
+        if [ -z "$FINISHED" ] || [ "$FINISHED" = "null" ] || [ "$FINISHED" = "0" ]; then
           FINISHED=$(date +%s)
+        fi
+
+        if [ -z "$STARTED" ] || [ "$STARTED" = "null" ] || [ "$STARTED" = "0" ]; then
+          STARTED=$(date +%s)
         fi
 
         DURATION=$((FINISHED - STARTED))
         echo "Pipeline duration (s): $DURATION"
 
-        cat <<EOF | curl -s --data-binary @- http://pushgateway:9091/metrics/job/drone_pipeline_duration/repo/$DRONE_REPO/branch/$DRONE_BRANCH
-        drone_pipeline_duration_seconds{repo="$DRONE_REPO",branch="$DRONE_BRANCH",pipeline="$DRONE_PIPELINE_NAME"} $DURATION
-        EOF
+        cat <<EOF | curl -s --data-binary @- http://pushgateway:9091/metrics/job/drone_pipeline_duration/repo/$DRONE_REPO/branch/$DRONE_BRANCH || true
+drone_pipeline_duration_seconds{repo="$DRONE_REPO",branch="$DRONE_BRANCH",pipeline="$DRONE_PIPELINE_NAME"} $DURATION
+EOF
 
 trigger:
   event:
