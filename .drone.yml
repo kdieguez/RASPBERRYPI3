@@ -32,6 +32,8 @@ steps:
         from_secret: DRONE_SERVER
       DRONE_API_TOKEN:
         from_secret: DRONE_API_TOKEN
+      # Pushgateway está expuesto en el HOST como 9092 -> contenedor pushgateway:9091
+      PUSHGATEWAY_URL: http://172.17.0.1:9092
     commands:
       - apk add --no-cache curl jq
       - |
@@ -42,23 +44,28 @@ steps:
         STARTED=$(echo "$BUILD_JSON" | jq -r '.started')
         FINISHED=$(echo "$BUILD_JSON" | jq -r '.finished')
 
-        if [ "$FINISHED" = "0" ] || [ -z "$FINISHED" ]; then
+        if [ -z "$STARTED" ] || [ "$STARTED" = "null" ] || [ "$STARTED" = "0" ]; then
+          STARTED=$(date +%s)
+        fi
+
+        if [ -z "$FINISHED" ] || [ "$FINISHED" = "null" ] || [ "$FINISHED" = "0" ]; then
           FINISHED=$(date +%s)
         fi
 
         DURATION=$((FINISHED - STARTED))
         echo "Pipeline duration (s): $DURATION"
 
-        cat <<EOF | curl -s --data-binary @- http://pushgateway:9091/metrics/job/drone_pipeline_duration/repo/$DRONE_REPO/branch/$DRONE_BRANCH
+        cat <<EOF | curl -s --data-binary @- "$PUSHGATEWAY_URL/metrics/job/drone_pipeline_duration/repo/$DRONE_REPO/branch/$DRONE_BRANCH" || true
         drone_pipeline_duration_seconds{repo="$DRONE_REPO",branch="$DRONE_BRANCH",pipeline="$DRONE_PIPELINE_NAME"} $DURATION
         EOF
+    depends_on:
+      - frontend-tests
 
 trigger:
   event:
     - pull_request
   branch:
     - main
-
 
 ---
 kind: pipeline
@@ -108,7 +115,6 @@ trigger:
   status:
     - failure
 
-
 ---
 kind: pipeline
 type: docker
@@ -147,7 +153,6 @@ trigger:
     - push
   branch:
     - main
-
 
 ---
 kind: pipeline
