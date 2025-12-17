@@ -42,9 +42,13 @@ steps:
         STARTED=$(echo "$BUILD_JSON" | jq -r '.started')
         FINISHED=$(echo "$BUILD_JSON" | jq -r '.finished')
 
-        if [ "$FINISHED" = "0" ] || [ -z "$FINISHED" ]; then
-          FINISHED=$(date +%s)
+        if [ "$FINISHED" = "0" ] || [ -z "$FINISHED" ] || [ "$FINISHED" = "null" ]; then
+            FINISHED=$(date +%s)
         fi
+        
+        if [ -z "$STARTED" ] || [ "$STARTED" = "null" ] || [ "$STARTED" = "0" ]; then
+            STARTED=$(date +%s)
+          fi
 
         DURATION=$((FINISHED - STARTED))
         echo "Pipeline duration (s): $DURATION"
