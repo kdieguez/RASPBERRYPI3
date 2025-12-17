@@ -28,32 +28,38 @@ steps:
   - name: publish-pipeline-duration
     image: alpine:3.20
     environment:
-      # Pushgateway expuesto en el HOST como 9092 -> contenedor:9091
-      PUSHGATEWAY_URL: http://172.17.0.1:9092
+      DRONE_SERVER:
+        from_secret: DRONE_SERVER
+      DRONE_API_TOKEN:
+        from_secret: DRONE_API_TOKEN
+      PUSHGATEWAY_URL:
+        from_secret: PUSHGATEWAY_URL
     commands:
-      - apk add --no-cache curl
+      - apk add --no-cache curl jq
       - |
-        STARTED="${DRONE_BUILD_STARTED:-0}"
-        FINISHED="${DRONE_BUILD_FINISHED:-0}"
+        set -e
 
-        if [ -z "$STARTED" ] || [ "$STARTED" = "0" ]; then
-          STARTED=$(date +%s)
-        fi
+        BUILD_JSON="$(curl -fsS \
+          -H "Authorization: Bearer ${DRONE_API_TOKEN}" \
+          "${DRONE_SERVER}/api/repos/${DRONE_REPO}/builds/${DRONE_BUILD_NUMBER}")"
 
-        if [ -z "$FINISHED" ] || [ "$FINISHED" = "0" ]; then
-          FINISHED=$(date +%s)
-        fi
+        STARTED="$(echo "$BUILD_JSON" | jq -r '.started // 0')"
+        FINISHED="$(echo "$BUILD_JSON" | jq -r '.finished // 0')"
+
+        NOW="$(date +%s)"
+        if [ "$STARTED" = "0" ] || [ -z "$STARTED" ]; then STARTED="$NOW"; fi
+        if [ "$FINISHED" = "0" ] || [ -z "$FINISHED" ]; then FINISHED="$NOW"; fi
 
         DURATION=$((FINISHED - STARTED))
         echo "Pipeline duration (s): $DURATION"
 
-        printf 'drone_pipeline_duration_seconds{repo="%s",branch="%s",pipeline="%s"} %s\n' \
-          "$DRONE_REPO" "$DRONE_BRANCH" "$DRONE_PIPELINE_NAME" "$DURATION" \
-          | curl -s --data-binary @- \
-          "$PUSHGATEWAY_URL/metrics/job/drone_pipeline_duration/repo/$DRONE_REPO/branch/$DRONE_BRANCH" \
-          || true
-    depends_on:
-      - frontend-tests
+        cat <<EOF | curl -fsS --data-binary @- "${PUSHGATEWAY_URL}/metrics/job/drone_pipeline_duration/repo/${DRONE_REPO}/branch/${DRONE_BRANCH}"
+drone_pipeline_duration_seconds{repo="${DRONE_REPO}",branch="${DRONE_BRANCH}",pipeline="${DRONE_PIPELINE_NAME}"} ${DURATION}
+EOF
+    when:
+      status:
+        - success
+        - failure
 
 trigger:
   event:
@@ -109,7 +115,6 @@ trigger:
   status:
     - failure
 
-
 ---
 kind: pipeline
 type: docker
@@ -148,7 +153,6 @@ trigger:
     - push
   branch:
     - main
-
 
 ---
 kind: pipeline
