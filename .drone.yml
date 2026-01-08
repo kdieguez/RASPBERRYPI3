@@ -4,7 +4,7 @@ type: docker
 name: ci-pr-prod
 
 steps:
-  - name: backend-tests-and-sonar
+  - name: backend-tests-sonar-qg
     image: maven:3.9-eclipse-temurin-17
     environment:
       SONAR_TOKEN:
@@ -23,37 +23,31 @@ steps:
       - npm run build
       - npm test -- --watch=false
     depends_on:
-      - backend-tests-and-sonar
+      - backend-tests-sonar-qg
 
   - name: publish-pipeline-duration
     image: alpine:3.20
-    environment:
-      # Pushgateway expuesto en el HOST como 9092 -> contenedor:9091
-      PUSHGATEWAY_URL: http://172.17.0.1:9092
     commands:
       - apk add --no-cache curl
       - |
-        STARTED="${DRONE_BUILD_STARTED:-0}"
-        FINISHED="${DRONE_BUILD_FINISHED:-0}"
+        set -e
 
-        if [ -z "$STARTED" ] || [ "$STARTED" = "0" ]; then
-          STARTED=$(date +%s)
-        fi
+        START_TS=$(date +%s)
 
-        if [ -z "$FINISHED" ] || [ "$FINISHED" = "0" ]; then
-          FINISHED=$(date +%s)
-        fi
+        while true; do
+          NOW=$(date +%s)
+          DURATION=$((NOW - START_TS))
 
-        DURATION=$((FINISHED - STARTED))
-        echo "Pipeline duration (s): $DURATION"
+          printf 'drone_pipeline_running_seconds{repo="%s",branch="%s",pipeline="%s"} %s\n' \
+            "$DRONE_REPO" "$DRONE_BRANCH" "$DRONE_PIPELINE_NAME" "$DURATION" \
+          | curl -fsS --data-binary @- \
+            http://pushgateway:9091/metrics/job/drone_pipeline_runtime/repo/$DRONE_REPO/branch/$DRONE_BRANCH
 
-        printf 'drone_pipeline_duration_seconds{repo="%s",branch="%s",pipeline="%s"} %s\n' \
-          "$DRONE_REPO" "$DRONE_BRANCH" "$DRONE_PIPELINE_NAME" "$DURATION" \
-          | curl -s --data-binary @- \
-          "$PUSHGATEWAY_URL/metrics/job/drone_pipeline_duration/repo/$DRONE_REPO/branch/$DRONE_BRANCH" \
-          || true
+          sleep 15
+        done
     depends_on:
       - frontend-tests
+    detach: true
 
 trigger:
   event:
@@ -109,7 +103,6 @@ trigger:
   status:
     - failure
 
-
 ---
 kind: pipeline
 type: docker
@@ -148,7 +141,6 @@ trigger:
     - push
   branch:
     - main
-
 
 ---
 kind: pipeline
