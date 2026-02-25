@@ -1,6 +1,6 @@
 package com.aerolineas;
 
-import com.aerolineas.config.DB;
+
 import com.aerolineas.controller.*;
 import com.aerolineas.http.JsonErrorHandler;
 import com.aerolineas.middleware.Auth;
